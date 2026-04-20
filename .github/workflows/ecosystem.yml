@@ -1,0 +1,39 @@
+name: ecosystem
+
+on:
+  pull_request:
+
+jobs:
+  ecosystem:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build `basedpython`
+        run: cargo build --release
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Run ecosystem tests
+        run: |
+          ROUND_TRIP_FLAG=""
+          if [ "${{ github.event.inputs.round_trip }}" = "true" ]; then
+            ROUND_TRIP_FLAG="--round-trip"
+          fi
+
+          PROJECT_FLAG=""
+          if [ -n "${{ github.event.inputs.project }}" ]; then
+            PROJECT_FLAG="--project ${{ github.event.inputs.project }}"
+          fi
+
+          python scripts/ecosystem_test.py \
+            --by ./target/release/by \
+            $ROUND_TRIP_FLAG \
+            $PROJECT_FLAG

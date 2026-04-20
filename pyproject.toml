@@ -1,0 +1,24 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "basedpython"
+description = "a transpiler for both Python and the Python-like language basedpython"
+readme = "README.md"
+license = { file = "LICENSE" }
+version = "0.0.0"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Compilers",
+]
+
+[dependency-groups]
+docs = ["zensical"]
+
+[tool.maturin]
+bindings = "bin"

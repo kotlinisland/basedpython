@@ -1,0 +1,39 @@
+# Pinned open-source Python projects used for ecosystem testing.
+#
+# Each entry is cloned at `ref` (branch, tag, or full SHA).  Use a full SHA for
+# reproducibility; a branch name is acceptable while the project list is being
+# assembled but will produce non-deterministic results as upstream moves.
+#
+# To update all entries to their current HEAD SHA, run:
+#   python scripts/update_ecosystem_refs.py
+#
+# Fields:
+#   name   — short identifier used in output / temporary directory names
+#   url    — HTTPS clone URL
+#   ref    — branch, tag, or commit SHA to check out
+#   paths  — (optional) sub-paths to test instead of the whole repo
+
+[[projects]]
+name = "requests"
+url = "https://github.com/psf/requests"
+ref = "main"
+
+[[projects]]
+name = "flask"
+url = "https://github.com/pallets/flask"
+ref = "main"
+
+[[projects]]
+name = "click"
+url = "https://github.com/pallets/click"
+ref = "main"
+
+[[projects]]
+name = "rich"
+url = "https://github.com/Textualize/rich"
+ref = "master"
+
+[[projects]]
+name = "httpx"
+url = "https://github.com/encode/httpx"
+ref = "master"

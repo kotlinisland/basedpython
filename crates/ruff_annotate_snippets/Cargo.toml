@@ -1,0 +1,29 @@
+[package]
+name = "ruff_annotate_snippets"
+version = "0.1.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+anstyle = { workspace = true }
+memchr = { workspace = true }
+unicode-width = { workspace = true }
+
+[dev-dependencies]
+anstream = { workspace = true }
+
+[features]
+default = []
+testing-colors = []
+
+[lints]
+workspace = true
+
+[lib]
+test = false

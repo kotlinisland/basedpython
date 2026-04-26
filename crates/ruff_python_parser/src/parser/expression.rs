@@ -270,6 +270,40 @@ impl<'src> Parser<'src> {
                 break;
             }
 
+            // callable type: `(int) -> int`, `(int, str) -> bool`, `() -> None`
+            // `->` binds tighter than `|` so `(a) -> int | None` → `Callable[[a], int] | None`
+            let is_callable_lhs = left.is_parenthesized
+                || matches!(&left.expr, Expr::Tuple(t) if t.parenthesized);
+            if is_callable_lhs && current_token == TokenKind::Rarrow {
+                // stop before consuming `->` if the caller expects higher-precedence operators only
+                if OperatorPrecedence::BitOr < left_precedence {
+                    break;
+                }
+                self.bump(TokenKind::Rarrow);
+                // parse return type stopping before `|` so the union wraps the whole callable
+                let returns =
+                    self.parse_binary_expression_or_higher(OperatorPrecedence::BitOr, context);
+                let is_par = left.is_parenthesized;
+                let lhs_expr = left.expr;
+                let args = if is_par {
+                    vec![lhs_expr]
+                } else if let Expr::Tuple(t) = lhs_expr {
+                    t.elts
+                } else {
+                    vec![]
+                };
+                left = ParsedExpr {
+                    expr: Expr::CallableType(ast::ExprCallableType {
+                        args,
+                        returns: Box::new(returns.expr),
+                        range: self.node_range(start),
+                        node_index: AtomicNodeIndex::NONE,
+                    }),
+                    is_parenthesized: false,
+                };
+                continue;
+            }
+
             let Some(operator) = BinaryLikeOperator::try_from_tokens(current_token, self.peek())
             else {
                 // Not an operator.
@@ -2789,12 +2823,28 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lambda);
 
-        let parameters = if self.at(TokenKind::Colon) {
+        // basedpython typed lambda: `lambda (a: int, b: str) -> int: body`
+        // standard lambda: `lambda a, b: body` or `lambda: body`
+        let (parameters, returns) = if self.at(TokenKind::Lpar) {
+            let params = self.parse_parameters(FunctionKind::FunctionDef);
+            let returns = if self.eat(TokenKind::Rarrow) {
+                Some(Box::new(
+                    self.parse_expression_list(ExpressionContext::default())
+                        .expr,
+                ))
+            } else {
+                None
+            };
+            (Some(Box::new(params)), returns)
+        } else if self.at(TokenKind::Colon) {
             // test_ok lambda_with_no_parameters
             // lambda: 1
-            None
+            (None, None)
         } else {
-            Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
+            (
+                Some(Box::new(self.parse_parameters(FunctionKind::Lambda))),
+                None,
+            )
         };
 
         self.expect(TokenKind::Colon);
@@ -2821,6 +2871,7 @@ impl<'src> Parser<'src> {
         ast::ExprLambda {
             body: Box::new(body.expr),
             parameters,
+            returns,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

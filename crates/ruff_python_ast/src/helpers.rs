@@ -125,6 +125,7 @@ impl SideEffect {
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
             | Expr::IpyEscapeCommand(_) => Self::Present,
+            Expr::CallableType(_) => Self::Absent,
 
             // Side-effect-free expressions — continue walking child nodes.
             Expr::BoolOp(_)
@@ -185,6 +186,7 @@ const fn is_known_safe_binop_operand(expr: &Expr) -> bool {
         | Expr::Name(_)
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_)
+        | Expr::CallableType(_)
         | Expr::TString(_) => false,
     }
 }
@@ -439,6 +441,10 @@ where
                     || step
                         .as_ref()
                         .is_some_and(|value| any_over_expr(value, &mut *func))
+            }
+            Expr::CallableType(ast::ExprCallableType { args, returns, .. }) => {
+                args.iter().any(|e| any_over_expr(e, &mut *func))
+                    || any_over_expr(returns, &mut *func)
             }
             Expr::Name(_)
             | Expr::StringLiteral(_)
@@ -1596,6 +1602,7 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Name(_) => false,
             Expr::Slice(_) => false,
             Expr::IpyEscapeCommand(_) => false,
+            Expr::CallableType(_) => false,
 
             // These literals may or may not be empty.
             Expr::FString(f_string) => is_non_empty_f_string(f_string),

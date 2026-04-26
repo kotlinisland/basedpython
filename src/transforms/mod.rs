@@ -1,4 +1,5 @@
 pub mod annotation;
+pub mod callable;
 pub mod auto_quote;
 pub mod dedent_string;
 pub mod coalesce;
@@ -12,5 +13,6 @@ pub mod mutable_defaults;
 pub mod none_chain;
 pub mod overload;
 pub mod subscript;
+pub mod typed_lambda;
 pub mod typing_redirect;
 pub mod unpack;

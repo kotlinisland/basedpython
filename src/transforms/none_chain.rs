@@ -1,22 +1,94 @@
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::symbol_table::SymbolTable;
 
 /// rewrites `a?.b` to `None if a is None else a.b`
-/// and `a?.b()` to `None if a is None else a.b()`
+/// and chains like `a?.b?.c` to `None if a is None else None if (_t := a.b) is None else _t.c`
 pub struct NoneChain<'src> {
     source: &'src str,
+    symbols: &'src SymbolTable,
     pub edits: Vec<(TextRange, String)>,
 }
 
 impl<'src> NoneChain<'src> {
-    pub fn new(source: &'src str) -> Self {
-        Self { source, edits: Vec::new() }
+    pub fn new(source: &'src str, symbols: &'src SymbolTable) -> Self {
+        Self { source, symbols, edits: Vec::new() }
+    }
+}
+
+/// returns the first name in `["_t", "_t0", ..]` not bound anywhere
+/// visible from `pos` in the symbol table
+fn pick_temp_var(symbols: &SymbolTable, pos: TextSize) -> &'static str {
+    for name in ["_t", "_t0", "_t1", "_t2", "_t3", "_t4", "_t5", "_t6", "_t7", "_t8", "_t9"] {
+        if symbols.resolve(name, pos).is_none() {
+            return name;
+        }
+    }
+    "_t9"
+}
+
+/// walks an attribute-access chain and returns `Some((python_form, guards))` when
+/// any `?.` is present, where `python_form` has all `?.` replaced by `.` and
+/// `guards` is the ordered list of accumulated sub-expressions that must be
+/// non-None before each subsequent optional access is safe
+pub(super) fn expand_chain(expr: &Expr, source: &str) -> Option<(String, Vec<String>)> {
+    let Expr::Attribute(attr) = expr else { return None };
+    let field = attr.attr.as_str();
+    match expand_chain(&attr.value, source) {
+        Some((v_form, mut guards)) => {
+            if attr.optional {
+                guards.push(v_form.clone());
+            }
+            Some((format!("{v_form}.{field}"), guards))
+        }
+        None => {
+            if !attr.optional {
+                return None;
+            }
+            let start = usize::from(attr.value.range().start());
+            let end = usize::from(attr.value.range().end());
+            let v_form = source[start..end].to_owned();
+            Some((format!("{v_form}.{field}"), vec![v_form]))
+        }
+    }
+}
+
+/// builds a `None if ... is None else ...` chain from guards and final result,
+/// using walrus assignment to avoid evaluating compound intermediate expressions twice
+pub(super) fn build_expansion(guards: &[String], result: &str, temp: &str) -> String {
+    let mut s = String::new();
+    let mut use_t = false;
+    let mut prev_guard: Option<&str> = None;
+
+    for guard in guards {
+        let guard_expr = if use_t {
+            let prev = prev_guard.unwrap();
+            let incremental = &guard[prev.len() + 1..];
+            format!("{temp}.{incremental}")
+        } else {
+            guard.clone()
+        };
+
+        if guard_expr.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            s.push_str(&format!("None if {guard_expr} is None else "));
+        } else {
+            s.push_str(&format!("None if ({temp} := {guard_expr}) is None else "));
+            use_t = true;
+        }
+        prev_guard = Some(guard.as_str());
     }
 
-    fn src(&self, range: TextRange) -> &str {
-        &self.source[usize::from(range.start())..usize::from(range.end())]
+    if use_t {
+        let last = prev_guard.unwrap();
+        let incremental = &result[last.len() + 1..];
+        s.push_str(&format!("{temp}.{incremental}"));
+    } else {
+        s.push_str(result);
     }
+
+    s
 }
 
 impl<'src, 'ast> Visitor<'ast> for NoneChain<'src> {
@@ -25,17 +97,12 @@ impl<'src, 'ast> Visitor<'ast> for NoneChain<'src> {
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if let Expr::Attribute(attr) = expr
-            && attr.optional
-        {
-            let obj = self.src(attr.value.range());
-            let field = attr.attr.as_str();
-            let full = format!("{obj}.{field}");
-            self.edits.push((
-                expr.range(),
-                format!("None if {obj} is None else {full}"),
-            ));
-            return;
+        if let Expr::Attribute(_) = expr {
+            if let Some((form, guards)) = expand_chain(expr, self.source) {
+                let temp = pick_temp_var(self.symbols, expr.range().start());
+                self.edits.push((expr.range(), build_expansion(&guards, &form, temp)));
+                return;
+            }
         }
         walk_expr(self, expr);
     }
@@ -54,6 +121,46 @@ mod tests {
         check(
             "x = a?.b\n",
             "x = None if a is None else a.b\n",
+        );
+    }
+
+    #[test]
+    fn double_chain() {
+        check(
+            "x = a?.a?.b\n",
+            "x = None if a is None else None if (_t := a.a) is None else _t.b\n",
+        );
+    }
+
+    #[test]
+    fn double_chain_t_taken() {
+        check(
+            "_t = 1\nx = a?.a?.b\n",
+            "_t = 1\nx = None if a is None else None if (_t0 := a.a) is None else _t0.b\n",
+        );
+    }
+
+    #[test]
+    fn triple_chain() {
+        check(
+            "x = a?.b?.c?.d\n",
+            "x = None if a is None else None if (_t := a.b) is None else None if (_t := _t.c) is None else _t.d\n",
+        );
+    }
+
+    #[test]
+    fn mixed_chain() {
+        check(
+            "x = a?.b.c\n",
+            "x = None if a is None else a.b.c\n",
+        );
+    }
+
+    #[test]
+    fn optional_after_plain_attr() {
+        check(
+            "x = a.b?.c\n",
+            "x = None if (_t := a.b) is None else _t.c\n",
         );
     }
 }

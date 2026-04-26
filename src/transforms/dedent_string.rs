@@ -1,4 +1,3 @@
-use ruff_python_ast::str_prefix::StringLiteralPrefix;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
@@ -17,7 +16,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// """
 /// ```
 ///
-/// fires only on plain (non-raw, non-f, non-b) triple-quoted single-part strings
+/// fires on all triple-quoted single-part strings (plain, f/t/r)
 /// that open with `"""\n` and whose content is consistently indented
 pub struct DedentString<'src> {
     source: &'src str,
@@ -27,6 +26,15 @@ pub struct DedentString<'src> {
 impl<'src> DedentString<'src> {
     pub fn new(source: &'src str) -> Self {
         Self { source, edits: Vec::new() }
+    }
+
+    fn thing(&mut self, string_expr: &dyn Ranged) {
+        let start = usize::from(string_expr.range().start());
+        let end = usize::from(string_expr.range().end());
+        let raw = &self.source[start..end];
+        if let Some(transformed) = dedent_triple_string(raw) {
+            self.edits.push((string_expr.range(), transformed));
+        }
     }
 }
 
@@ -41,47 +49,30 @@ impl<'src, 'ast> Visitor<'ast> for DedentString<'src> {
                 if let Some(part) = string_expr.as_single_part_string() {
                     let flags = part.flags;
                     if flags.is_triple_quoted() {
-                        let start = usize::from(string_expr.range().start());
-                        let end = usize::from(string_expr.range().end());
-                        let raw = &self.source[start..end];
-                        if let Some(transformed) = dedent_triple_string(raw) {
-                            self.edits.push((string_expr.range(), transformed));
-                        }
+                        self.thing(string_expr)
                     }
                 }
             }
-            // TODO: support f and t strings
-            // Expr::FString(string_expr) => {
-            //     if let Some(part) = string_expr.as_single_part_string() {
-            //         let flags = part.flags;
-            //         if flags.is_triple_quoted() {
-            //             let start = usize::from(string_expr.range().start());
-            //             let end = usize::from(string_expr.range().end());
-            //             let raw = &self.source[start..end];
-            //             if let Some(transformed) = dedent_triple_string(raw) {
-            //                 self.edits.push((string_expr.range(), transformed));
-            //             }
-            //         }
-            //     }
-            // }
-            // Expr::TString(string_expr) => {
-            //     if let Some(part) = string_expr.as_single_part_string() {
-            //         let flags = part.flags;
-            //         if flags.is_triple_quoted() {
-            //             let start = usize::from(string_expr.range().start());
-            //             let end = usize::from(string_expr.range().end());
-            //             let raw = &self.source[start..end];
-            //             if let Some(transformed) = dedent_triple_string(raw) {
-            //                 self.edits.push((string_expr.range(), transformed));
-            //             }
-            //         }
-            //     }
-            // }
+            Expr::FString(string_expr) => {
+                if let Some(fstring) = string_expr.as_single_part_fstring() {
+                    if fstring.flags.is_triple_quoted() {
+                        self.thing(string_expr)
+                    }
+                }
+            }
+            Expr::TString(string_expr) => {
+                if let Some(tstring) = string_expr.as_single_part_tstring() {
+                    if tstring.flags.is_triple_quoted() {
+                        self.thing(string_expr)
+                    }
+                }
+            }
             _ => {}
         }
         walk_expr(self, expr);
     }
 }
+
 
 fn dedent_triple_string(raw: &str) -> Option<String> {
     let quote_start = raw.find("\"\"\"").or_else(|| raw.find("'''"))?;
@@ -209,13 +200,33 @@ mod tests {
             indoc! {r#"
                 a = "asdf"
                 text = t"""
-                    start-of-line
+                    start-of-line{a}
+                    |
                     """
             "#},
             indoc! {r#"
                 a = "asdf"
-                text = f"""\
-                start-of-line\
+                text = t"""\
+                start-of-line{a}
+                |\
+                """
+            "#},
+        );
+    }
+
+    #[test]
+    fn rstring_dedent() {
+        check(
+            indoc! {r#"
+                text = r"""
+                    start-of-line
+                    |
+                    """
+            "#},
+            indoc! {r#"
+                text = r"""\
+                start-of-line
+                |\
                 """
             "#},
         );
@@ -244,14 +255,6 @@ mod tests {
         check(
             "text = '''\n    hello\n    '''\n",
             "text = '''\\\nhello\\\n'''\n",
-        );
-    }
-
-    #[test]
-    fn raw_string_unchanged() {
-        check(
-            "text = r\"\"\"\n    hello\n    \"\"\"\n",
-            "text = r\"\"\"\n    hello\n    \"\"\"\n",
         );
     }
 

@@ -254,9 +254,112 @@ impl<'src, 'sym> LiteralType<'src, 'sym> {
     }
 
     fn transform_annotation(&mut self, expr: &Expr) {
-        if let Some(rewrite) = self.transform_type_expr(expr, true) {
-            self.edits.push((expr.range(), rewrite));
+        self.emit_type_edits(expr, true);
+    }
+
+    /// Emit minimal edits for literal type rewrites. Unlike `transform_type_expr`
+    /// which returns a full string replacement, this method emits one edit per
+    /// contiguous literal group, leaving non-literal parts (e.g. class self-refs
+    /// handled by auto_quote) at their own ranges so they don't get subsumed.
+    fn emit_type_edits(&mut self, expr: &Expr, at_root: bool) {
+        if at_root && matches!(expr, Expr::NoneLiteral(_)) {
+            return;
         }
+        if is_literal_expr(expr) {
+            self.needs_literal_import = true;
+            self.edits
+                .push((expr.range(), format!("Literal[{}]", self.src(expr.range()))));
+            return;
+        }
+        if let Expr::BinOp(b) = expr {
+            if matches!(b.op, Operator::BitOr) {
+                self.emit_union_group_edits(expr);
+                return;
+            }
+        }
+        if let Expr::Subscript(s) = expr {
+            if self.is_literal_name(&s.value) {
+                return;
+            }
+            if self.is_annotated_name(&s.value) {
+                if let Expr::Tuple(t) = s.slice.as_ref() {
+                    if !t.parenthesized && !t.elts.is_empty() {
+                        self.emit_type_edits(&t.elts[0], false);
+                    }
+                }
+                return;
+            }
+            if !self.is_type_subscript(&s.value) {
+                return;
+            }
+            match s.slice.as_ref() {
+                Expr::Tuple(t) if !t.parenthesized => {
+                    for e in &t.elts {
+                        self.emit_type_edits(e, false);
+                    }
+                }
+                slice => self.emit_type_edits(slice, false),
+            }
+        }
+    }
+
+    /// Emit one edit per contiguous literal group within a union expression.
+    /// Each edit covers only `first_literal.start..last_literal.end`, so
+    /// non-literal name nodes between groups are left at their original ranges.
+    fn emit_union_group_edits(&mut self, union_expr: &Expr) {
+        let parts = flatten_union(union_expr);
+        if !parts.iter().any(|p| is_literal_expr(p)) {
+            return;
+        }
+
+        let mut group_start: Option<TextSize> = None;
+        let mut group_end = TextSize::from(0);
+        let mut group_lits: Vec<String> = Vec::new();
+        let mut pending_none_start: Option<TextSize> = None;
+
+        macro_rules! flush_group {
+            () => {
+                if let Some(start) = group_start.take() {
+                    let lit_str = std::mem::take(&mut group_lits).join(", ");
+                    self.needs_literal_import = true;
+                    self.edits.push((
+                        TextRange::new(start, group_end),
+                        format!("Literal[{lit_str}]"),
+                    ));
+                }
+            };
+        }
+
+        for p in &parts {
+            if matches!(p, Expr::NoneLiteral(_)) {
+                if group_start.is_some() {
+                    // None following a literal: extend the group
+                    group_lits.push("None".to_owned());
+                    group_end = p.range().end();
+                } else {
+                    pending_none_start = Some(p.range().start());
+                }
+            } else if is_literal_expr(p) {
+                if group_start.is_none() {
+                    if let Some(pn) = pending_none_start.take() {
+                        group_start = Some(pn);
+                        group_lits.push("None".to_owned());
+                    } else {
+                        group_start = Some(p.range().start());
+                    }
+                }
+                group_lits.push(self.src(p.range()).to_owned());
+                group_end = p.range().end();
+            } else {
+                // non-literal: flush current group, discard pending None
+                pending_none_start = None;
+                flush_group!();
+                // recurse into non-literal sub-expressions
+                self.emit_type_edits(p, false);
+            }
+        }
+        // trailing None stays as-is; flush final group
+        flush_group!();
     }
 }
 
@@ -311,9 +414,10 @@ impl<'src, 'sym, 'ast> Visitor<'ast> for LiteralType<'src, 'sym> {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         if let Expr::Subscript(s) = expr {
             if self.is_type_subscript(&s.value) || self.is_annotated_name(&s.value) {
-                if let Some(rewrite) = self.transform_type_expr(expr, false) {
-                    self.edits.push((expr.range(), rewrite));
-                }
+                // emit_type_edits recurses into the slice itself, so we don't
+                // also walk_expr — that would double-process nested subscripts
+                self.emit_type_edits(expr, false);
+                return;
             }
         }
         walk_expr(self, expr);

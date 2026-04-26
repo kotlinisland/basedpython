@@ -6,6 +6,7 @@ pub enum PythonVersion {
     V312,
     V313,
     V314,
+    V315,
 }
 
 impl PythonVersion {
@@ -16,6 +17,7 @@ impl PythonVersion {
             "3.12" => Some(Self::V312),
             "3.13" => Some(Self::V313),
             "3.14" => Some(Self::V314),
+            "3.15" => Some(Self::V315),
             _ => None,
         }
     }
@@ -29,6 +31,7 @@ impl std::fmt::Display for PythonVersion {
             Self::V312 => "3.12",
             Self::V313 => "3.13",
             Self::V314 => "3.14",
+            Self::V315 => "3.15",
         })
     }
 }

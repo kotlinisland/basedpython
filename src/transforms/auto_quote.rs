@@ -1,15 +1,13 @@
-//! Auto-quotes forward self-references in class base subscripts.
+//! auto-quotes forward self-references in class definitions
 //!
 //! `class A(list[A])` → `class A(list["A"])`
 //!
-//! When the class name appears as a name expression inside a subscript slice
-//! in the base-class list, it is replaced with a string literal.  This makes
-//! the reference a proper PEP 484 forward reference that can be resolved by
-//! type checkers without `from __future__ import annotations`.
+//! the class name appearing as a subscript slice argument in base classes or
+//! the class body is replaced with a string literal — a PEP 484 forward
+//! reference resolvable by type checkers without `from __future__ import annotations`
 //!
-//! Only fires when the occurrence is inside a subscript slice, not when it is
-//! a direct base (e.g. `class A(A):` is left alone — that is a runtime error
-//! regardless of quoting, and not the auto-quoting use-case).
+//! fires when the name is inside a subscript slice; direct bases (`class A(A):`)
+//! are left alone — that is a runtime error regardless of quoting
 
 use ruff_python_ast::visitor::{Visitor, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, StmtClassDef};
@@ -29,26 +27,77 @@ impl<'src> AutoQuote<'src> {
     }
 
     fn process_class(&mut self, class: &StmtClassDef) {
-        let Some(args) = &class.arguments else {
-            return;
-        };
         let class_name = class.name.id.as_str();
 
-        for base in &args.args {
-            // Only look inside subscripts, not at direct base references.
-            self.find_self_refs_in_subscript_slice(base, class_name);
+        if let Some(args) = &class.arguments {
+            for base in &args.args {
+                self.find_self_refs_in_subscript_slice(base, class_name);
+            }
+        }
+
+        self.quote_self_refs_in_body(&class.body, class_name);
+    }
+
+    fn quote_self_refs_in_body(&mut self, stmts: &[Stmt], class_name: &str) {
+        for stmt in stmts {
+            match stmt {
+                Stmt::Expr(e) => self.walk_expr_for_subscripts(e.value.as_ref(), class_name),
+                Stmt::Assign(a) => self.walk_expr_for_subscripts(a.value.as_ref(), class_name),
+                Stmt::AnnAssign(a) => {
+                    self.find_self_refs_in_subscript_slice(a.annotation.as_ref(), class_name);
+                    if let Some(value) = &a.value {
+                        self.walk_expr_for_subscripts(value.as_ref(), class_name);
+                    }
+                }
+                Stmt::FunctionDef(f) => {
+                    for param in f.parameters.iter_non_variadic_params() {
+                        if let Some(ann) = &param.parameter.annotation {
+                            self.find_self_refs_in_subscript_slice(ann, class_name);
+                        }
+                    }
+                    if let Some(var) = &f.parameters.vararg {
+                        if let Some(ann) = &var.annotation {
+                            self.find_self_refs_in_subscript_slice(ann, class_name);
+                        }
+                    }
+                    if let Some(kwarg) = &f.parameters.kwarg {
+                        if let Some(ann) = &kwarg.annotation {
+                            self.find_self_refs_in_subscript_slice(ann, class_name);
+                        }
+                    }
+                    if let Some(ret) = &f.returns {
+                        self.find_self_refs_in_subscript_slice(ret, class_name);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
-    /// Recursively walk `expr` looking for subscripts, then quote any
-    /// occurrence of `class_name` inside their slice.
+    // only descends into callee/attribute positions — `f(A)` untouched, `list[A]()` → `list["A"]()`
+    fn walk_expr_for_subscripts(&mut self, expr: &Expr, class_name: &str) {
+        match expr {
+            Expr::Subscript(s) => {
+                self.quote_name_in_type_arg(s.slice.as_ref(), class_name);
+                self.walk_expr_for_subscripts(&s.value, class_name);
+            }
+            Expr::Call(c) => {
+                self.walk_expr_for_subscripts(&c.func, class_name);
+            }
+            Expr::Attribute(a) => {
+                self.walk_expr_for_subscripts(&a.value, class_name);
+            }
+            _ => {}
+        }
+    }
+
     fn find_self_refs_in_subscript_slice(&mut self, expr: &Expr, class_name: &str) {
         match expr {
             Expr::Subscript(s) => {
                 self.quote_name_in_type_arg(s.slice.as_ref(), class_name);
             }
             Expr::BinOp(b) => {
-                // `A | B` in a base — propagate into both arms.
+                // `A | B` union base — propagate into both arms
                 self.find_self_refs_in_subscript_slice(&b.left, class_name);
                 self.find_self_refs_in_subscript_slice(&b.right, class_name);
             }
@@ -56,8 +105,6 @@ impl<'src> AutoQuote<'src> {
         }
     }
 
-    /// Recursively scan a type-argument expression for `class_name` and quote
-    /// every occurrence.
     fn quote_name_in_type_arg(&mut self, expr: &Expr, class_name: &str) {
         match expr {
             Expr::Name(n) if n.id.as_str() == class_name => {
@@ -70,7 +117,7 @@ impl<'src> AutoQuote<'src> {
                 }
             }
             Expr::Subscript(s) => {
-                // The value position is a type name, not a type arg — skip it.
+                // value position is the type name (e.g. `list`) — skip it, only descend into slice
                 self.quote_name_in_type_arg(s.slice.as_ref(), class_name);
             }
             Expr::BinOp(b) => {
@@ -131,7 +178,6 @@ mod tests {
 
     #[test]
     fn direct_base_not_quoted() {
-        // `class A(A):` is a direct base, not a subscript arg — leave alone.
         check("class A(A): ...\n", "class A(A): ...\n");
     }
 
@@ -148,6 +194,65 @@ mod tests {
         check(
             "class A(Union[A, A]): ...\n",
             "class A(Union[\"A\", \"A\"]): ...\n",
+        );
+    }
+
+    #[test]
+    fn body_expr_stmt_call() {
+        check(
+            indoc! {"
+                class A(list[A], dict[int]):
+                    list[A]()
+            "},
+            indoc! {"
+                class A(list[\"A\"], dict[int]):
+                    list[\"A\"]()
+            "},
+        );
+    }
+
+    #[test]
+    fn body_ann_assign() {
+        check(
+            indoc! {"
+                class A(list[A]):
+                    x: list[A] = list[A]()
+            "},
+            indoc! {"
+                class A(list[\"A\"]):
+                    x: list[\"A\"] = list[\"A\"]()
+            "},
+        );
+    }
+
+    #[test]
+    fn body_method_annotations() {
+        check(
+            indoc! {"
+                class A(list[A]):
+                    def method(self, x: list[A]) -> list[A]: ...
+            "},
+            indoc! {"
+                class A(list[\"A\"]):
+                    def method(self, x: list[\"A\"]) -> list[\"A\"]: ...
+            "},
+        );
+    }
+
+    #[test]
+    fn body_method_body_not_quoted() {
+        // method body runs after A is defined — no quoting needed
+        check(
+            indoc! {"
+                class A(list[A]):
+                    def method(self):
+                        return list[A]()
+            "},
+            indoc! {"
+                class A(list[\"A\"]):
+                    def method(self):
+                        return list[A]()
+            "},
         );
     }
 

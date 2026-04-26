@@ -10,9 +10,15 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [lib]
 
 [dependencies]
+ruff_cache = { workspace = true, optional = true }
+ruff_macros = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -24,16 +30,22 @@ get-size2 = { workspace = true, optional = true }
 is-macro = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [features]
+schemars = ["dep:schemars", "dep:serde_json"]
+cache = ["dep:ruff_cache", "dep:ruff_macros"]
+serde = [
+    "dep:serde",
+    "ruff_text_size/serde",
+    "dep:ruff_cache",
+    "compact_str/serde",
+]
 get-size = ["dep:get-size2", "ruff_text_size/get-size"]
-serde = ["dep:serde", "ruff_text_size/serde", "compact_str/serde"]
-# declared but unused — kept so upstream cfg guards don't trigger check-cfg
-cache = []
-salsa = []
-schemars = []
 
 [lints]
 workspace = true

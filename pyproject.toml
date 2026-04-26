@@ -14,10 +14,18 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Rust",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Pre-processors",
+    "Topic :: Software Development :: Code Generators",
 ]
 
 [dependency-groups]
+dev = [
+    "ty>=0.0.32",
+]
 docs = ["zensical"]
 
 [tool.maturin]

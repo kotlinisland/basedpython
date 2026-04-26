@@ -32,22 +32,6 @@ by --min-version 3.12 build
 
 ## features
 
-### subscription normalization
-
-tuple subscripts are normalized so the key is an unambiguous 1-tuple:
-
-```python
-# input
-x[(a, b)]
-x[a, b]
-
-# output
-x[(a, b),]
-x[(a, b),]
-```
-
-this eliminates the inconsistency with call expressions and visual ambiguity between `x[(a, b)]` (tuple key) and `x[a]` (scalar key)
-
 ### mutable default argument via lazy evaluation
 
 mutable default arguments are automatically rewritten to the sentinel pattern:
@@ -58,6 +42,7 @@ def f(x=[], y={}):
     pass
 
 # output
+_MISSING = object()
 def f(x=_MISSING, y=_MISSING):
     if x is _MISSING:
         x = []
@@ -65,6 +50,10 @@ def f(x=_MISSING, y=_MISSING):
         y = {}
     pass
 ```
+
+### callable syntax
+
+#### TODO
 
 ### python version polyfills
 
@@ -115,11 +104,12 @@ math.exp2(x)          →  2 ** (x)
 
 ### multiline strings
 
-# TODO
+#### TODO
 
 ### None operators
 
-# TODO 
+`?.` `??`
+#### TODO 
 
 ### modifier keywords
 
@@ -134,8 +124,15 @@ final data class A:
     class def bar(): ...
 
     static def baz(): ...
-```
 
+enum B:
+    a, b, c
+
+protocol C:
+    a: int
+
+newtype MyInt = int
+```
 
 ### visibility modifiers
 
@@ -155,3 +152,20 @@ __all__ = ["api"]
 ```
 
 `export`/`public` adds the symbol's name to an auto-generated `__all__` list. `private` strips the modifier and renames the declaration with a leading underscore (the conventional Python "internal" marker). Both apply to `def` and `class` at module scope; inside a class body the modifier is stripped without renaming or affecting `__all__`
+
+### subscription normalization
+
+tuple subscripts are normalized so the key is an unambiguous 1-tuple:
+
+```python
+# input
+x[(a, b)]
+x[a, b]
+
+# output
+x[(a, b),]
+x[(a, b),]
+```
+
+this eliminates the inconsistency with call expressions and visual ambiguity between `x[(a, b)]` (tuple key) and `x[a]` (scalar key)
+

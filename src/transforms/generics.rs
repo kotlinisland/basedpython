@@ -208,22 +208,22 @@ impl<'src, 'sym> GenericPolyfill<'src, 'sym> {
 
         // Modify or add base classes.
         if let Some(args) = &class.arguments {
-            // Collect renames within base class expressions, applied to the
-            // args text slice (these would be subsumed by the args.range() edit
-            // if emitted globally, so we apply them inline instead).
-            let mut base_renames: Vec<(TextRange, String)> = Vec::new();
+            // Emit rename edits for type params within base class expressions
+            // as individual edits — this lets literal_types and auto_quote also
+            // emit their own non-overlapping edits on the same expressions.
             for base_expr in &args.args {
-                rename_in_expr(base_expr, &rename_map, &mut base_renames);
+                rename_in_expr(base_expr, &rename_map, &mut self.edits);
             }
-            let args_src = self.src(args.range()).to_owned();
-            let args_src = apply_renames_in_slice(&args_src, args.range().start(), &base_renames);
-
-            let new_args = if args_src == "()" {
-                format!("({generic_str})")
+            if args.args.is_empty() && args.keywords.is_empty() {
+                // empty `()` → replace with `(Generic[_T])`; 2-char range, safe
+                self.edits.push((args.range(), format!("({generic_str})")));
             } else {
-                format!("{}, {generic_str})", &args_src[..args_src.len() - 1])
-            };
-            self.edits.push((args.range(), new_args));
+                // insert `, Generic[_T]` before the closing `)` as a zero-width
+                // edit so it doesn't subsume any edits on the base expressions
+                let rparen = args.range().end() - TextSize::from(1);
+                let insert_range = TextRange::new(rparen, rparen);
+                self.edits.push((insert_range, format!(", {generic_str}")));
+            }
             self.edits.push((tp.range(), String::new()));
         } else {
             self.edits.push((tp.range(), format!("({generic_str})")));

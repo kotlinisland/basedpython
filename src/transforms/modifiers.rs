@@ -24,7 +24,9 @@
 //! `export`/`public`       → modifier deleted; symbol name added to auto-generated `__all__`
 //! `private`               → modifier deleted; symbol renamed with `_` prefix and excluded from `__all__`
 
-use ruff_python_ast::visitor::{Visitor, walk_stmt};
+use std::collections::HashMap;
+
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, StmtAnnAssign, StmtClassDef, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -44,6 +46,8 @@ pub struct Modifiers<'src> {
     pub needs_newtype: bool,
     /// Names marked `export`/`public` at module level. Used to generate `__all__`.
     pub exports: Vec<String>,
+    /// Module-level names renamed by `private` (original → `_original`).
+    pub private_renames: Vec<String>,
     /// Tracks the current class-nesting depth so visibility modifiers can
     /// distinguish module-level declarations from class members.
     class_depth: u32,
@@ -64,6 +68,7 @@ impl<'src> Modifiers<'src> {
             needs_classvar: false,
             needs_newtype: false,
             exports: Vec::new(),
+            private_renames: Vec::new(),
             class_depth: 0,
         }
     }
@@ -112,8 +117,7 @@ impl<'src> Modifiers<'src> {
                 }
                 "final" => {
                     self.needs_final = true;
-                    self.edits
-                        .push((dec.range(), format!("@final\n{indent}")));
+                    self.edits.push((dec.range(), format!("@final\n{indent}")));
                 }
                 "data_class" => {
                     self.needs_dataclass = true;
@@ -148,6 +152,7 @@ impl<'src> Modifiers<'src> {
                 "private" => {
                     self.edits.push((dec.range(), String::new()));
                     if self.class_depth == 0 {
+                        self.private_renames.push(class.name.as_str().to_owned());
                         self.rename_with_underscore(class.name.range());
                     }
                 }
@@ -170,8 +175,7 @@ impl<'src> Modifiers<'src> {
                 }
                 "final" => {
                     self.needs_final = true;
-                    self.edits
-                        .push((dec.range(), format!("@final\n{indent}")));
+                    self.edits.push((dec.range(), format!("@final\n{indent}")));
                 }
                 "override" => {
                     self.needs_override = true;
@@ -199,6 +203,7 @@ impl<'src> Modifiers<'src> {
                 "private" => {
                     self.edits.push((dec.range(), String::new()));
                     if self.class_depth == 0 {
+                        self.private_renames.push(func.name.as_str().to_owned());
                         self.rename_with_underscore(func.name.range());
                     }
                 }
@@ -219,39 +224,68 @@ impl<'src> Modifiers<'src> {
     }
 
     fn process_ann_assign(&mut self, node: &StmtAnnAssign) {
-        // Only handle our synthetic annotation markers from the parser.
-        let Expr::Name(ann) = node.annotation.as_ref() else {
-            return;
-        };
         let Some(value) = &node.value else { return };
         let name = self.src(node.target.range()).to_owned();
-        let value_src = self.src(value.range()).to_owned();
 
-        match ann.id.as_str() {
-            "__let__" => {
-                if self.class_depth > 0 {
-                    self.edits.push((node.range(), format!("{name} = {value_src}")));
-                } else {
-                    self.needs_final_annotation = true;
-                    self.edits.push((
-                        node.range(),
-                        format!("{name}: Final = {value_src}"),
-                    ));
+        match node.annotation.as_ref() {
+            Expr::Name(ann) => {
+                // untyped: `let a = v`, `class a = v`, `newtype Foo = v`
+                let prefix_range = TextRange::new(node.range().start(), value.range().start());
+                match ann.id.as_str() {
+                    "__let__" => {
+                        if self.class_depth > 0 {
+                            self.edits.push((prefix_range, format!("{name} = ")));
+                        } else {
+                            self.needs_final_annotation = true;
+                            self.edits.push((prefix_range, format!("{name}: Final = ")));
+                        }
+                    }
+                    "__final__" => {
+                        self.edits.push((prefix_range, format!("{name} = ")));
+                    }
+                    "__classvar__" => {
+                        self.needs_classvar = true;
+                        self.edits
+                            .push((prefix_range, format!("{name}: ClassVar = ")));
+                    }
+                    "__newtype__" => {
+                        let value_src = self.src(value.range()).to_owned();
+                        self.needs_newtype = true;
+                        self.edits.push((
+                            node.range(),
+                            format!("{name} = NewType(\"{name}\", {value_src})"),
+                        ));
+                    }
+                    "__override_assign__" => {
+                        self.edits.push((prefix_range, format!("{name} = ")));
+                    }
+                    "__abstract_annot__" => {
+                        // erase only the "abstract " prefix; "a: int" remains in source unchanged
+                        let erase_range =
+                            TextRange::new(node.range().start(), node.target.range().start());
+                        self.edits.push((erase_range, String::new()));
+                    }
+                    _ => {}
                 }
             }
-            "__classvar__" => {
-                self.needs_classvar = true;
-                self.edits.push((
-                    node.range(),
-                    format!("{name}: ClassVar = {value_src}"),
-                ));
-            }
-            "__newtype__" => {
-                self.needs_newtype = true;
-                self.edits.push((
-                    node.range(),
-                    format!("{name} = NewType(\"{name}\", {value_src})"),
-                ));
+            ann @ Expr::Subscript(s) if matches!(s.value.as_ref(), Expr::Name(n) if n.id.as_str() == "__let__") =>
+            {
+                // typed: `let a: T = v` — annotation is Subscript(__let__, T)
+                // callable transform visits only the slice independently, so emit
+                // bracket edits around the slice range; they don't overlap with callable's edit
+                let slice = s.slice.as_ref();
+                let pre_range = TextRange::new(ann.range().start(), slice.range().start());
+                let post_range = TextRange::new(slice.range().end(), value.range().start());
+                if self.class_depth > 0 {
+                    // inside class: `a: T = v` (no Final wrapper; keep the type)
+                    self.edits.push((pre_range, format!("{name}: ")));
+                    // post_range covers ` = ` which matches source; emit as-is
+                    self.edits.push((post_range, " = ".to_owned()));
+                } else {
+                    self.needs_final_annotation = true;
+                    self.edits.push((pre_range, format!("{name}: Final[")));
+                    self.edits.push((post_range, "] = ".to_owned()));
+                }
             }
             _ => {}
         }
@@ -306,9 +340,44 @@ impl<'src, 'ast> Visitor<'ast> for Modifiers<'src> {
     }
 }
 
+/// renames all `Name` expression nodes that match a `private`-renamed symbol
+pub struct NameRenamer {
+    renames: HashMap<String, String>,
+    pub edits: Vec<(TextRange, String)>,
+}
+
+impl NameRenamer {
+    pub fn new(private_names: &[String]) -> Self {
+        let renames = private_names
+            .iter()
+            .map(|n| (n.clone(), format!("_{n}")))
+            .collect();
+        Self {
+            renames,
+            edits: Vec::new(),
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast> for NameRenamer {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+        walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        if let Expr::Name(n) = expr {
+            if let Some(new_name) = self.renames.get(n.id.as_str()) {
+                self.edits.push((expr.range(), new_name.clone()));
+                return;
+            }
+        }
+        walk_expr(self, expr);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{transpile, Config};
+    use crate::{Config, transpile};
     use indoc::indoc;
 
     fn check(input: &str, expected: &str) {
@@ -451,6 +520,17 @@ mod tests {
     }
 
     #[test]
+    fn enum_class_no_body() {
+        check(
+            "enum class Color\n",
+            indoc! {"
+                from enum import Enum
+                class Color(Enum): ...
+            "},
+        );
+    }
+
+    #[test]
     fn enum_class_with_base() {
         check(
             "enum class Color(str): ...\n",
@@ -517,6 +597,25 @@ mod tests {
     }
 
     #[test]
+    fn final_var_decl() {
+        check("final a = 1", "a = 1");
+    }
+
+    #[test]
+    fn final_var_decl_in_class() {
+        check(
+            indoc! {"
+                class A:
+                    final a = 1
+            "},
+            indoc! {"
+                class A:
+                    a = 1
+            "},
+        );
+    }
+
+    #[test]
     fn let_decl_in_class() {
         check(
             indoc! {"
@@ -553,6 +652,27 @@ mod tests {
                 class Foo:
                     count: ClassVar = 0
             "},
+        );
+    }
+
+    #[test]
+    fn class_var_multiline_string() {
+        check(
+            indoc! {r#"
+                class A:
+                    class x = """
+                    asdf
+                    asdf
+                    """
+            "#},
+            indoc! {r#"
+                from typing import ClassVar
+                class A:
+                    x: ClassVar = """\
+                asdf
+                asdf\
+                """
+            "#},
         );
     }
 
@@ -625,18 +745,92 @@ mod tests {
 
     #[test]
     fn private_def() {
+        check("private def helper(): ...\n", "def _helper(): ...\n");
+    }
+
+    #[test]
+    fn private_def_call_site_renamed() {
         check(
-            "private def helper(): ...\n",
-            "def _helper(): ...\n",
+            indoc! {"
+                private def helper(): ...
+
+                helper()
+            "},
+            indoc! {"
+                def _helper(): ...
+
+                _helper()
+            "},
+        );
+    }
+
+    #[test]
+    fn override_assign() {
+        check("override a = 1\n", "a = 1\n");
+    }
+
+    #[test]
+    fn override_assign_in_class() {
+        check(
+            indoc! {"
+                class Foo:
+                    override a = 1
+            "},
+            indoc! {"
+                class Foo:
+                    a = 1
+            "},
+        );
+    }
+
+    #[test]
+    fn abstract_annot() {
+        check("abstract a: int\n", "a: int\n");
+    }
+
+    #[test]
+    fn abstract_annot_in_class() {
+        check(
+            indoc! {"
+                class Foo:
+                    abstract a: int
+            "},
+            indoc! {"
+                class Foo:
+                    a: int
+            "},
+        );
+    }
+
+    #[test]
+    fn abstract_data_class() {
+        check(
+            "abstract data class A: ...\n",
+            indoc! {"
+                from dataclasses import dataclass
+                @dataclass(slots=True)
+                class A: ...
+            "},
+        );
+    }
+
+    #[test]
+    fn final_data_class() {
+        check(
+            "final data class A: ...\n",
+            indoc! {"
+                from typing import final
+                from dataclasses import dataclass
+                @final
+                @dataclass(slots=True)
+                class A: ...
+            "},
         );
     }
 
     #[test]
     fn private_class() {
-        check(
-            "private class Helper: ...\n",
-            "class _Helper: ...\n",
-        );
+        check("private class Helper: ...\n", "class _Helper: ...\n");
     }
 
     #[test]

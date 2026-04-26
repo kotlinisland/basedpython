@@ -18,6 +18,11 @@ impl<'src> NoneCoalesce<'src> {
     }
 }
 
+fn expand_none_chain(expr: &Expr, source: &str) -> Option<String> {
+    let (form, guards) = super::none_chain::expand_chain(expr, source)?;
+    Some(super::none_chain::build_expansion(&guards, &form, "_t"))
+}
+
 impl<'src, 'ast> Visitor<'ast> for NoneCoalesce<'src> {
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         walk_stmt(self, stmt);
@@ -27,12 +32,15 @@ impl<'src, 'ast> Visitor<'ast> for NoneCoalesce<'src> {
         if let Expr::BinOp(b) = expr
             && matches!(b.op, Operator::Coalesce)
         {
-            let lhs = self.src(b.left.range());
             let rhs = self.src(b.right.range());
-            self.edits.push((
-                expr.range(),
-                format!("{lhs} if {lhs} is not None else {rhs}"),
-            ));
+            let replacement = match expand_none_chain(&b.left, self.source) {
+                Some(expanded) => format!("_t if (_t := {expanded}) is not None else {rhs}"),
+                None => {
+                    let lhs = self.src(b.left.range());
+                    format!("{lhs} if {lhs} is not None else {rhs}")
+                }
+            };
+            self.edits.push((expr.range(), replacement));
             return;
         }
         walk_expr(self, expr);
@@ -50,5 +58,19 @@ mod tests {
     #[test]
     fn basic_coalesce() {
         check("x = a ?? b\n", "x = a if a is not None else b\n");
+    }
+
+    #[test]
+    fn coalesce_with_optional_chain() {
+        check(
+            indoc::indoc! {"
+                def f(a):
+                    a?.a.b ?? 1
+            "},
+            indoc::indoc! {"
+                def f(a):
+                    _t if (_t := None if a is None else a.a.b) is not None else 1
+            "},
+        );
     }
 }

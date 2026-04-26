@@ -837,6 +837,7 @@ pub struct ExprUnaryOp<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
     parameters: Option<ComparableParameters<'a>>,
+    returns: Option<Box<ComparableExpr<'a>>>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -1009,6 +1010,12 @@ pub struct ExprIpyEscapeCommand<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprCallableType<'a> {
+    args: Vec<ComparableExpr<'a>>,
+    returns: Box<ComparableExpr<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableExpr<'a> {
     BoolOp(ExprBoolOp<'a>),
     NamedExpr(ExprNamed<'a>),
@@ -1045,6 +1052,7 @@ pub enum ComparableExpr<'a> {
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
+    CallableType(ExprCallableType<'a>),
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -1102,11 +1110,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::Lambda(ast::ExprLambda {
                 parameters,
+                returns,
                 body,
                 range: _,
                 node_index: _,
             }) => Self::Lambda(ExprLambda {
                 parameters: parameters.as_ref().map(Into::into),
+                returns: returns.as_ref().map(|r| Box::new(r.as_ref().into())),
                 body: body.into(),
             }),
             ast::Expr::If(ast::ExprIf {
@@ -1324,6 +1334,15 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 range: _,
                 node_index: _,
             }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand { kind: *kind, value }),
+            ast::Expr::CallableType(ast::ExprCallableType {
+                args,
+                returns,
+                range: _,
+                node_index: _,
+            }) => Self::CallableType(ExprCallableType {
+                args: args.iter().map(ComparableExpr::from).collect(),
+                returns: Box::new(returns.as_ref().into()),
+            }),
         }
     }
 }

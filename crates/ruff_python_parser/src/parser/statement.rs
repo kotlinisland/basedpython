@@ -160,7 +160,24 @@ impl<'src> Parser<'src> {
                     let kw = self.src_text(self.current_token_range());
                     let next = self.peek();
                     let is_modifier = match kw {
-                        "final" | "abstract" | "override" | "open" | "static"
+                        "final" => match next {
+                            TokenKind::Class | TokenKind::Def => true,
+                            // "final data class", "final enum class", etc.
+                            TokenKind::Name => {
+                                let (_, p2) = self.peek2();
+                                matches!(p2, TokenKind::Class | TokenKind::Def)
+                            }
+                            _ => false,
+                        },
+                        "abstract" | "open" => match next {
+                            TokenKind::Class | TokenKind::Def => true,
+                            TokenKind::Name => {
+                                let (_, p2) = self.peek2();
+                                p2 == TokenKind::Class
+                            }
+                            _ => false,
+                        },
+                        "override" | "static"
                         | "export" | "public" | "private" => {
                             matches!(next, TokenKind::Class | TokenKind::Def)
                         }
@@ -174,9 +191,9 @@ impl<'src> Parser<'src> {
                     if is_modifier {
                         return self.parse_with_modifier(start);
                     }
-                    // `let x = 5` — readonly declaration
+                    // `let x = 5` or `let x: T = 5` — readonly declaration
                     if kw == "let" && next == TokenKind::Name
-                        && self.peek2().1 == TokenKind::Equal
+                        && matches!(self.peek2().1, TokenKind::Equal | TokenKind::Colon)
                     {
                         return self.parse_let_decl(start);
                     }
@@ -189,6 +206,24 @@ impl<'src> Parser<'src> {
                     // `protocol Foo:` — protocol class
                     if kw == "protocol" && next == TokenKind::Name {
                         return self.parse_protocol_def(start);
+                    }
+                    // `abstract a: int` — abstract annotation declaration
+                    if kw == "abstract" && next == TokenKind::Name
+                        && self.peek2().1 == TokenKind::Colon
+                    {
+                        return self.parse_abstract_annot_decl(start);
+                    }
+                    // `override a = 1` — override assignment
+                    if kw == "override" && next == TokenKind::Name
+                        && self.peek2().1 == TokenKind::Equal
+                    {
+                        return self.parse_override_assign_decl(start);
+                    }
+                    // `final a = 1` — final variable declaration
+                    if kw == "final" && next == TokenKind::Name
+                        && self.peek2().1 == TokenKind::Equal
+                    {
+                        return self.parse_final_decl(start);
                     }
                 }
 
@@ -204,58 +239,75 @@ impl<'src> Parser<'src> {
     /// pointing at the modifier text in the source. The downstream `modifiers` transform
     /// uses the decorator to emit the appropriate `@decorator` line.
     fn parse_with_modifier(&mut self, start: TextSize) -> Stmt {
-        let modifier_start = self.current_token_range().start();
+        let mut decorators = vec![];
 
-        // Determine the logical modifier name from the keyword text(s).
-        let modifier_name: &'static str = if self.at(TokenKind::Class) {
-            // `class def f(cls):` → @classmethod
-            self.bump(TokenKind::Class);
-            "classmethod"
-        } else {
-            let kw = self.src_text(self.current_token_range()).to_owned();
-            match kw.as_str() {
-                "frozen" => {
-                    self.bump(TokenKind::Name); // consume "frozen"
-                    // consume "data"
-                    self.bump(TokenKind::Name);
-                    "frozen_data_class"
-                }
-                "data" => {
-                    self.bump(TokenKind::Name);
-                    "data_class"
-                }
-                "enum" => {
-                    self.bump(TokenKind::Name);
-                    "enum_class"
-                }
-                "final" => { self.bump(TokenKind::Name); "final" }
-                "abstract" => { self.bump(TokenKind::Name); "abstract" }
-                "override" => { self.bump(TokenKind::Name); "override" }
-                "open" => { self.bump(TokenKind::Name); "open" }
-                "static" => { self.bump(TokenKind::Name); "static" }
-                "export" | "public" => { self.bump(TokenKind::Name); "export" }
-                "private" => { self.bump(TokenKind::Name); "private" }
-                _ => unreachable!("unexpected modifier keyword"),
-            }
-        };
+        loop {
+            let modifier_start = self.current_token_range().start();
 
-        // The synthetic decorator range covers exactly the modifier text(s) + trailing
-        // whitespace up to (but not including) the class/def keyword. The transform
-        // uses this to replace the modifier prefix with `@decorator\n{indent}`.
-        let modifier_end = self.current_token_range().start();
-        let decorator_range = TextRange::new(modifier_start, modifier_end);
+            // Determine the logical modifier name from the keyword text(s).
+            // The synthetic decorator range covers exactly the modifier text(s) + trailing
+            // whitespace up to (but not including) the class/def keyword. The transform
+            // uses this to replace the modifier prefix with `@decorator\n{indent}`.
+            let modifier_name: &'static str = if self.at(TokenKind::Class) {
+                // `class def f(cls):` → @classmethod
+                self.bump(TokenKind::Class);
+                "classmethod"
+            } else {
+                let kw = self.src_text(self.current_token_range()).to_owned();
+                match kw.as_str() {
+                    "frozen" => {
+                        self.bump(TokenKind::Name); // consume "frozen"
+                        // consume "data"
+                        self.bump(TokenKind::Name);
+                        "frozen_data_class"
+                    }
+                    "data" => {
+                        self.bump(TokenKind::Name);
+                        "data_class"
+                    }
+                    "enum" => {
+                        self.bump(TokenKind::Name);
+                        "enum_class"
+                    }
+                    "final" => { self.bump(TokenKind::Name); "final" }
+                    "abstract" => { self.bump(TokenKind::Name); "abstract" }
+                    "override" => { self.bump(TokenKind::Name); "override" }
+                    "open" => { self.bump(TokenKind::Name); "open" }
+                    "static" => { self.bump(TokenKind::Name); "static" }
+                    "export" | "public" => { self.bump(TokenKind::Name); "export" }
+                    "private" => { self.bump(TokenKind::Name); "private" }
+                    _ => unreachable!("unexpected modifier keyword"),
+                }
+            };
 
-        let decorator = ast::Decorator {
-            expression: Expr::Name(ast::ExprName {
-                id: Name::new_static(modifier_name),
-                ctx: ExprContext::Load,
+            let modifier_end = self.current_token_range().start();
+            let decorator_range = TextRange::new(modifier_start, modifier_end);
+
+            decorators.push(ast::Decorator {
+                expression: Expr::Name(ast::ExprName {
+                    id: Name::new_static(modifier_name),
+                    ctx: ExprContext::Load,
+                    range: decorator_range,
+                    node_index: AtomicNodeIndex::NONE,
+                }),
                 range: decorator_range,
                 node_index: AtomicNodeIndex::NONE,
-            }),
-            range: decorator_range,
-            node_index: AtomicNodeIndex::NONE,
-        };
-        let decorators = vec![decorator];
+            });
+
+            // stop when we reach the def/class being modified
+            if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
+                break;
+            }
+            // another modifier keyword follows — keep looping
+            if self.at(TokenKind::Name) {
+                let kw = self.src_text(self.current_token_range());
+                if matches!(kw, "data" | "enum" | "frozen" | "abstract" | "open"
+                    | "static" | "export" | "public" | "private" | "override") {
+                    continue;
+                }
+            }
+            break;
+        }
 
         if self.at(TokenKind::Def) {
             Stmt::FunctionDef(self.parse_function_definition(decorators, start))
@@ -307,6 +359,54 @@ impl<'src> Parser<'src> {
         let let_range = self.current_token_range();
         self.bump(TokenKind::Name); // consume "let"
         let name = self.parse_identifier();
+        let let_name = Expr::Name(ast::ExprName {
+            id: Name::new_static("__let__"),
+            ctx: ExprContext::Load,
+            range: let_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        // optional `: annotation` before `=`
+        let annotation = if self.eat(TokenKind::Colon) {
+            let type_ann = self.parse_conditional_expression_or_higher().expr;
+            let slice_range = type_ann.range();
+            Expr::Subscript(ast::ExprSubscript {
+                value: Box::new(let_name),
+                slice: Box::new(type_ann),
+                ctx: ExprContext::Load,
+                range: TextRange::new(let_range.start(), slice_range.end()),
+                node_index: AtomicNodeIndex::NONE,
+            })
+        } else {
+            let_name
+        };
+        self.bump(TokenKind::Equal);
+        let value = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: Some(Box::new(value)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `final x = 5` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `x: Final = 5` at module scope or `x = 5` inside a class.
+    fn parse_final_decl(&mut self, start: TextSize) -> Stmt {
+        let final_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "final"
+        let name = self.parse_identifier();
         self.bump(TokenKind::Equal);
         let value = self
             .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
@@ -318,9 +418,9 @@ impl<'src> Parser<'src> {
             node_index: AtomicNodeIndex::NONE,
         });
         let annotation = Expr::Name(ast::ExprName {
-            id: Name::new_static("__let__"),
+            id: Name::new_static("__final__"),
             ctx: ExprContext::Load,
-            range: let_range,
+            range: final_range,
             node_index: AtomicNodeIndex::NONE,
         });
         self.eat(TokenKind::Semi);
@@ -355,6 +455,76 @@ impl<'src> Parser<'src> {
             id: Name::new_static("__newtype__"),
             ctx: ExprContext::Load,
             range: newtype_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: Some(Box::new(value)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `abstract a: int` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `a: int` (strips the `abstract` prefix).
+    /// The real annotation is stored as the `value` field so the transform can reconstruct it.
+    fn parse_abstract_annot_decl(&mut self, start: TextSize) -> Stmt {
+        let abstract_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "abstract"
+        let name = self.parse_identifier();
+        self.bump(TokenKind::Colon); // consume ":"
+        let annotation_expr = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        // synthetic annotation covering "abstract " — the transform erases this prefix
+        let synthetic_ann = Expr::Name(ast::ExprName {
+            id: Name::new_static("__abstract_annot__"),
+            ctx: ExprContext::Load,
+            range: TextRange::new(abstract_range.start(), name.range.start()),
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(synthetic_ann),
+            value: Some(Box::new(annotation_expr)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `override a = 1` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `a = 1` (strips the `override` prefix).
+    fn parse_override_assign_decl(&mut self, start: TextSize) -> Stmt {
+        let override_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "override"
+        let name = self.parse_identifier();
+        self.bump(TokenKind::Equal);
+        let value = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let annotation = Expr::Name(ast::ExprName {
+            id: Name::new_static("__override_assign__"),
+            ctx: ExprContext::Load,
+            range: TextRange::new(override_range.start(), name.range.start()),
             node_index: AtomicNodeIndex::NONE,
         });
         self.eat(TokenKind::Semi);

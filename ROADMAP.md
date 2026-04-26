@@ -2,49 +2,24 @@
 
 THIS IS THE SECRET INTERNAL ROADMAP, DO NOT MAKE PUBLIC
 
-## parser strategy
+## implementation strategy
 
-the project currently depends on `ruff_python_parser` and `ruff_python_ast` via git, pointing to the upstream
-[astral-sh/ruff](https://github.com/astral-sh/ruff) repository. this is sufficient for transformations that operate on standard Python syntax
-
-when the language needs to diverge from Python's grammar (new keywords, new operators, syntax that is not valid Python),
-we will fork the relevant ruff parser crates (`ruff_python_parser`, `ruff_python_ast`, `ruff_python_lexer`) into this
-repository and switch the `Cargo.toml` dependencies from git to path. at that point the fork becomes the canonical
-parser for basedpython
-
-## semantic analysis strategy
-
-many planned features require knowledge that goes beyond the syntax of a single file: which names are types vs values,
-what class a method call resolves to, where a symbol is defined across the project. this is needed for features like
-literal literal types (distinguishing `1 | 2` as a type annotation vs a bitwise-or expression), extension functions
-(rewriting `obj.bar()` call sites), sealed class enforcement, and annotation context detection inside subscripts
-
-the plan has two phases:
-
-**phase 1 — project-wide symbol table (no type inference)**
-a pre-pass that collects class definitions, type aliases, extension function names, and imports across all `.by` files
-in the project. this is sufficient for the majority of features: extension function call site rewriting, annotation
-context detection for literal types, sealed class checking, auto type quoting. this is the next step and does not
-require any new heavy dependencies
-
-**phase 2 — fork `ty`**
-[astral-sh/ty](https://github.com/astral-sh/ty) is the type inference engine being built alongside ruff. when
-basedpython needs flow-sensitive type information (e.g. knowing the type of `x` after assignments, conditional
-narrowing, cross-file inference beyond simple symbol lookup), we will fork the relevant `ty` crates into this
-repository, the same way the parser will be forked when grammar divergence is needed. at that point `ty` becomes the
-semantic backend for basedpython
-
-**why not fork `ty` now:** `ty` is under very active development with unstable internal APIs and incomplete
-functionality. a premature fork would create an enormous maintenance burden with no path to stay in sync with
-upstream improvements. the symbol table phase handles nearly all near-term features, so the fork is deferred until
-`ty` reaches an API stability point that makes the integration tractable
+the project forks `ruff` and `ty` for ast and type features respectivly
 
 ## planned features
 
-- [ ] language server (fork ty)
-- [ ] source maps
-- [ ] build wheels (`by build`?)
-  - ensure that built wheel depends on the correct deps for polyfill (`tomli`/`typing_extensions` etc)
+### misc
+
+- [x] fork ruff/ty
+  - [x] drop-in replacement for `ty`
+  - [x] drop-in replacement for `ruff`
+- [ ] ide plugins
+  - [ ] pycharm
+  - [ ] vscode
+- [ ] unified executable (`by`) with `transpile`, `check`, `lint`, `format`, `server`
+- [x] source maps
+- [ ] `by build` builds wheels 
+  - [ ] built wheel depends on the correct deps for polyfill (`tomli`/`typing_extensions` etc)
 - [ ] config file as part of `pyproject.toml`
   - [ ] enable all rules/strictness by default (with a "drop-in" option or something)
   - [ ] high level configs:
@@ -53,23 +28,41 @@ upstream improvements. the symbol table phase handles nearly all near-term featu
     - `pure-python` - only features that are in cpython, i.e. polyfils
   - [ ] config option to enforce `open`
   - [ ] config option for `abstract` impl: `abc.ABCMeta`, or `by_extensions.abstract`
+  - [ ] config option for `final` by default
 - [ ] web playground like ty, runs client side
-- [ ] tree-sitter/textmate grammar
+- [x] textmate grammar
+- [ ] compile to bytecode instead of python
 - [x] subscription normalization: `x[(x, y)]` → `x[(x, y),]`
 - [x] mutable default argument fix: `def f(x=[]):` → sentinel pattern
 - [x] PEP 695 generics polyfill: `class A[T]`, `def f[T]()`, `type X = ...` → 3.10-compatible equivalents including TypeVar name renaming
 - [x] `typing` import redirect: names unavailable in stdlib until later versions are redirected to `typing_extensions`
 - [x] expression compat rewrites: `datetime.UTC`, `sys.exception()`, `math.exp2()` → 3.10-compatible equivalents
-- [ ] callable syntax: `(int) -> int` -> `Callable[[int], int]` / `[T](int, t: T) -> T` → a `Protocol` definition
-  `(int, /, a: str, *args: int, **kwargs: str) -> None`
+- [ ] type soundness:
+  ```bython
+  def f(a: int):
+      print(a + 1)
+  ```
+  ```python
+  def f(a: int):
+      if not isinstance(a, int):
+          raise TypeError
+      print(a + 1)
+  ```
+- [ ] callable syntax:
+  - [x] `(int) -> int` -> `Callable[[int], int]`
+  - [ ] non-denotable: generate a `Protocol` definition
+    - [ ] named: `(a: int) -> str`
+    - [ ] other forms: `(int, /, a: str, *args: int, **kwargs: str) -> None`
+    - [ ] type parameters `[T](int, t: T) -> T`
+- [x] annotations on `lambda`: `lambda (a: int, b: str) -> bool: a + b` -> `lambda a, b: a + b` #easy
 - [x] unpack syntax in type annotations: `def f(*args: *tuple[int, ...])` -> `def f(*args: Unpack[tuple[int, ...]])` #easy
 - [x] intersection types: `A & B` -> `ty_extensions.Intersection[A, B]` #easy
 - [x] auto type quoting where mandatory: `class A(list[A])` -> `class A(list["A"])` #easy
 - [x] empty class declarations: `class A` -> `class A: ...`
 - [x] empty abstract functions: `abstract def f(self) -> int` -> `def f(self) -> int: raise NotImplementedError`
-- [ ] `by_extensions` package with things like `abstract`
-- [ ] keyword parameters in subscriptions: `x[y=z]`
+- [ ] `by_extensions` package with things like `abstract`/`generic`
 - [ ] syntax for `TypeIs`: `def f(a) -> a is int` -> `def f(a) -> TypeIs[int]` #easy
+- [ ] keyword parameters in subscriptions: `x[y=z]`
 - [ ] specify generics via keyword:
   ```bython
   class A[B=int, C=int]
@@ -77,14 +70,42 @@ upstream improvements. the symbol table phase handles nearly all near-term featu
   A[C=str]()
   ```
 - [ ] explicit variance keywords: `class A[out T]`, `in`, `in out`
+- [ ] reify generics
+  ```bython
+  a: list[int]
+  a = []
+  ```
+  ```python
+  a: list[int]
+  a = list[int]()
+  ```
 - [ ] multi-expression lambdas: (needs design)
   ```bython
-  x(\( x, y ->
-     print(x)
-     print(y)
-  ))
+  x(: print(it))
+  # trailing
+  x: print(it)
+  if x: print(it) # error, ambigious, need parens
+  a = (): print(1)
+  foo(:
+      a = 1
+      a + 1,
+      :
+      b = 2
+      b + 1
+  )
   ```
-- [ ] extension functions: (needs design) `def Foo.bar():`
+- [ ] extension functions: 
+  needs design 
+  ```bython
+  def Foo.bar(self):
+      return self.foo()
+  
+  # OR
+  
+  extension Foo:
+      def bar(self):
+          return self.foo()
+  ```
 - [ ] property syntax: (needs design)
   ```
   var a: int
@@ -97,21 +118,26 @@ upstream improvements. the symbol table phase handles nearly all near-term featu
 - [ ] trailing closure: if the last argument is a lambda, it can be written outside the call parens: 
   needs design
   ```bython
-  xs.map() \( it + 1 )
+  xs.map: it + 1
   # → xs.map(lambda it: it + 1)
   ```
-- [x] compile-time multiline string de-indenting:
+- [ ] compile-time multiline string de-indenting:
   ```bython
   text = """
       start-of-line
+      a
       """
   ```
   ```python
   text = """\
-  start-of-line\
+  start-of-line
+  a\
   """
   ```
+  - [x] transform
+  - [ ] error when the text is positioned before the ending quotes
   - [ ] reverse transform
+  - [ ] formatting support
 - [ ] range literals: `1..10` `1..<10`
 - [ ] lazy values: needs design
 - [ ] `late` keyword: `late name: int`
@@ -154,9 +180,58 @@ upstream improvements. the symbol table phase handles nearly all near-term featu
   - maybe also call expressions
 - [ ] make ternary expressions bearable: `if bool() 1 else 2`
 - [ ] `match`/`try` as an expression #easy
+- [ ] reified type parameters #types
+  ```bython
+  def f[T](x: object) -> bool:
+      return isinstance(x, T)
+  f[int](1)
+  ```
+  ```python
+  # this decorator evaluates the function but replaces `T` (in `__closure__`) with the passed value
+  @generic
+  def f[T](x: object) -> bool:
+      return isinstance(x, T)
+  f[int]
+  ```
+- [ ] generic function calls 
+  ```bython
+  def f[T](t1: T, t2: T) -> T: ...
+  f[object](1, "a")
+  ```
+- [ ] `private` class members should be prefixed with `__`
+- [ ] `===` operator and `x is y` -> `instanceof(x, y)`
+- [ ] string function names: `def "this doesn't fail"()`
+- [ ] mutate by copy: #veryhard
+  needs design
+  ```bython
+  data class A:
+      init(copy var i: int)
+  a = A(1)
+  b = a
+  a.i = 2  # a = a.copy(i = 2) 
+  b === a # false
+  ```
+- [ ] macros #veryhard
+- [ ] shape type `closed` should be a keyword
+- [ ] enum shorthand syntax `enum E: a, b, c, d` #easy
+  ```python
+  class E(Enum):
+      a = auto()
+      ...
+  ```
+- [ ] rust stype enums?
+- [ ] syntax for `cast`
+  needs design 
+  `a as int`/`a as? int`/`a.as[int]`
+- [ ] `super` syntax
+  ```by
+  class A(int, str):
+      def f():
+          super[int].__str__()
+  ```
 
 ### anonymous named tuple:
-```
+```bython
 def foo(x: (name: str, age: int)) -> (name: str, age: int):
     return ("asdf", 1)
 
@@ -174,7 +249,7 @@ These compile to calls into a thin `basedpython` runtime module (or are rewritte
 - [ ] `.len` — `len(x)` as a member; avoids the global function syntax
 - [ ] `Sequence.get(i, default=None)` — index with a fallback, like `dict.get`
 - [ ] `Iterable.first` / `.last` — first or last element; raise on empty
-- [ ] `Iterable.first_or_none` / `.last_or_none`
+- [ ] `Iterable.first_or_none` / `.last_or_none` (also .first_or_missing) sentinal value version
 - [ ] `Iterable.first(predicate)` — first matching element
 - [ ] `Iterable.is_empty` / `.is_not_empty` —> `len(s) == 0`
 - [ ] `filter`/`map`/`reduce`
@@ -196,13 +271,24 @@ These compile to calls into a thin `basedpython` runtime module (or are rewritte
 
 ### declaration modifiers
 
-- [ ] `class a = 1` -> `a: ClassVar = 1` #easy
-- [ ] `let a = 1` -> `a = 1` (there is no such `ReadOnly` in python) #easy
-- [ ] `final a = 1` -> `a: Final = 1` #easy
-- [x] `const x = 5` → `x: Final = 5` #easy
+- [x] `class a = 1` -> `a: ClassVar = 1` #easy
+- [x] `override a = 1` -> `a = 1` #easy
+- [x] `absract a`  #easy
+- [x] `let a = 1` -> `a = 1` (there is no such `ReadOnly` in python, can use `Final` at top level) #easy
+- [x] final variable: #easy
+  ```bython
+  class A:
+      final a = 1
+  final a = 1
+  ```
+  ```python
+  class A:
+      a = 1
+  a: Final = 1
+  ```
 - [x] `final class Foo:` → `@final\nclass Foo:` (from `typing`) #easy
 - [x] `final def foo():` → `@final\ndef foo():` (from `typing`) #easy
-- [x] `open class Foo:` — explicitly permits subclassing (documentation/lint intent; `final` is the default for classes in strict mode) #easy
+- [x] `open class Foo:` — `final` will be the default for classes in strict mode #easy
 - [x] `abstract class Foo:` → `class Foo:` (don't use `abc`, it's too invasive) #easy
 - [x] `abstract def foo():` → `@abstractmethod\ndef foo(): raise NotImplementedError` #easy
 - [x] `override def foo():` → `@override\ndef foo():` (from `typing`) #easy
@@ -220,7 +306,6 @@ These compile to calls into a thin `basedpython` runtime module (or are rewritte
   def f(a): ...
   ```
 - [x] `static def foo():` inside a class → `@staticmethod\ndef foo():` #easy
-- [ ] `sealed class Foo:` — subclassing allowed only within the same module; enforced at transpile time #hard
 - [x] `class a = 1` -> `a: ClassVar = 1` #easy
 - [x] `class def f(cls):` -> `@classmethod\ndef f(cls):` #easy
 - [ ] more flexible keyword arguments
@@ -233,8 +318,18 @@ These compile to calls into a thin `basedpython` runtime module (or are rewritte
     ```bython
     def f(**kwargs: dict[object, int]): ...
     
-    f(???)
+    f(???)  # not just str
     ```
+- [ ] f-string by default: `"{1}"` -> `"f"{1}"`
+- [ ] type-directed t-strings
+  ```python
+  def f(t: Template): ...
+  
+  f("asdf{abc}fdsa")
+  ```
+- [ ] t-string prefix functions: `foo"a{b}c"` -> `foo(t"a{b}c")`
+- [ ] type-directed other things (need to think about what it is)
+- [ ] dot access for tuples: `('a', 'b').1` -> `('a', 'b')[1]`
 
 ### class keywords
 
@@ -244,20 +339,35 @@ These compile to calls into a thin `basedpython` runtime module (or are rewritte
 - [x] `enum class Foo:` → `class Foo(Enum):` (from `enum`) #easy
 - [x] `newtype Foo = int` -> `Foo = NewType("Foo", int)` #easy
 
-#### to discuss
-- [ ] `dict Foo:` -> `class Foo(TypedDict):`
-- [ ] `tuple Foo:` -> `class Foo(NamedTuple):`
+### shape type syntax
 
-could we generalise this with some new syntax:
 ```bython
 # typed dict
-type Foo = {a: int}
+type Foo = {"a": int}
 
 # named tuple
-type Bar = (name: str, age: int)
+type Bar = (name: str, age: int) 
+# OR
+type Bar = (name = str, age = int)
 ```
+- [ ] index types for typed dict
+  ```python
+  type a = {
+      a: int,
+      **: dict[str, str],
+  }
+  ```
+- [ ] inline protocol
+  needs design
+  ```
+  a: protocol (
+    def foo()
+  )
+  ```
 
-- [ ] ### primary constructors
+### primary constructors
+
+- [ ]
 
 ```bython
 class A:
@@ -291,7 +401,7 @@ a = object: Base(
 )
 ```
 
-# error object system
+### error object system
 
 needs design
 
@@ -308,12 +418,11 @@ def g() -> int | MyError:
 
 do we need a syntax for `assert not None`? maybe `!!`, maybe an extension `.safe`?
 
+## type system
 
-# type system
-
-- see `docs/generics.md` #hard
-- [ ] a true top type: maybe Void/Unit: doesn't have **any** members
-- [ ] rename `Any` to `dynamic`
+- [ ] see `docs/generics.md` #hard
+- [ ] a true top type: maybe `Void`/`Unit`: doesn't have **any** members
+- [ ] rename `Any` to `dynamic` #easy
 - [ ] `final`/`Final` means can't override, not immutable
 - [ ] mapped type parameters:
   needs design
@@ -321,7 +430,7 @@ do we need a syntax for `assert not None`? maybe `!!`, maybe an extension `.safe
   class A[T: {"a": int, "b": str, int: bool}]
       def __getattr__(self, key: T.Key) -> T.Value: ...
   ```
-- [x] literal literal types: `a: "asdf" | 5 = "asdf"` -> `a: Literal["asdf", 5]` (single-file symbol resolution; cross-file resolution pending)
+- [x] literal literal types: `a: "asdf" | 5 = "asdf"` -> `a: Literal["asdf", 5]`
 - [x] tuple literal types: `a: (int, str)` -> `a: tuple[int, str]`
 - [ ] tuples are variadic by default: `a: tuple[int]` -> `tuple[int, ...]`
 - [ ] constraints need to use a keyword: `type A[T: constraints (int, str)]` -> `type A[T: (int, str)]`
@@ -364,7 +473,22 @@ do we need a syntax for `assert not None`? maybe `!!`, maybe an extension `.safe
       imposter="sus",  # yes error
   )
   ```
-- `Ts` as a paramspec argument
+- [ ] `Ts` as a paramspec argument
   ```bython
   def f[*Ts](fn: Callable[*Ts, None])  # should be valid
-- ```
+  ```
+- [ ] inline type plugins #veryhard
+  needs design
+  ```bython
+  @type_function
+  def tf():
+      return datetime.now().seconds  # literal int type 
+  
+  def f() -> tf(): ...
+  ```
+- [ ] `sealed class Foo` — subclassing allowed only within the same project #hard
+  we could compile the subtypes into the base class!
+- [ ] literal `float` and `complex` types
+- [ ] fix `type`, make constructors safe
+- [ ] fix overloads (hmm)
+- [ ] error with top level `final` variables

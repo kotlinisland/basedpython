@@ -406,12 +406,16 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         }
         Expr::Lambda(ast::ExprLambda {
             parameters,
+            returns,
             body,
             range: _,
             node_index: _,
         }) => {
             if let Some(parameters) = parameters {
                 visitor.visit_parameters(parameters);
+            }
+            if let Some(returns) = returns {
+                visitor.visit_expr(returns);
             }
             visitor.visit_expr(body);
         }
@@ -634,6 +638,17 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             }
         }
         Expr::IpyEscapeCommand(_) => {}
+        Expr::CallableType(ast::ExprCallableType {
+            args,
+            returns,
+            range: _,
+            node_index: _,
+        }) => {
+            for arg in args {
+                visitor.visit_expr(arg);
+            }
+            visitor.visit_expr(returns);
+        }
     }
 }
 

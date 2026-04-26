@@ -117,6 +117,9 @@ impl Transformer for Relocator {
             Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { range, .. }) => {
                 *range = self.range;
             }
+            Expr::CallableType(ast::ExprCallableType { range, .. }) => {
+                *range = self.range;
+            }
         }
         walk_expr(self, expr);
     }

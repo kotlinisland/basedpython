@@ -116,7 +116,7 @@ impl PySourceType {
     /// Infers the source type from the file extension.
     pub fn try_from_extension(extension: &str) -> Option<Self> {
         let ty = match extension {
-            "py" => Self::Python,
+            "py" | "by" => Self::Python,
             "pyi" => Self::Stub,
             "pyw" => Self::Python,
             "ipynb" => Self::Ipynb,

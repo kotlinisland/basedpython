@@ -1,0 +1,138 @@
+use ruff_formatter::write;
+use ruff_python_ast::{Expr, StmtAnnAssign};
+
+use crate::expression::is_splittable_expression;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::prelude::*;
+use crate::statement::stmt_assign::{
+    AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
+};
+use crate::statement::trailing_semicolon;
+
+#[derive(Default)]
+pub struct FormatStmtAnnAssign;
+
+/// detect a synthetic basedpython `let` annotation: returns `None` for bare `__let__`,
+/// or `Some(type_expr)` for the typed form `__let__[T]`
+fn synthetic_let(ann: &Expr) -> Option<Option<&Expr>> {
+    match ann {
+        Expr::Name(n) if n.id.as_str() == "__let__" => Some(None),
+        Expr::Subscript(s) if matches!(s.value.as_ref(), Expr::Name(n) if n.id.as_str() == "__let__") => {
+            Some(Some(s.slice.as_ref()))
+        }
+        _ => None,
+    }
+}
+
+/// detect a synthetic basedpython annotation marker name (classvar / newtype)
+fn synthetic_marker(ann: &Expr) -> Option<&'static str> {
+    if let Expr::Name(n) = ann {
+        match n.id.as_str() {
+            "__classvar__" => return Some("class"),
+            "__newtype__" => return Some("newtype"),
+            _ => {}
+        }
+    }
+    None
+}
+
+impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
+    fn fmt_fields(&self, item: &StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
+        let StmtAnnAssign {
+            range: _,
+            node_index: _,
+            target,
+            annotation,
+            value,
+            simple: _,
+        } = item;
+
+        // basedpython synthetic annotations — format back to the surface syntax
+        if let Some(type_ann) = synthetic_let(annotation) {
+            write!(f, [token("let"), space(), target.format()])?;
+            if let Some(t) = type_ann {
+                write!(f, [token(":"), space(), t.format()])?;
+            }
+            if let Some(v) = value {
+                write!(f, [space(), token("="), space(), v.format()])?;
+            }
+            return Ok(());
+        }
+        if let Some(keyword) = synthetic_marker(annotation) {
+            write!(f, [text(keyword), space(), target.format()])?;
+            if let Some(v) = value {
+                write!(f, [space(), token("="), space(), v.format()])?;
+            }
+            return Ok(());
+        }
+
+        let comments = f.context().comments().clone();
+        let annotation_parentheses = annotation
+            .as_ref()
+            .needs_parentheses(item.into(), f.context());
+
+        write!(f, [target.format(), token(":"), space()])?;
+
+        if let Some(value) = value {
+            if annotation_parentheses != OptionalParentheses::Always
+                && is_splittable_expression(annotation, f.context())
+            {
+                FormatStatementsLastExpression::RightToLeft {
+                    before_operator: AnyBeforeOperator::Expression(annotation),
+                    operator: AnyAssignmentOperator::Assign,
+                    value,
+                    statement: item.into(),
+                }
+                .fmt(f)?;
+            } else {
+                // Remove unnecessary parentheses around the annotation if the parenthesize long type hints preview style is enabled.
+                // Ensure we keep the parentheses if the annotation has any comments.
+                let parentheses = if comments.has_leading(annotation.as_ref())
+                    || comments.has_trailing(annotation.as_ref())
+                    || annotation_parentheses == OptionalParentheses::Always
+                {
+                    Parentheses::Always
+                } else {
+                    Parentheses::Never
+                };
+
+                annotation.format().with_options(parentheses).fmt(f)?;
+
+                write!(
+                    f,
+                    [
+                        space(),
+                        token("="),
+                        space(),
+                        FormatStatementsLastExpression::left_to_right(value, item)
+                    ]
+                )?;
+            }
+        } else if annotation_parentheses == OptionalParentheses::Always {
+            annotation
+                .format()
+                .with_options(Parentheses::Always)
+                .fmt(f)?;
+        } else {
+            // Parenthesize the value and inline the comment if it is a "simple" type annotation, similar
+            // to what we do with the value.
+            // ```python
+            // class Test:
+            //     safe_age: (
+            //         Decimal  #  the user's age, used to determine if it's safe for them to use ruff
+            //     )
+            // ```
+            FormatStatementsLastExpression::left_to_right(annotation, item).fmt(f)?;
+        }
+
+        if f.options().source_type().is_ipynb()
+            && f.context().node_level().is_last_top_level_statement()
+            && target.is_name_expr()
+            && trailing_semicolon(item.into(), f.context().source()).is_some()
+        {
+            token(";").fmt(f)?;
+        }
+
+        Ok(())
+    }
+}

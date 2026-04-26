@@ -1,17 +1,23 @@
 mod reverse_transforms;
 mod transforms;
 pub mod config;
+pub mod source_map;
 pub mod symbol_table;
 
 pub use config::Config;
+pub use source_map::SourceMap;
 
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_parser::parse_module;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use symbol_table::SymbolTable;
 
 pub fn transpile(source: &str, config: &Config) -> Result<String, String> {
+    transpile_with_map(source, config).map(|(s, _)| s)
+}
+
+pub fn transpile_with_map(source: &str, config: &Config) -> Result<(String, SourceMap), String> {
     let parsed = parse_module(source).map_err(|e| e.to_string())?;
     let symbols = SymbolTable::build(source, parsed.suite());
 
@@ -29,13 +35,15 @@ pub fn transpile(source: &str, config: &Config) -> Result<String, String> {
     let mut literal_types = transforms::literal_types::LiteralType::new(source, &symbols);
     let mut auto_quote = transforms::auto_quote::AutoQuote::new(source);
     let mut intersection = transforms::intersection::IntersectionType::new(source);
+    let mut callable = transforms::callable::CallableSyntax::new(source);
     let mut unpack = transforms::unpack::UnpackSyntax::new(source, config.clone());
     let mut empty_decls = transforms::empty_declarations::EmptyDeclarations::new();
     let mut modifiers = transforms::modifiers::Modifiers::new(source);
     let mut overload = transforms::overload::Overload::new(source);
     let mut coalesce = transforms::coalesce::NoneCoalesce::new(source);
-    let mut none_chain = transforms::none_chain::NoneChain::new(source);
+    let mut none_chain = transforms::none_chain::NoneChain::new(source, &symbols);
     let mut dedent_string = transforms::dedent_string::DedentString::new(source);
+    let mut typed_lambda = transforms::typed_lambda::TypedLambda::new(source);
 
     for stmt in parsed.suite() {
         subscript.visit_stmt(stmt);
@@ -47,12 +55,14 @@ pub fn transpile(source: &str, config: &Config) -> Result<String, String> {
         literal_types.visit_stmt(stmt);
         auto_quote.visit_stmt(stmt);
         intersection.visit_stmt(stmt);
+        callable.visit_stmt(stmt);
         unpack.visit_stmt(stmt);
         empty_decls.visit_stmt(stmt);
         modifiers.visit_stmt(stmt);
         coalesce.visit_stmt(stmt);
         none_chain.visit_stmt(stmt);
         dedent_string.visit_stmt(stmt);
+        typed_lambda.visit_stmt(stmt);
     }
     // Overload uses visit_body to see sibling statements; entry via the module suite.
     use ruff_python_ast::visitor::Visitor as _;
@@ -68,16 +78,29 @@ pub fn transpile(source: &str, config: &Config) -> Result<String, String> {
     edits.extend(literal_types.edits);
     edits.extend(auto_quote.edits);
     edits.extend(intersection.edits);
+    edits.extend(callable.edits);
     edits.extend(unpack.edits);
-    edits.extend(empty_decls.edits);
     let exports = std::mem::take(&mut modifiers.exports);
+    let private_renames = std::mem::take(&mut modifiers.private_renames);
     edits.extend(modifiers.edits);
+    edits.extend(empty_decls.edits);
+
+    // rename call sites that reference private-renamed module-level symbols
+    if !private_renames.is_empty() {
+        let mut name_renamer = transforms::modifiers::NameRenamer::new(&private_renames);
+        for stmt in parsed.suite() {
+            name_renamer.visit_stmt(stmt);
+        }
+        edits.extend(name_renamer.edits);
+    }
     edits.extend(overload.edits);
     edits.extend(coalesce.edits);
     edits.extend(none_chain.edits);
     edits.extend(dedent_string.edits);
+    edits.extend(typed_lambda.edits);
 
-    let result = apply_edits(source, edits);
+    let kept_edits = dedup_edits(edits);
+    let result = apply_deduped(source, &kept_edits);
 
     // Append auto-generated `__all__` when `export`/`public` was used.
     let result = if exports.is_empty() {
@@ -124,6 +147,9 @@ pub fn transpile(source: &str, config: &Config) -> Result<String, String> {
     // Modifier keyword imports.
     {
         let mut typing_imports: Vec<&'static str> = Vec::new();
+        if callable.needs_import {
+            typing_imports.push("Callable");
+        }
         if modifiers.needs_final {
             typing_imports.push("final");
         }
@@ -164,11 +190,15 @@ pub fn transpile(source: &str, config: &Config) -> Result<String, String> {
         preamble.push_str("_MISSING = object()\n");
     }
 
-    if preamble.is_empty() {
-        Ok(result)
+    let output = if preamble.is_empty() {
+        result
     } else {
-        Ok(format!("{preamble}{result}"))
-    }
+        format!("{preamble}{result}")
+    };
+
+    let map = SourceMap::build(source, &kept_edits, &preamble);
+
+    Ok((output, map))
 }
 
 /// Rewrite standard Python source into idiomatic basedpython.
@@ -200,14 +230,11 @@ pub fn reverse_transpile(source: &str, _config: &Config) -> Result<String, Strin
     Ok(apply_edits(source, edits))
 }
 
-fn apply_edits(source: &str, mut edits: Vec<(TextRange, String)>) -> String {
-    // Sort by start ascending, larger range first on ties, so that when a big
-    // edit subsumes a smaller one we see the big one first.
+/// sort and deduplicate edits: ascending by start, drop subsumed ranges
+fn dedup_edits(mut edits: Vec<(TextRange, String)>) -> Vec<(TextRange, String)> {
     edits.sort_by_key(|e| (e.0.start(), std::cmp::Reverse(e.0.end())));
-
-    // Drop edits whose range is fully covered by a previously accepted edit.
     let mut kept: Vec<(TextRange, String)> = Vec::new();
-    let mut max_end = ruff_text_size::TextSize::from(0);
+    let mut max_end = TextSize::from(0);
     for (range, text) in edits {
         if range.start() >= max_end {
             if range.end() > max_end {
@@ -215,16 +242,21 @@ fn apply_edits(source: &str, mut edits: Vec<(TextRange, String)>) -> String {
             }
             kept.push((range, text));
         }
-        // else: subsumed by an earlier (larger) edit — discard
     }
+    kept
+}
 
-    // Apply in reverse start order so earlier offsets aren't shifted.
-    kept.sort_by_key(|e| std::cmp::Reverse(e.0.start()));
+fn apply_deduped(source: &str, deduped: &[(TextRange, String)]) -> String {
     let mut result = source.to_string();
-    for (range, new_text) in kept {
+    for (range, new_text) in deduped.iter().rev() {
         let start = usize::from(range.start());
         let end = usize::from(range.end());
-        result.replace_range(start..end, &new_text);
+        result.replace_range(start..end, new_text);
     }
     result
+}
+
+fn apply_edits(source: &str, edits: Vec<(TextRange, String)>) -> String {
+    let kept = dedup_edits(edits);
+    apply_deduped(source, &kept)
 }

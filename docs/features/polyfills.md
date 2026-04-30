@@ -181,19 +181,19 @@ redirected to `typing_extensions.Required` / `typing_extensions.NotRequired`
 
 ### `typing.TypeVarTuple` / `typing.Unpack` (PEP 646)
 
-Redirected to `typing_extensions.TypeVarTuple` / `typing_extensions.Unpack` 
+redirected to `typing_extensions.TypeVarTuple` / `typing_extensions.Unpack` 
 
 ### `typing.dataclass_transform` (PEP 681)
 
-Redirected to `typing_extensions.dataclass_transform` 
+redirected to `typing_extensions.dataclass_transform` 
 
 ### `typing.reveal_type` / `typing.assert_type`
 
-Redirected to `typing_extensions.reveal_type` / `typing_extensions.assert_type` 
+redirected to `typing_extensions.reveal_type` / `typing_extensions.assert_type` 
 
 ### `datetime.UTC`
 
-Rewritten to `datetime.timezone.utc`:
+rewritten to `datetime.timezone.utc`:
 
 ```python
 # python source
@@ -204,7 +204,7 @@ from datetime import UTC
 from datetime import timezone as UTC
 ```
 
-Or inline:
+or inline:
 
 ```python
 # python source
@@ -217,7 +217,7 @@ datetime.timezone.utc
 
 ### `sys.exception()`
 
-Rewritten to `sys.exc_info()[1]`:
+rewritten to `sys.exc_info()[1]`:
 
 ```python
 # python source
@@ -230,15 +230,15 @@ err = sys.exc_info()[1]
 
 ### `math.exp2(x)`
 
-Rewritten to `2 ** x`.
+rewritten to `2 ** x`.
 
 ### `math.cbrt(x)`
 
-Injected as a shim: `x ** (1 / 3)` for positive values, with sign handling for negative values.
+injected as a shim: `x ** (1 / 3)` for positive values, with sign handling for negative values.
 
 ### `enum.StrEnum`
 
-Injected as a pure-Python shim:
+injected as a pure-Python shim:
 
 ```python
 class StrEnum(str, enum.Enum):
@@ -360,7 +360,7 @@ type Grid[T] = list[list[T]]
 ```
 ```python
 # generated Python
-from typing_extensions import TypeALiasType
+from typing_extensions import TypeAliasType
 
 Point = TypeAliasType("Point", tuple[float, float])
 Grid = TypeAliasType("Grid", tuple[float, float])

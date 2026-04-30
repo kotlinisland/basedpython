@@ -54,10 +54,10 @@ TODO: more top types like `Callable[Ts, None]`?
 `Concatenate` will be replaced with a new unpack notation:
 `***` means unpack positional and keyword items, a combination of `*` and `**`
 ```bython
-def f[P: Parameters](fn: Callable[P, None] -> Callable[[int, ***P], None]:
+def f[P: Parameters](fn: Callable[P, None]) -> Callable[[int, ***P], None]:
 ```
 
-`Callable` will expose it's type via "attributes as types" by forwarding to it's `Parameters` type parameter
+`Callable` will expose its type via "attributes as types" by forwarding to it's `Parameters` type parameter
 ```bython
 class Callable[P: Parameters, R]:
     @type_check_only

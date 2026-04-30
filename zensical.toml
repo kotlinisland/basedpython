@@ -1,6 +1,32 @@
 [project]
 site_name = "basedpython"
 site_url = "https://kotlinisland.github.io/basedpython/"
+nav = [
+    "index.md",
+    "getting-started.md",
+    {"features" = [
+        {"auto-quoting" ="features/auto-quoting.md"},
+        {"callable syntax" = "features/callable-syntax.md"},
+        {"intersection types" = "features/intersection-types.md"},
+        {"literal types" = "features/literal-types.md"},
+        {"modifier keywords" = "features/modifiers.md"},
+        {"multiline strings" = "features/multiline-strings.md"},
+        {"mutable default arguments" = "features/mutable-defaults.md"},
+        {"none operators" = "features/none-operators.md"},
+        {"overload syntax" = "features/overload.md"},
+        {"polyfills" = "features/polyfills.md"},
+        {"subscription normalization" = "features/subscription-normalization.md"},
+        {"typed lambda" = "features/typed-lambda.md"},
+        {"unpack syntax" = "features/unpack-syntax.md"},
+        {"visibility modifiers" = "features/visibility-modifiers.md"}
+    ]},
+    {"development" = [
+        {"generics" = "development/generics.md"},
+        {"how transpilation works" = "development/how-transpilation-works.md"},
+        {"reverse transforms" = "development/reverse-transforms.md"},
+        {"ruff upstream sync" = "development/ruff-upstream-sync.md"}
+    ]}
+]
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
@@ -13,3 +39,9 @@ media = "(prefers-color-scheme: dark)"
 scheme = "slate"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to light mode"
+
+[project.theme]
+features = [
+    "navigation.path",
+    "navigation.indexes",
+]

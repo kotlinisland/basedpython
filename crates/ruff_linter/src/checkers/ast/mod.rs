@@ -908,6 +908,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.source_type.is_ipynb()
     }
 
+    fn is_basedpython(&self) -> bool {
+        self.source_type.is_basedpython()
+    }
+
     fn in_generator_context(&self) -> bool {
         for scope in self.semantic.current_scopes() {
             if matches!(
@@ -1720,6 +1724,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 arguments: _,
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) => {
                 if let Expr::Name(ast::ExprName {
                     id,
@@ -1794,6 +1799,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Expr::Lambda(
                 lambda @ ast::ExprLambda {
                     parameters,
+                    returns: _,
                     body: _,
                     range: _,
                     node_index: _,
@@ -1840,6 +1846,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 arguments,
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) => {
                 self.visit_expr(func);
 
@@ -2122,6 +2129,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ctx,
                 range: _,
                 node_index: _,
+                is_typeof: _,
             }) => {
                 // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
@@ -2163,6 +2171,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 range: _,
                                 node_index: _,
                                 parenthesized: _,
+                                is_anon_named_tuple: _,
+                                is_anon_named_tuple_value: _,
+                                parameter_slash: _,
+                                parameter_star: _,
+                                is_parameter_shape: _,
                             }) = slice.as_ref()
                             {
                                 let mut iter = elts.iter();
@@ -2212,7 +2225,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
             }
             Expr::StringLiteral(string_literal) => {
-                if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
+                // basedpython promotes bare string literals in type positions to
+                // `Literal["..."]` rather than treating them as forward references
+                if self.semantic.in_type_definition()
+                    && !self.semantic.in_typing_literal()
+                    && !self.source_type.is_basedpython()
+                {
                     self.visit
                         .string_type_definitions
                         .push((string_literal, self.semantic.snapshot()));
@@ -2419,6 +2437,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 name: _,
                 range: _,
                 node_index: _,
+                variance: _,
             }) => {
                 if let Some(expr) = bound {
                     self.visit
@@ -3173,6 +3192,7 @@ impl<'a> Checker<'a> {
 
                 let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
+                    returns: _,
                     body,
                     range: _,
                     node_index: _,

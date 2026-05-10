@@ -73,6 +73,7 @@ fn map_call_with_two_arguments<'a>(
             },
         range: _,
         node_index: _,
+        is_cast: _,
     } = call;
 
     if !keywords.is_empty() {

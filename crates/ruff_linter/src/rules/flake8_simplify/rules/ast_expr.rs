@@ -254,6 +254,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         arguments: Arguments { args, keywords, .. },
         range: _,
         node_index: _,
+        is_cast: _,
     }) = expr
     else {
         return;

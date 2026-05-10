@@ -18,8 +18,13 @@ use crate::text_helpers::ShowNonprinting;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SourceKind {
-    /// The source contains Python source code, and whether it's a stub.
-    Python { code: String, is_stub: bool },
+    /// The source contains Python source code, whether it's a stub, and
+    /// whether basedpython grammar extensions are enabled.
+    Python {
+        code: String,
+        is_stub: bool,
+        is_basedpython: bool,
+    },
     /// The source contains a Jupyter notebook.
     IpyNotebook(Box<Notebook>),
     /// The source contains Markdown text.
@@ -57,7 +62,7 @@ impl SourceKind {
 
     pub fn expect_python(self) -> String {
         match self {
-            SourceKind::Python { code, is_stub: _ } => code,
+            SourceKind::Python { code, .. } => code,
             _ => panic!("expected python code"),
         }
     }
@@ -79,8 +84,26 @@ impl SourceKind {
     pub fn py_source_type(&self) -> PySourceType {
         match self {
             Self::IpyNotebook(_) => PySourceType::Ipynb,
-            Self::Python { is_stub: true, .. } => PySourceType::Stub,
-            Self::Python { is_stub: false, .. } => PySourceType::Python,
+            Self::Python {
+                is_stub: true,
+                is_basedpython: true,
+                ..
+            } => PySourceType::BasedPythonStub,
+            Self::Python {
+                is_stub: true,
+                is_basedpython: false,
+                ..
+            } => PySourceType::Stub,
+            Self::Python {
+                is_stub: false,
+                is_basedpython: true,
+                ..
+            } => PySourceType::BasedPython,
+            Self::Python {
+                is_stub: false,
+                is_basedpython: false,
+                ..
+            } => PySourceType::Python,
             Self::Markdown(_) => PySourceType::Python,
         }
     }
@@ -93,9 +116,14 @@ impl SourceKind {
                 cloned.update(source_map, new_source);
                 SourceKind::IpyNotebook(cloned)
             }
-            SourceKind::Python { is_stub, .. } => SourceKind::Python {
+            SourceKind::Python {
+                is_stub,
+                is_basedpython,
+                ..
+            } => SourceKind::Python {
                 code: new_source,
                 is_stub: *is_stub,
+                is_basedpython: *is_basedpython,
             },
             SourceKind::Markdown(_) => SourceKind::Markdown(new_source),
         }
@@ -123,6 +151,7 @@ impl SourceKind {
                 Ok(Some(Self::Python {
                     code: contents,
                     is_stub: py_source_type.is_stub(),
+                    is_basedpython: py_source_type.is_basedpython(),
                 }))
             }
             SourceType::Markdown => {
@@ -149,6 +178,7 @@ impl SourceKind {
             SourceType::Python(py_source_type) => Ok(Some(Self::Python {
                 code: source_code,
                 is_stub: py_source_type.is_stub(),
+                is_basedpython: py_source_type.is_basedpython(),
             })),
             SourceType::Toml(_) => Ok(None),
             SourceType::Markdown => Ok(Some(Self::Markdown(source_code))),

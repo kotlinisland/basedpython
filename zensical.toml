@@ -1,0 +1,72 @@
+[project]
+site_name = "basedpython"
+site_url = "https://kotlinisland.github.io/basedpython/"
+docs_dir = "docs/basedpython"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.nav]]
+"basedpython language reference" = "index.md"
+
+[[project.nav]]
+"getting started" = "getting-started.md"
+
+[[project.nav]]
+"CLI reference" = "cli-reference.md"
+
+[[project.nav]]
+"api lock" = "features/api-lock.md"
+
+[[project.nav]]
+"python version compatibility" = "features/polyfills.md"
+
+[[project.nav]]
+"type-system features" = [
+  { "tuple type literals" = "features/tuple-types.md" },
+  { "callable arrow syntax" = "features/callable.md" },
+  { "intersection types" = "features/intersection.md" },
+  { "negation types" = "features/not-type.md" },
+  { "`typeof` keyword" = "features/typeof.md" },
+  { "strict `float` and `complex`" = "features/no-number-promotions.md" },
+  { "literal type promotion" = "features/literal-types.md" },
+  { "typed dict literals" = "features/typed-dict-literal.md" },
+  { "anonymous named tuple types" = "features/anonymous-named-tuple.md" },
+  { "explicit typevar constraints" = "features/constraints.md" },
+  { "typevar variance keywords" = "features/variance.md" },
+  { "explicit generic call sites" = "features/generic-calls.md" },
+  { "automatic forward references" = "features/forward-references.md" },
+  { "typed lambda" = "features/typed-lambda.md" },
+  { "implicit overload stubs" = "features/overloads.md" },
+  { "type narrowing predicates" = "features/type-is.md" },
+]
+
+[[project.nav]]
+"syntax extensions" = [
+  { "modifiers and visibility" = "features/modifiers.md" },
+  { "empty declarations" = "features/empty-declarations.md" },
+  { "identity and isinstance" = "features/identity-swap.md" },
+  { "optional chaining (`?.`)" = "features/optional-chaining.md" },
+  { "none-coalesce operator (`??`)" = "features/none-coalesce.md" },
+  { "mutable default arguments" = "features/mutable-defaults.md" },
+  { "dedented triple-quoted strings" = "features/dedent-strings.md" },
+  { "subscription normalization" = "features/subscription-normalization.md" },
+  { "keyword arguments in subscripts" = "features/kw-subscript.md" },
+  { "unpack syntax" = "features/unpack-syntax.md" },
+  { "super keyword" = "features/super.md" }
+]
+
+[[project.nav]]
+development = [
+  { "how transpilation works" = "development/how-transpilation-works.md" },
+  { "reverse transforms" = "development/reverse-transforms.md" }
+]

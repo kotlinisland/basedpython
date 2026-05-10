@@ -127,6 +127,7 @@ Module(
                                         args: [],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                             ctx: Load,

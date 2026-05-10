@@ -572,7 +572,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:6:12
       |
@@ -618,7 +618,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:7:12
       |

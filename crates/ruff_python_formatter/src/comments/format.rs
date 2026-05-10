@@ -333,10 +333,10 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 2 => write!(f, [empty_line()]),
                 _ => match f.options().source_type() {
-                    PySourceType::Stub => {
+                    PySourceType::Stub | PySourceType::BasedPythonStub => {
                         write!(f, [empty_line()])
                     }
-                    PySourceType::Python | PySourceType::Ipynb => {
+                    PySourceType::Python | PySourceType::BasedPython | PySourceType::Ipynb => {
                         write!(f, [empty_line(), empty_line()])
                     }
                 },
@@ -573,9 +573,12 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
             .find(|comment| comment.line_position().is_own_line())
         {
             // Black has different rules for stub vs. non-stub and top level vs. indented
-            let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-                (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
-                (PySourceType::Stub, _) => u32::from(self.node_kind == NodeKind::StmtClassDef),
+            let empty_lines = match (
+                f.options().source_type().is_stub(),
+                f.context().node_level(),
+            ) {
+                (true, NodeLevel::TopLevel(_)) => 1,
+                (true, _) => u32::from(self.node_kind == NodeKind::StmtClassDef),
                 (_, NodeLevel::TopLevel(_)) => 2,
                 (_, _) => 1,
             };
@@ -622,9 +625,12 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesAfterLeadingComments<'_> {
             .find(|comment| comment.line_position().is_own_line())
         {
             // Black has different rules for stub vs. non-stub and top level vs. indented
-            let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-                (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
-                (PySourceType::Stub, _) => 0,
+            let empty_lines = match (
+                f.options().source_type().is_stub(),
+                f.context().node_level(),
+            ) {
+                (true, NodeLevel::TopLevel(_)) => 1,
+                (true, _) => 0,
                 (_, NodeLevel::TopLevel(_)) => 2,
                 (_, _) => 1,
             };

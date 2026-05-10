@@ -13,7 +13,7 @@ use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    UnionType, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -41,6 +41,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             range: _,
             node_index: _,
         } = binary;
+
+        // basedpython `a ?? b` lowers to `a if a is not None else b`. infer
+        // accordingly: result is `(left minus None) | right`
+        if *op == ast::Operator::Coalesce {
+            let db = self.db();
+            let left_ty = self.infer_expression(left, tcx);
+            let right_ty = self.infer_expression(right, tcx);
+            let none = Type::none(db);
+            let left_non_none = if left_ty.is_subtype_of(db, none) {
+                Type::Never
+            } else {
+                match left_ty {
+                    Type::Union(u) => u.map(db, |elem| {
+                        if elem.is_subtype_of(db, none) {
+                            Type::Never
+                        } else {
+                            *elem
+                        }
+                    }),
+                    _ => left_ty,
+                }
+            };
+            if left_non_none.is_equivalent_to(db, right_ty) {
+                return left_non_none;
+            }
+            return UnionType::from_two_elements(db, left_non_none, right_ty);
+        }
 
         let (left_ty, right_ty) =
             match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
@@ -593,10 +620,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ),
 
                     (
-                        LiteralValueTypeKind::Int(_),
-                        LiteralValueTypeKind::Int(_),
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
                         ast::Operator::Div,
-                    ) => Some(KnownClass::Float.to_instance(db)),
+                    ) => Some({
+                        // basedpython: int/int true division produces a float literal when the
+                        // divisor is non-zero. for `.py` files (or div-by-zero) fall back to the
+                        // float instance to preserve typeshed's `int|float` widening behaviour
+                        #[expect(clippy::cast_precision_loss)]
+                        let computed = if self.is_basedpython_file() && m.as_i64() != 0 {
+                            Some(Type::float_literal(n.as_i64() as f64 / m.as_i64() as f64))
+                        } else {
+                            None
+                        };
+                        computed.unwrap_or_else(|| KnownClass::Float.to_instance(db))
+                    }),
 
                     (
                         LiteralValueTypeKind::Int(n),
@@ -834,7 +872,49 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Some(result)
                     }
 
-                    _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
+                    (l, r, op) => {
+                        // basedpython: literal arithmetic on float/complex (and mixed numeric).
+                        // f64 arithmetic preserves IEEE 754 semantics — `0.1 + 0.2` becomes
+                        // `Literal[0.30000000000000004]`, not `Literal[0.3]`. Division by zero
+                        // and NaN results fall through to the dunder path so they don't surface
+                        // as `Literal[inf]` / `Literal[NaN]`
+                        let complex_involved = matches!(l, LiteralValueTypeKind::Complex(_))
+                            || matches!(r, LiteralValueTypeKind::Complex(_));
+                        let float_involved = matches!(l, LiteralValueTypeKind::Float(_))
+                            || matches!(r, LiteralValueTypeKind::Float(_));
+
+                        let outcome = if complex_involved {
+                            as_complex_components(db, l)
+                                .zip(as_complex_components(db, r))
+                                .map(|(a, b)| complex_binary_op_result(db, a, b, op))
+                        } else if float_involved {
+                            as_f64_value(l)
+                                .zip(as_f64_value(r))
+                                .map(|(a, b)| float_binary_op_result(a, b, op))
+                        } else {
+                            None
+                        };
+
+                        match outcome {
+                            Some(LiteralArithOutcome::Literal(ty)) => Some(ty),
+                            Some(LiteralArithOutcome::Widen) => {
+                                // basedpython: widen to the typing-spec union form so the
+                                // result mirrors how `float` / `complex` annotations are
+                                // interpreted in `.py` files (`int | float`,
+                                // `int | float | complex`). this gives callers something
+                                // they can use without losing all type info
+                                let widened = if complex_involved {
+                                    crate::types::set_theoretic::KnownUnion::Complex.to_type(db)
+                                } else {
+                                    crate::types::set_theoretic::KnownUnion::Float.to_type(db)
+                                };
+                                Some(widened)
+                            }
+                            Some(LiteralArithOutcome::Unsupported) | None => {
+                                Type::try_call_bin_op_return_type(db, left_ty, op, right_ty)
+                            }
+                        }
+                    }
                 };
 
                 result.map(|result| match result {
@@ -1050,7 +1130,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::LiteralValue(literal)
                 if matches!(
                     literal.kind(),
-                    LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
+                    LiteralValueTypeKind::Bool(_)
+                        | LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::Float(_)
                 ) => {}
             Type::NominalInstance(instance)
                 if matches!(
@@ -1076,4 +1158,111 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         true
     }
+}
+
+/// basedpython: extract an f64 value from a numeric-ish literal kind (bool/int/float)
+fn as_f64_value(kind: LiteralValueTypeKind<'_>) -> Option<f64> {
+    match kind {
+        LiteralValueTypeKind::Bool(b) => Some(if b { 1.0 } else { 0.0 }),
+        #[expect(clippy::cast_precision_loss)]
+        LiteralValueTypeKind::Int(n) => Some(n.as_i64() as f64),
+        LiteralValueTypeKind::Float(f) => Some(f.as_f64()),
+        _ => None,
+    }
+}
+
+/// basedpython: extract `(re, im)` from any numeric-ish literal kind (bool/int/float/complex)
+fn as_complex_components<'db>(
+    db: &'db dyn Db,
+    kind: LiteralValueTypeKind<'db>,
+) -> Option<(f64, f64)> {
+    match kind {
+        LiteralValueTypeKind::Complex(c) => Some((c.re(db), c.im(db))),
+        _ => as_f64_value(kind).map(|v| (v, 0.0)),
+    }
+}
+
+/// basedpython literal-arithmetic outcome
+pub(crate) enum LiteralArithOutcome<'db> {
+    /// A literal value was computed
+    Literal(Type<'db>),
+    /// Arithmetic is defined but the result is undefined at runtime (NaN, division by zero).
+    /// Widen to the instance type rather than fall through to dunder dispatch, since the
+    /// typeshed dunder may return `Any` (e.g. `float.__pow__(float) -> Any`)
+    Widen,
+    /// Op not supported on this type; fall through to dunder dispatch
+    Unsupported,
+}
+
+/// basedpython: compute the result of a binary operation on two f64 values
+fn float_binary_op_result<'db>(a: f64, b: f64, op: ast::Operator) -> LiteralArithOutcome<'db> {
+    let result = match op {
+        ast::Operator::Add => a + b,
+        ast::Operator::Sub => a - b,
+        ast::Operator::Mult => a * b,
+        ast::Operator::Div => {
+            if b == 0.0 {
+                return LiteralArithOutcome::Widen;
+            }
+            a / b
+        }
+        ast::Operator::FloorDiv => {
+            if b == 0.0 {
+                return LiteralArithOutcome::Widen;
+            }
+            (a / b).floor()
+        }
+        ast::Operator::Mod => {
+            if b == 0.0 {
+                return LiteralArithOutcome::Widen;
+            }
+            a - (a / b).floor() * b
+        }
+        ast::Operator::Pow => {
+            // Python promotes `(-1.0) ** 0.5` to a complex; f64 returns NaN. Widen to
+            // `float` (= `int | float` in basedpython) rather than the typeshed dunder
+            // which returns `Any` and erases all useful information
+            let r = a.powf(b);
+            if r.is_nan() {
+                return LiteralArithOutcome::Widen;
+            }
+            r
+        }
+        _ => return LiteralArithOutcome::Unsupported,
+    };
+    if result.is_nan() {
+        return LiteralArithOutcome::Widen;
+    }
+    LiteralArithOutcome::Literal(Type::float_literal(result))
+}
+
+/// basedpython: compute the result of a binary operation on two complex values.
+/// Only Add/Sub/Mult/Div are supported; other operators fall through to the dunder
+/// path so that `complex // complex` etc. surface as ordinary unsupported-op errors
+fn complex_binary_op_result(
+    db: &dyn Db,
+    (a_re, a_im): (f64, f64),
+    (b_re, b_im): (f64, f64),
+    op: ast::Operator,
+) -> LiteralArithOutcome<'_> {
+    let (re, im) = match op {
+        ast::Operator::Add => (a_re + b_re, a_im + b_im),
+        ast::Operator::Sub => (a_re - b_re, a_im - b_im),
+        ast::Operator::Mult => (a_re * b_re - a_im * b_im, a_re * b_im + a_im * b_re),
+        ast::Operator::Div => {
+            let denom = b_re * b_re + b_im * b_im;
+            if denom == 0.0 {
+                return LiteralArithOutcome::Widen;
+            }
+            (
+                (a_re * b_re + a_im * b_im) / denom,
+                (a_im * b_re - a_re * b_im) / denom,
+            )
+        }
+        _ => return LiteralArithOutcome::Unsupported,
+    };
+    if re.is_nan() || im.is_nan() {
+        return LiteralArithOutcome::Widen;
+    }
+    LiteralArithOutcome::Literal(Type::complex_literal(db, re, im))
 }

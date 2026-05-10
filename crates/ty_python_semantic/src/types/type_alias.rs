@@ -25,7 +25,7 @@ pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    rhs_scope: ScopeId<'db>,
+    pub(crate) rhs_scope: ScopeId<'db>,
 
     pub(super) specialization: Option<Specialization<'db>>,
 }

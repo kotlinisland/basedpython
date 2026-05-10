@@ -83,6 +83,11 @@ Module(
                                             ],
                                             ctx: Load,
                                             parenthesized: true,
+                                            is_anon_named_tuple: false,
+                                            is_anon_named_tuple_value: false,
+                                            parameter_slash: None,
+                                            parameter_star: None,
+                                            is_parameter_shape: false,
                                         },
                                     ),
                                     ifs: [],
@@ -149,6 +154,7 @@ Module(
                                                 ],
                                                 keywords: [],
                                             },
+                                            is_cast: false,
                                         },
                                     ),
                                     ifs: [],
@@ -612,6 +618,11 @@ Module(
                                             ],
                                             ctx: Store,
                                             parenthesized: false,
+                                            is_anon_named_tuple: false,
+                                            is_anon_named_tuple_value: false,
+                                            parameter_slash: None,
+                                            parameter_star: None,
+                                            is_parameter_shape: false,
                                         },
                                     ),
                                     iter: Name(
@@ -680,6 +691,11 @@ Module(
                                             ],
                                             ctx: Store,
                                             parenthesized: false,
+                                            is_anon_named_tuple: false,
+                                            is_anon_named_tuple_value: false,
+                                            parameter_slash: None,
+                                            parameter_star: None,
+                                            is_parameter_shape: false,
                                         },
                                     ),
                                     iter: Name(
@@ -1084,6 +1100,7 @@ Module(
                                                 ],
                                                 keywords: [],
                                             },
+                                            is_cast: false,
                                         },
                                     ),
                                     ifs: [],
@@ -1255,6 +1272,7 @@ Module(
                                                     kwarg: None,
                                                 },
                                             ),
+                                            returns: None,
                                             body: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
@@ -1461,6 +1479,7 @@ Module(
                                                         kwarg: None,
                                                     },
                                                 ),
+                                                returns: None,
                                                 body: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),

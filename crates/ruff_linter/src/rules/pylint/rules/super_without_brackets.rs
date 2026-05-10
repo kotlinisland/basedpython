@@ -71,6 +71,12 @@ impl AlwaysFixableViolation for SuperWithoutBrackets {
 
 /// PLW0245
 pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
+    // basedpython promotes bare `super` (and `super[T]`) into the canonical call
+    // forms at transpile time, so the parentheses-less form is intentional
+    if checker.source_type.is_basedpython() {
+        return;
+    }
+
     // The call must be to `super` (without parentheses).
     let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
         return;

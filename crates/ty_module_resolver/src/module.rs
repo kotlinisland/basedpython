@@ -129,19 +129,26 @@ fn all_submodule_names_for_package<'db>(
     ) -> bool {
         is_dir
             || (is_file
-                && matches!(extension, Some("py" | "pyi"))
-                && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
+                && matches!(extension, Some("py" | "pyi" | "by" | "byi"))
+                && !matches!(
+                    basename,
+                    Some("__init__.py" | "__init__.pyi" | "__init__.by" | "__init__.byi")
+                ))
     }
 
     fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
         system_path_to_file(db, dir.join("__init__.pyi"))
             .or_else(|_| system_path_to_file(db, dir.join("__init__.py")))
+            .or_else(|_| system_path_to_file(db, dir.join("__init__.byi")))
+            .or_else(|_| system_path_to_file(db, dir.join("__init__.by")))
             .ok()
     }
 
     fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {
         vendored_path_to_file(db, dir.join("__init__.pyi"))
             .or_else(|_| vendored_path_to_file(db, dir.join("__init__.py")))
+            .or_else(|_| vendored_path_to_file(db, dir.join("__init__.byi")))
+            .or_else(|_| vendored_path_to_file(db, dir.join("__init__.by")))
             .ok()
     }
 
@@ -159,8 +166,11 @@ fn all_submodule_names_for_package<'db>(
 
     let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
     debug_assert!(
-        matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
-        "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
+        matches!(
+            path.file_name(),
+            Some("__init__.py" | "__init__.pyi" | "__init__.by" | "__init__.byi")
+        ),
+        "expected package file `{:?}` to be `__init__.py`, `__init__.pyi`, `__init__.by`, or `__init__.byi`",
         path.file_name(),
     );
 

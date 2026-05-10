@@ -1,0 +1,11 @@
+class A(list[A]):
+    pass
+
+class B(dict[str, list[B | None]]):
+    pass
+
+class C(C):
+    pass
+
+class D(list[Z]):
+    pass

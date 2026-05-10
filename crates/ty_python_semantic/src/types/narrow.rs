@@ -1587,9 +1587,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let mut last_rhs_ty: Option<Type> = None;
 
+        // basedpython: in `.by` files, the `is`/`is not` keyword form
+        // performs isinstance-style narrowing on the lhs (the `===`/`!==`
+        // operators retain Python's identity-narrowing semantics). The
+        // parser flattens both spellings to the same `CmpOp`, so we look
+        // at the original source text between the two operands to tell
+        // them apart
+        let file = expression.file(self.db);
+        let basedpython_keyword_form = file
+            .source_type(self.db)
+            .is_basedpython()
+            .then(|| ruff_db::source::source_text(self.db, file));
+
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
+
+            // literal rhs (None, True/False, numbers, strings, bytes, `...`) keeps
+            // Python identity semantics — `isinstance(x, None)` would be invalid
+            let basedpython_is_keyword = basedpython_keyword_form.as_ref().is_some_and(|src| {
+                use ruff_text_size::Ranged;
+                matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) && !right.is_literal_expr() && {
+                    let between =
+                        &src[usize::from(left.range().end())..usize::from(right.range().start())];
+                    let trimmed = between.trim();
+                    !trimmed.starts_with("===") && !trimmed.starts_with("!==")
+                }
+            });
 
             // Narrowing for:
             // - `if type(x) is Y`
@@ -1641,6 +1665,31 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         ),
                     );
                 }
+            }
+
+            // basedpython: `x is Y` / `x is not Y` (keyword form) narrows
+            // on the lhs like `isinstance(x, Y)` / `not isinstance(x, Y)`
+            if basedpython_is_keyword
+                && narrowable_ast(left)
+                && let Some(narrowable) = PlaceExpr::try_from_expr(left)
+            {
+                let positive = is_positive == matches!(op, ast::CmpOp::Is);
+                if let Some(constraint_ty) = ClassInfoConstraintFunction::IsInstance
+                    .generate_constraint(self.db, rhs_ty, positive)
+                {
+                    let place = self.expect_place(&narrowable);
+                    let constraint = NarrowingConstraint::intersection(
+                        constraint_ty.negate_if(self.db, !positive),
+                    );
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone());
+                        })
+                        .or_insert(constraint);
+                }
+                last_rhs_ty = Some(rhs_ty);
+                continue;
             }
 
             // Left-hand-side narrowing for:

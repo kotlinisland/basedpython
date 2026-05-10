@@ -285,6 +285,7 @@ Module(
                                                 },
                                             ),
                                             ctx: Load,
+                                            is_typeof: false,
                                         },
                                     ),
                                     orelse: Name(

@@ -290,6 +290,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 },
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                is_cast: false,
             };
             Some(Expr::Call(call_node))
         } else {

@@ -60,6 +60,7 @@ Module(
                                 args: [],
                                 keywords: [],
                             },
+                            is_cast: false,
                         },
                     ),
                     annotation: Name(

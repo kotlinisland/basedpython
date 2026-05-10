@@ -279,16 +279,16 @@ Module(
             With(
                 StmtWith {
                     node_index: NodeIndex(None),
-                    range: 136..159,
+                    range: 136..160,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 141..154,
+                            range: 141..159,
                             node_index: NodeIndex(None),
                             context_expr: Tuple(
                                 ExprTuple {
                                     node_index: NodeIndex(None),
-                                    range: 141..154,
+                                    range: 141..159,
                                     elts: [
                                         Name(
                                             ExprName {
@@ -298,36 +298,40 @@ Module(
                                                 ctx: Load,
                                             },
                                         ),
-                                        Name(
-                                            ExprName {
+                                        Named(
+                                            ExprNamed {
                                                 node_index: NodeIndex(None),
-                                                range: 149..154,
-                                                id: Name("item2"),
-                                                ctx: Load,
+                                                range: 149..159,
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 149..154,
+                                                        id: Name("item2"),
+                                                        ctx: Invalid,
+                                                    },
+                                                ),
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 156..159,
+                                                    },
+                                                ),
                                             },
                                         ),
                                     ],
                                     ctx: Load,
                                     parenthesized: true,
+                                    is_anon_named_tuple: true,
+                                    is_anon_named_tuple_value: false,
+                                    parameter_slash: None,
+                                    parameter_star: None,
+                                    is_parameter_shape: false,
                                 },
                             ),
                             optional_vars: None,
                         },
                     ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 156..159,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 156..159,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
+                    body: [],
                 },
             ),
         ],
@@ -376,5 +380,12 @@ Module(
 3 | with (item1, item2 item3, item4): ...
 4 | with (item1, item2 as f1 item3, item4): ...
 5 | with (item1, item2: ...
-  |                   ^ Syntax Error: Expected `)`, found `:`
+  |            ^ Syntax Error: anonymous named tuple is not valid in .py files
+  |
+
+
+  |
+4 | with (item1, item2 as f1 item3, item4): ...
+5 | with (item1, item2: ...
+  |                        ^ Syntax Error: unexpected EOF while parsing
   |

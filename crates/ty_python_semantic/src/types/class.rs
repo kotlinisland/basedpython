@@ -478,7 +478,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the generic context if this is a generic class.
-    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+    pub fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.as_static().and_then(|class| class.generic_context(db))
     }
 
@@ -840,7 +840,7 @@ impl<'db> ClassType<'db> {
         matches!(self, Self::Generic(_))
     }
 
-    pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
+    pub(crate) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
         match self {
             Self::NonGeneric(_) => None,
             Self::Generic(generic) => Some(generic),

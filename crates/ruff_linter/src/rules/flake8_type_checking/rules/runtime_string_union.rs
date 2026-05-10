@@ -73,6 +73,12 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
         return;
     }
 
+    // basedpython promotes bare string literals in type positions to
+    // `Literal["..."]`, so they are valid members of a `X | Y` union
+    if checker.source_type.is_basedpython() {
+        return;
+    }
+
     // Search for strings within the binary operator.
     let mut strings = Vec::new();
     traverse_op(expr, &mut strings);

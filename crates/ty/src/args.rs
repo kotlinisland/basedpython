@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
 use clap::builder::Styles;
@@ -19,7 +21,11 @@ const STYLES: Styles = Styles::styled()
     .placeholder(AnsiColor::Cyan.on_default());
 
 #[derive(Debug, Parser)]
-#[command(author, name = "ty", about = "An extremely fast Python type checker.")]
+#[command(
+    author,
+    name = "by",
+    about = "an extremely fast Python type checker, with basedpython support"
+)]
 #[command(long_version = crate::version::version())]
 #[command(styles = STYLES)]
 pub struct Cli {
@@ -55,6 +61,58 @@ pub(crate) enum Command {
     Explain {
         #[command(subcommand)]
         command: ExplainCommand,
+    },
+
+    // ── basedpython commands ─────────────────────────────────────────────────
+    /// Transpile and run a module with `python -m <module>`.
+    Run {
+        /// module to run (e.g. `by run main` looks for main.by)
+        module: String,
+        /// minimum Python version the output must run on
+        #[arg(long, value_name = "VERSION", default_value = "3.10")]
+        min_version: String,
+    },
+
+    /// Transpile all .by files and write them to out/.
+    Build {
+        /// minimum Python version the output must run on
+        #[arg(long, value_name = "VERSION", default_value = "3.10")]
+        min_version: String,
+    },
+
+    /// Generate an api lockfile (`api.lock`) summarising the public type-level
+    /// surface of the project.
+    ///
+    /// The file is one record per public symbol in a terse, line-oriented
+    /// format. It is not meant to be parsed back into types — the goal is that
+    /// any meaningful change to the public api shows up as a diff.
+    GenerateApiFile {
+        /// Where to write the lockfile. Defaults to `api.lock` in the project root.
+        #[arg(short = 'o', long, value_name = "PATH")]
+        output: Option<PathBuf>,
+        /// Write the lockfile to stdout instead of a file.
+        #[arg(long, conflicts_with = "output")]
+        stdout: bool,
+        /// Run the command within the given project directory.
+        #[arg(long, value_name = "PROJECT")]
+        project: Option<SystemPathBuf>,
+        /// Path to your project's Python environment or interpreter.
+        #[arg(long, value_name = "PATH", alias = "venv")]
+        python: Option<SystemPathBuf>,
+        /// Python version to assume when resolving types.
+        #[arg(long, value_name = "VERSION", alias = "target-version", value_enum)]
+        python_version: Option<PythonVersion>,
+    },
+
+    /// Transpile a single file to stdout (reads stdin if no file given).
+    Transpile {
+        file: Option<PathBuf>,
+        /// convert Python source into basedpython idioms (instead of the default by → py direction)
+        #[arg(long)]
+        reverse: bool,
+        /// minimum Python version the output must run on
+        #[arg(long, value_name = "VERSION", default_value = "3.10")]
+        min_version: String,
     },
 }
 

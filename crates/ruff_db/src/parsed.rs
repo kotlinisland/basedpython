@@ -42,9 +42,12 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
 pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
+    let is_basedpython = matches!(file.path(db).extension(), Some("by" | "byi"));
 
     let target_version = db.python_version();
-    let options = ParseOptions::from(ty).with_target_version(target_version);
+    let options = ParseOptions::from(ty)
+        .with_target_version(target_version)
+        .with_basedpython(is_basedpython);
     parse_unchecked(&source, options)
         .try_into_module()
         .expect("PySourceType always parses into a module")

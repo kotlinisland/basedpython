@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/typed_dict_literal.by
+---
+## Input
+```bython
+a: {"name": str, "age": int}
+
+b: {"key": int, **: str}
+
+c: {**: int}
+
+d: dict[str, {"name": str, **: int}]
+
+def f(x: {"name": str, **: object}) -> {"id": int}: ...
+```
+
+## Output
+```bython
+a: {"name": str, "age": int}
+
+b: {"key": int, **: str}
+
+c: {**: int}
+
+d: dict[str, {"name": str, **: int}]
+
+
+def f(x: {"name": str, **: object}) -> {"id": int}: ...
+```

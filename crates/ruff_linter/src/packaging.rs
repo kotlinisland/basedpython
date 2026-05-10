@@ -30,6 +30,9 @@ pub fn is_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
         .iter()
         .any(|namespace_package| path.starts_with(namespace_package))
         || path.join("__init__.py").is_file()
+        || path.join("__init__.pyi").is_file()
+        || path.join("__init__.by").is_file()
+        || path.join("__init__.byi").is_file()
 }
 
 /// Return the package root for the given path to a directory with Python file.

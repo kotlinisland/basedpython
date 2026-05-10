@@ -363,6 +363,11 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
@@ -469,6 +474,11 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),

@@ -222,7 +222,10 @@ fn copy_directory_recursive(db: &mut Db, src: &SystemPath, dest: &SystemPath) ->
             copy_directory_recursive(db, src_path, &dest_path)?;
         } else if file_type.is_file() {
             let is_python_source = entry_path.extension().is_some_and(|ext| {
-                ext.eq_ignore_ascii_case("py") || ext.eq_ignore_ascii_case("pyi")
+                ext.eq_ignore_ascii_case("py")
+                    || ext.eq_ignore_ascii_case("pyi")
+                    || ext.eq_ignore_ascii_case("by")
+                    || ext.eq_ignore_ascii_case("byi")
             });
 
             if !is_python_source {

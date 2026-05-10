@@ -27,7 +27,7 @@ class Section(NamedTuple):
 
 
 SECTIONS: list[Section] = [
-    Section("Overview", "index.md", generated=True),
+    # Section("Overview", "index.md", generated=True),
     Section("Tutorial", "tutorial.md", generated=False),
     Section("Installing Ruff", "installation.md", generated=False),
     Section("The Ruff Linter", "linter.md", generated=False),
@@ -55,25 +55,25 @@ SECTIONS: list[Section] = [
 ]
 
 LINK_REWRITES: dict[str, str] = {
-    "https://docs.astral.sh/ruff/": "index.md",
-    "https://docs.astral.sh/ruff/configuration/": "configuration.md",
-    "https://docs.astral.sh/ruff/configuration/#config-file-discovery": (
-        "configuration.md#config-file-discovery"
-    ),
-    "https://docs.astral.sh/ruff/contributing/": "contributing.md",
-    "https://docs.astral.sh/ruff/editors": "editors/index.md",
-    "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
-    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
-        "faq.md#how-does-ruffs-linter-compare-to-flake8"
-    ),
-    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
-        "faq.md#how-does-ruffs-formatter-compare-to-black"
-    ),
-    "https://docs.astral.sh/ruff/installation/": "installation.md",
-    "https://docs.astral.sh/ruff/rules/": "rules.md",
-    "https://docs.astral.sh/ruff/settings/": "settings.md",
-    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
-    "https://docs.astral.sh/ruff/preview/": "preview.md",
+    # "https://docs.astral.sh/ruff/": "index.md",
+    # "https://docs.astral.sh/ruff/configuration/": "configuration.md",
+    # "https://docs.astral.sh/ruff/configuration/#config-file-discovery": (
+    #     "configuration.md#config-file-discovery"
+    # ),
+    # "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    # "https://docs.astral.sh/ruff/editors": "editors/index.md",
+    # "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
+    # "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
+    #     "faq.md#how-does-ruffs-linter-compare-to-flake8"
+    # ),
+    # "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
+    #     "faq.md#how-does-ruffs-formatter-compare-to-black"
+    # ),
+    # "https://docs.astral.sh/ruff/installation/": "installation.md",
+    # "https://docs.astral.sh/ruff/rules/": "rules.md",
+    # "https://docs.astral.sh/ruff/settings/": "settings.md",
+    # "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
+    # "https://docs.astral.sh/ruff/preview/": "preview.md",
 }
 
 
@@ -207,6 +207,11 @@ def main() -> None:
                     ["cargo", "dev", "generate-options"],
                     encoding="utf-8",
                 )
+            elif filename == "rules.md":
+                file_content = subprocess.check_output(
+                    ["cargo", "dev", "generate-rules-table"],
+                    encoding="utf-8",
+                )
             else:
                 block = content.split(f"<!-- Begin section: {title} -->\n\n")
                 if len(block) != 2:
@@ -219,12 +224,6 @@ def main() -> None:
                     raise ValueError(msg)
 
                 file_content = block[0]
-
-                if filename == "rules.md":
-                    file_content += "\n" + subprocess.check_output(
-                        ["cargo", "dev", "generate-rules-table"],
-                        encoding="utf-8",
-                    )
 
             f.write(clean_file_content(file_content, title))
 

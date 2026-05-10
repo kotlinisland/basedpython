@@ -725,9 +725,9 @@ mod tests {
           |     ^^^^^ Call site
           |
         info: Function: `print` (`builtins`)
-            --> stdlib/builtins.pyi:4367:5
+            --> stdlib/builtins.byi:4066:5
              |
-        4367 | def print(
+        4066 | def print(
              |     ^^^^^
              |
 
@@ -738,9 +738,9 @@ mod tests {
           |     ^^^^^ Call site
           |
         info: Function: `print` (`builtins`)
-            --> stdlib/builtins.pyi:4386:5
+            --> stdlib/builtins.byi:4084:5
              |
-        4386 | def print(
+        4084 | def print(
              |     ^^^^^
              |
         "#);
@@ -782,9 +782,9 @@ mod tests {
           |         ^^^^^ Call site
           |
         info: Class: `super` (`builtins`)
-           --> stdlib/builtins.pyi:316:7
+           --> stdlib/builtins.byi:281:7
             |
-        316 | class super:
+        281 | class super:
             |       ^^^^^
             |
         ");

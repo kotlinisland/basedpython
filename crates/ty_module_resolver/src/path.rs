@@ -38,10 +38,10 @@ impl ModulePath {
 
     /// Returns true if this is a path to a "stub file."
     ///
-    /// i.e., A module whose file extension is `pyi`.
+    /// i.e., A module whose file extension is `pyi` or `byi`.
     #[must_use]
     pub(crate) fn is_stub_file(&self) -> bool {
-        self.relative_path.extension() == Some("pyi")
+        matches!(self.relative_path.extension(), Some("pyi" | "byi"))
     }
 
     /// Returns true if this is a path to a "stub package."
@@ -63,14 +63,14 @@ impl ModulePath {
                 "Cannot push part {component} to {self:?}, which already has an extension"
             );
             if self.is_standard_library() {
-                assert_eq!(
-                    component_extension, "pyi",
-                    "Extension must be `pyi`; got `{component_extension}`"
+                assert!(
+                    matches!(component_extension, "pyi" | "byi"),
+                    "Extension must be `pyi` or `byi`; got `{component_extension}`"
                 );
             } else {
                 assert!(
-                    matches!(component_extension, "pyi" | "py"),
-                    "Extension must be `py` or `pyi`; got `{component_extension}`"
+                    matches!(component_extension, "pyi" | "py" | "byi" | "by"),
+                    "Extension must be `py`, `pyi`, `by`, or `byi`; got `{component_extension}`"
                 );
             }
         }
@@ -138,6 +138,8 @@ impl ModulePath {
 
                 system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
                     || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
+                    || system_path_to_file(resolver.db, absolute_path.join("__init__.by")).is_ok()
+                    || system_path_to_file(resolver.db, absolute_path.join("__init__.byi")).is_ok()
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
                 let absolute_path = search_path.join(relative_path);
@@ -148,20 +150,27 @@ impl ModulePath {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(
-                        resolver.db,
-                        search_path.join(relative_path).join("__init__.pyi"),
-                    )
-                    .is_ok(),
+                    | TypeshedVersionsQueryResult::MaybeExists => {
+                        let absolute_path = search_path.join(relative_path);
+                        system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
+                            || system_path_to_file(resolver.db, absolute_path.join("__init__.byi"))
+                                .is_ok()
+                    }
                 }
             }
             SearchPathInner::StandardLibraryVendored(search_path) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => resolver
-                        .vendored()
-                        .exists(search_path.join(relative_path).join("__init__.pyi")),
+                    | TypeshedVersionsQueryResult::MaybeExists => {
+                        let absolute_path = search_path.join(relative_path);
+                        resolver
+                            .vendored()
+                            .exists(absolute_path.join("__init__.pyi"))
+                            || resolver
+                                .vendored()
+                                .exists(absolute_path.join("__init__.byi"))
+                    }
                 }
             }
         }
@@ -289,8 +298,10 @@ impl ModulePath {
                 }
             });
 
-            let skip_final_part =
-                relative_path.ends_with("__init__.py") || relative_path.ends_with("__init__.pyi");
+            let skip_final_part = relative_path.ends_with("__init__.py")
+                || relative_path.ends_with("__init__.pyi")
+                || relative_path.ends_with("__init__.by")
+                || relative_path.ends_with("__init__.byi");
             if skip_final_part {
                 ModuleName::from_components(parent_components)
             } else {
@@ -324,6 +335,33 @@ impl ModulePath {
             search_path: search_path.clone(),
             relative_path: relative_path.with_extension("py"),
         })
+    }
+
+    #[must_use]
+    pub(crate) fn with_by_extension(&self) -> Option<Self> {
+        if self.is_standard_library() {
+            return None;
+        }
+        let ModulePath {
+            search_path,
+            relative_path,
+        } = self;
+        Some(ModulePath {
+            search_path: search_path.clone(),
+            relative_path: relative_path.with_extension("by"),
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn with_byi_extension(&self) -> Self {
+        let ModulePath {
+            search_path,
+            relative_path,
+        } = self;
+        ModulePath {
+            search_path: search_path.clone(),
+            relative_path: relative_path.with_extension("byi"),
+        }
     }
 
     pub(crate) fn into_search_path(self) -> SearchPath {
@@ -375,7 +413,8 @@ fn stdlib_path_to_module_name(relative_path: &Utf8Path) -> Option<ModuleName> {
         .parent()?
         .components()
         .map(|component| component.as_str());
-    let skip_final_part = relative_path.ends_with("__init__.pyi");
+    let skip_final_part =
+        relative_path.ends_with("__init__.pyi") || relative_path.ends_with("__init__.byi");
     if skip_final_part {
         ModuleName::from_components(parent_components)
     } else {
@@ -571,9 +610,9 @@ impl SearchPath {
 
     fn is_valid_extension(&self, extension: &str) -> bool {
         if self.is_standard_library() {
-            extension == "pyi"
+            matches!(extension, "pyi" | "byi")
         } else {
-            matches!(extension, "pyi" | "py")
+            matches!(extension, "pyi" | "py" | "byi" | "by")
         }
     }
 
@@ -983,7 +1022,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Extension must be `pyi`; got `py`")]
+    #[should_panic(expected = "Extension must be `pyi` or `byi`; got `py`")]
     fn stdlib_path_invalid_join_py() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_mocked_typeshed(MockedTypeshed::default())
@@ -995,7 +1034,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
+    #[should_panic(expected = "Extension must be `pyi` or `byi`; got `rs`")]
     fn stdlib_path_invalid_join_rs() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_mocked_typeshed(MockedTypeshed::default())
@@ -1007,7 +1046,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Extension must be `py` or `pyi`; got `rs`")]
+    #[should_panic(expected = "Extension must be `py`, `pyi`, `by`, or `byi`; got `rs`")]
     fn non_stdlib_path_invalid_join_rs() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
         SearchPath::first_party(db.system(), src)

@@ -242,6 +242,112 @@ if True:
         Ok(())
     }
 
+    /// basedpython: `constraints (int, str)` space is preserved in .by files
+    #[test]
+    fn constraints_space_preserved_in_by_files() -> Result<()> {
+        let input = "def f[T: constraints (int, str)](): ...\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: anonymous named tuple type expressions format as
+    /// `(name: T, name: T)` round-trip.
+    #[test]
+    fn anon_named_tuple_round_trip() -> Result<()> {
+        let input = "a: (name: str, age: int)\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: anonymous named tuple in function parameter and return.
+    #[test]
+    fn anon_named_tuple_signature_round_trip() -> Result<()> {
+        let input =
+            "def f(x: (name: str, age: int)) -> (name: str, age: int):\n    return (\"asdf\", 1)\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: single-field anonymous named tuple does not get a
+    /// trailing comma (it is not a degenerate single-element tuple).
+    #[test]
+    fn anon_named_tuple_single_field_round_trip() -> Result<()> {
+        let input = "a: (only: int)\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: anonymous named tuple value construction `(name=v, ...)`
+    /// round-trips with no spaces around `=` (Python keyword-argument style).
+    #[test]
+    fn anon_named_tuple_value_round_trip() -> Result<()> {
+        let input = "a = (name=\"asdf\", age=20)\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: mixed positional + named value form round-trips.
+    #[test]
+    fn anon_named_tuple_mixed_value_round_trip() -> Result<()> {
+        let input = "a = (1, name=\"a\")\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: mixed positional + named type form round-trips.
+    #[test]
+    fn anon_named_tuple_mixed_type_round_trip() -> Result<()> {
+        let input = "a: (int, name: str)\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: use-site variance `out X` round-trips with no brackets
+    /// around the inner type.
+    #[test]
+    fn use_site_variance_out_round_trip() -> Result<()> {
+        let input = "a: list[out int]\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: use-site variance `in X` round-trips
+    #[test]
+    fn use_site_variance_in_round_trip() -> Result<()> {
+        let input = "a: list[in int]\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
+    /// basedpython: use-site variance `in out X` round-trips with the two
+    /// keywords kept separated by a single space.
+    #[test]
+    fn use_site_variance_in_out_round_trip() -> Result<()> {
+        let input = "a: list[in out int]\n";
+        let options = PyFormatOptions::from_extension(Path::new("test.by"));
+        let actual = format_module_source(input, options)?.as_code().to_string();
+        assert_eq!(input, actual);
+        Ok(())
+    }
+
     /// Use this test to debug the formatting of some snipped
     #[ignore]
     #[test]

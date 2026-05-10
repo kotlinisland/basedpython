@@ -176,6 +176,11 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             parenthesized: true,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
+            is_parameter_shape: false,
         }
         .into(),
     };

@@ -17,12 +17,12 @@ Module(
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 42..51,
+                            range: 42..45,
                             node_index: NodeIndex(None),
                             context_expr: Tuple(
                                 ExprTuple {
                                     node_index: NodeIndex(None),
-                                    range: 42..51,
+                                    range: 42..45,
                                     elts: [
                                         Name(
                                             ExprName {
@@ -35,14 +35,32 @@ Module(
                                         Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 47..48,
-                                                id: Name("b"),
-                                                ctx: Load,
+                                                range: 45..45,
+                                                id: Name(""),
+                                                ctx: Invalid,
                                             },
                                         ),
                                     ],
                                     ctx: Load,
                                     parenthesized: true,
+                                    is_anon_named_tuple: false,
+                                    is_anon_named_tuple_value: false,
+                                    parameter_slash: None,
+                                    parameter_star: None,
+                                    is_parameter_shape: false,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 47..48,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 47..48,
+                                    id: Name("b"),
+                                    ctx: Load,
                                 },
                             ),
                             optional_vars: None,
@@ -60,7 +78,7 @@ Module(
   |
 1 | # parse_options: {"mode": "ipython"}
 2 | with (a, ?b
-  |          ^ Syntax Error: Expected an expression or a ')'
+  |          ^ Syntax Error: Expected an expression
 3 | ?
   |
 

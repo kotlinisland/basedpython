@@ -198,6 +198,7 @@ pub(crate) fn native_literals(
             },
         range: call_range,
         node_index: _,
+        is_cast: _,
     } = call;
 
     let semantic = checker.semantic();

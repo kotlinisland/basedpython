@@ -2,7 +2,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use std::process::Command;
 
 fn ty_cmd() -> Command {
-    let mut cmd = Command::new(get_cargo_bin("ty"));
+    let mut cmd = Command::new(get_cargo_bin("by"));
     cmd.env_clear();
     cmd
 }
@@ -65,7 +65,7 @@ fn rule_unknown() {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Unknown rule `does-not-exist`
     ");
 }

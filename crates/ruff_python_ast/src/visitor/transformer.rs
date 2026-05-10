@@ -390,12 +390,16 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
         }
         Expr::Lambda(ast::ExprLambda {
             parameters,
+            returns,
             body,
             range: _,
             node_index: _,
         }) => {
             if let Some(parameters) = parameters {
                 visitor.visit_parameters(parameters);
+            }
+            if let Some(returns) = returns {
+                visitor.visit_expr(returns);
             }
             visitor.visit_expr(body);
         }
@@ -519,6 +523,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             arguments,
             range: _,
             node_index: _,
+            is_cast: _,
         }) => {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
@@ -564,6 +569,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             ctx,
             range: _,
             node_index: _,
+            is_typeof: _,
         }) => {
             visitor.visit_expr(value);
             visitor.visit_expr(slice);
@@ -598,6 +604,11 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             range: _,
             node_index: _,
             parenthesized: _,
+            is_anon_named_tuple: _,
+            is_anon_named_tuple_value: _,
+            parameter_slash: _,
+            parameter_star: _,
+            is_parameter_shape: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
@@ -622,6 +633,19 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             }
         }
         Expr::IpyEscapeCommand(_) => {}
+        Expr::CallableType(ast::ExprCallableType {
+            args,
+            returns,
+            range: _,
+            node_index: _,
+            parameter_slash: _,
+            parameter_star: _,
+        }) => {
+            for arg in args {
+                visitor.visit_expr(arg);
+            }
+            visitor.visit_expr(returns);
+        }
     }
 }
 
@@ -725,6 +749,7 @@ pub fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut Ty
             name: _,
             range: _,
             node_index: _,
+            variance: _,
         }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);

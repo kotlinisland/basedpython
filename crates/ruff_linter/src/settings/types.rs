@@ -431,6 +431,10 @@ pub enum Language {
     #[default]
     Python,
     Pyi,
+    #[serde(rename = "bython", alias = "basedpython")]
+    BasedPython,
+    #[serde(rename = "byi", alias = "basedpythonstub")]
+    BasedPythonStub,
     Ipynb,
     Markdown,
 }
@@ -442,10 +446,14 @@ impl FromStr for Language {
         match s.to_ascii_lowercase().as_str() {
             "python" => Ok(Self::Python),
             "pyi" => Ok(Self::Pyi),
+            "bython" | "basedpython" => Ok(Self::BasedPython),
+            "byi" => Ok(Self::BasedPythonStub),
             "ipynb" => Ok(Self::Ipynb),
             "md" => Ok(Self::Markdown),
             _ => {
-                bail!("Unrecognized language: `{s}`. Expected one of `python`, `pyi`, or `ipynb`.")
+                bail!(
+                    "Unrecognized language: `{s}`. Expected one of `python`, `pyi`, `bython`, `byi`, `ipynb`, or `md`."
+                )
             }
         }
     }
@@ -457,6 +465,8 @@ impl From<Language> for SourceType {
             Language::Python => Self::Python(PySourceType::Python),
             Language::Ipynb => Self::Python(PySourceType::Ipynb),
             Language::Pyi => Self::Python(PySourceType::Stub),
+            Language::BasedPython => Self::Python(PySourceType::BasedPython),
+            Language::BasedPythonStub => Self::Python(PySourceType::BasedPythonStub),
             Language::Markdown => Self::Markdown,
         }
     }

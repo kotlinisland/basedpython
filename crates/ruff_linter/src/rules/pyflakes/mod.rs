@@ -170,6 +170,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_basedpython.by"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_34.py"))]
@@ -308,6 +309,7 @@ mod tests {
             &SourceKind::Python {
                 code: dedent(contents).to_string(),
                 is_stub: false,
+                is_basedpython: false,
             },
             Path::new("f401_preview_first_party_submodule/__init__.py"),
             &LinterSettings {
@@ -610,6 +612,7 @@ mod tests {
             &SourceKind::Python {
                 code: dedent(contents).to_string(),
                 is_stub: false,
+                is_basedpython: false,
             },
             Path::new("f401_preview_submodule.py"),
             &LinterSettings {
@@ -1015,6 +1018,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: contents.to_string(),
             is_stub: source_type.is_stub(),
+            is_basedpython: false,
         };
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
         let target_version = settings.unresolved_target_version;

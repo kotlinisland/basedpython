@@ -40,6 +40,31 @@ def foo() -> str:
 }
 
 #[test]
+fn by_file_activates() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let asdf = SystemPath::new("src/asdf.by");
+    let asdf_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(asdf, asdf_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(asdf, asdf_content, 1);
+    let diagnostics = server.document_diagnostic_request(asdf, None);
+
+    assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn unused_binding_has_unnecessary_hint_tag() -> Result<()> {
     let _filter = filter_result_id();
 

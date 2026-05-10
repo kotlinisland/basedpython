@@ -138,3 +138,22 @@ class StillSadlyAbstract(Abstract): ...
 
 StillSadlyAbstract()  # TODO: should emit diagnostic
 ```
+
+## basedpython: `abstract def` modifier
+
+in basedpython, the `abstract` keyword before `def` carries the same semantics as
+`@abc.abstractmethod` without needing the import
+
+### abstract methods are tracked
+
+```by
+import abc
+
+class Base(abc.ABC):
+    abstract def method(self) -> int: ...
+
+class Child(Base): ...
+
+# TODO: should emit diagnostic
+Child()
+```

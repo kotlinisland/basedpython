@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..18,
+    body: [
+        Assign(
+            StmtAssign {
+                node_index: NodeIndex(None),
+                range: 0..17,
+                targets: [
+                    Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 0..1,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                ],
+                value: Tuple(
+                    ExprTuple {
+                        node_index: NodeIndex(None),
+                        range: 4..17,
+                        elts: [
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 5..6,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            Named(
+                                ExprNamed {
+                                    node_index: NodeIndex(None),
+                                    range: 8..16,
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 8..12,
+                                            id: Name("name"),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                    value: StringLiteral(
+                                        ExprStringLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 13..16,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 13..16,
+                                                        node_index: NodeIndex(None),
+                                                        value: "a",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                            unclosed: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        ctx: Load,
+                        parenthesized: true,
+                        is_anon_named_tuple: false,
+                        is_anon_named_tuple_value: true,
+                        parameter_slash: None,
+                        parameter_star: None,
+                        is_parameter_shape: false,
+                    },
+                ),
+            },
+        ),
+    ],
+}

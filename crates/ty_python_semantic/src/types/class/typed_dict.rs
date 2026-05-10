@@ -636,6 +636,16 @@ pub enum DynamicTypedDictAnchor<'db> {
         offset: u32,
         schema: TypedDictSchema<'db>,
     },
+
+    /// basedpython: synthesized from a `{"key": T, ...}` type-expression
+    /// literal. Has no associated `Call` node — `range` points at the
+    /// originating dict-literal expression directly. Identity is shape-based:
+    /// identical schemas in the same scope intern to the same literal.
+    Synthesized {
+        scope: ScopeId<'db>,
+        range: TextRange,
+        schema: TypedDictSchema<'db>,
+    },
 }
 
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
@@ -663,7 +673,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => Some(*definition),
-            DynamicTypedDictAnchor::ScopeOffset { .. } => None,
+            DynamicTypedDictAnchor::ScopeOffset { .. }
+            | DynamicTypedDictAnchor::Synthesized { .. } => None,
         }
     }
 
@@ -671,7 +682,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => definition.scope(db),
-            DynamicTypedDictAnchor::ScopeOffset { scope, .. } => *scope,
+            DynamicTypedDictAnchor::ScopeOffset { scope, .. }
+            | DynamicTypedDictAnchor::Synthesized { scope, .. } => *scope,
         }
     }
 
@@ -713,6 +725,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                     .expect("scope offset should point to ExprCall");
                 node.range()
             }
+            DynamicTypedDictAnchor::Synthesized { range, .. } => {
+                let _ = module;
+                *range
+            }
         }
     }
 
@@ -726,7 +742,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             DynamicTypedDictAnchor::Definition(definition) => {
                 deferred_functional_typed_dict_schema(db, *definition)
             }
-            DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
+            DynamicTypedDictAnchor::ScopeOffset { schema, .. }
+            | DynamicTypedDictAnchor::Synthesized { schema, .. } => schema,
         }
     }
 

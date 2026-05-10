@@ -34,7 +34,12 @@ pub(crate) fn add_noqa(
         if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
             matches!(
                 SourceType::from(path),
-                SourceType::Python(PySourceType::Python | PySourceType::Stub)
+                SourceType::Python(
+                    PySourceType::Python
+                        | PySourceType::Stub
+                        | PySourceType::BasedPython
+                        | PySourceType::BasedPythonStub
+                )
             )
         } else {
             true

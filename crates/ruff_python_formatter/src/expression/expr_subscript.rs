@@ -1,6 +1,8 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_python_ast::helpers::UseSiteVariance;
+use ruff_python_ast::{Expr, ExprContext, ExprSubscript};
+use ruff_text_size::Ranged;
 
 use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
@@ -31,7 +33,28 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             value,
             slice,
             ctx: _,
+            is_typeof,
         } = item;
+
+        // basedpython surface form `typeof X` has no `[` `]` in source — emit
+        // it as `typeof <slice>` so `buff format` doesn't corrupt it
+        if *is_typeof {
+            return write!(f, [text("typeof"), space(), slice.format()]);
+        }
+
+        // basedpython use-site variance marker: the parser wraps `out X` /
+        // `in X` / `in out X` as `Subscript(Name(<marker>, Invalid), inner)`.
+        // The wrapper carries no brackets in the source — emit the keyword
+        // (sliced from the original source) followed by the inner expression.
+        if let Expr::Name(name) = value.as_ref()
+            && matches!(name.ctx, ExprContext::Invalid)
+            && UseSiteVariance::from_marker_id(name.id.as_str()).is_some()
+        {
+            return write!(
+                f,
+                [source_text_slice(name.range()), space(), slice.format()]
+            );
+        }
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 

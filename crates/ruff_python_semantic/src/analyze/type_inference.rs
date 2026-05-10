@@ -335,7 +335,7 @@ impl From<&Expr> for ResolvedPythonType {
                             _ => {}
                         }
                     }
-                    Operator::MatMult => {}
+                    Operator::MatMult | Operator::Coalesce => {}
                 }
                 ResolvedPythonType::Unknown
             }
@@ -350,7 +350,8 @@ impl From<&Expr> for ResolvedPythonType {
             | Expr::Starred(_)
             | Expr::Name(_)
             | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => ResolvedPythonType::Unknown,
+            | Expr::IpyEscapeCommand(_)
+            | Expr::CallableType(_) => ResolvedPythonType::Unknown,
         }
     }
 }

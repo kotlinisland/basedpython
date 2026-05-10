@@ -1,0 +1,55 @@
+# standalone distribution crate: bundles both `by` (the ty type-checker /
+# transpiler) and `buff` (the ruff linter / formatter) into a single maturin
+# wheel published to pypi as `basedpython`
+#
+# it is deliberately **excluded** from the root workspace (see the root
+# `Cargo.toml` `[workspace] exclude`): its `by`/`buff` bin names collide with the
+# same-named bins in `crates/ty` and `crates/ruff`, and cargo only tolerates that
+# under a package-scoped build — which is exactly how maturin builds this crate
+# (`cargo build -p basedpython`). a workspace-wide build never sees these bins
+#
+# the two bin sources mirror `crates/ty/src/main.rs` and `crates/ruff/src/main.rs`
+# verbatim so the published binaries behave identically to the standalone ones;
+# keep them in sync if those entrypoints change
+[package]
+name = "basedpython"
+version = "0.0.1-a1"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+# cargo-dist reads this crate (it drives the release version); it needs these
+# metadata keys, and the crate is its own workspace so it can't inherit them from
+# the root `[workspace.package]`
+description = "the basedpython toolchain — the `by` type-checker / transpiler and `buff` linter / formatter"
+repository = "https://github.com/KotlinIsland/basedpython"
+license = "MIT"
+
+# own workspace root so it resolves independently of the parent (the parent
+# excludes it); path deps below still resolve their own `workspace = true`
+# dependencies against their home workspace
+[workspace]
+
+[[bin]]
+name = "by"
+path = "src/by.rs"
+
+[[bin]]
+name = "buff"
+path = "src/buff.rs"
+
+[dependencies]
+ty = { path = "../ty" }
+ruff = { path = "../ruff" }
+anyhow = "1.0.80"
+argfile = "1.0.0"
+clap = { version = "4.5.3", features = ["derive"] }
+colored = "3.0.0"
+wild = "2"
+
+# jemalloc on the same targets ruff/ty use it (the union of both bins' cfgs:
+# ty omits macos, ruff keeps it, so gate on ruff's broader set)
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+tikv-jemallocator = "0.6.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+mimalloc = { version = "0.1.49", features = ["v2"] }

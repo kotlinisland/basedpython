@@ -36,6 +36,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                                 TypeVarTuple(

@@ -1,0 +1,28 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/empty_statements.by
+---
+## Input
+```bython
+class A
+
+class B[T]
+
+def f1()
+
+def f2[T]()
+```
+
+## Output
+```bython
+class A
+
+
+class B[T]
+
+
+def f1()
+
+
+def f2[T]()
+```

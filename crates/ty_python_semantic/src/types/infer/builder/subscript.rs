@@ -100,7 +100,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             ctx,
+            is_typeof: _,
         } = subscript;
+
+        // basedpython: `super[T]` is sugar for `super(<MRO predecessor of T>, self)`
+        // and must not be type-checked as a regular subscript expression. infer
+        // the slice as a type so `reveal_type` etc. behave, then return the
+        // pivot class type — the attribute lookup against the bound super is
+        // performed in `infer_attribute_load`
+        if self.is_basedpython_file()
+            && let ast::Expr::Name(name) = value.as_ref()
+            && name.id.as_str() == "super"
+        {
+            self.infer_expression(value, TypeContext::default());
+            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            return slice_ty;
+        }
 
         match ctx {
             ExprContext::Load => self.infer_subscript_load(subscript),
@@ -153,9 +168,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value: _,
             slice,
             ctx,
+            is_typeof: _,
         } = subscript;
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
+
+        // basedpython use-site variance: `Container[in T]` projects reads
+        // through T to `object` — the typevar appears in `__getitem__`'s
+        // return (a covariant position), and a contravariantly-projected T
+        // materializes to `object` there. We don't reject the read outright
+        // (mirroring kotlin's `Container<in T>` where reads give `Any?`); the
+        // returned `object` then forces narrower-typed targets to fail by
+        // normal assignability rules.
+        if instance_has_contravariant_projection(db, value_ty) {
+            // still infer the slice to surface other diagnostics
+            let _ = self.infer_expression(slice, TypeContext::default());
+            return Type::object();
+        }
 
         let mut constraint_keys = vec![];
 
@@ -211,6 +240,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         subscript,
                         value_ty,
                         class,
+                        generic_context,
+                    );
+                }
+            }
+            Type::FunctionLiteral(function) => {
+                let signature = function.signature(db);
+                if let Some(overload) = signature.overloads.first()
+                    && let Some(generic_context) = overload.generic_context
+                {
+                    return self.infer_explicit_function_specialization(
+                        subscript,
+                        value_ty,
                         generic_context,
                     );
                 }
@@ -452,6 +493,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
+    pub(super) fn infer_explicit_function_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let specialize = &|types: &[Option<Type<'db>>]| {
+            let specialization = generic_context.specialize_partial(db, types.iter().copied());
+            value_ty.apply_specialization(db, specialization)
+        };
+
+        self.infer_explicit_callable_specialization(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        )
+    }
+
     pub(super) fn infer_explicit_callable_specialization(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -528,6 +589,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
         let (type_arguments, store_inferred_type_arguments) = match slice_node {
+            // basedpython: an anonymous named tuple `(name: T, ...)` is a
+            // single type expression, not a list of generic arguments.
+            ast::Expr::Tuple(tuple) if tuple.is_anon_named_tuple => {
+                (std::slice::from_ref(slice_node), false)
+            }
+            // basedpython: a Parameters spec `(int, str, /, name: T)` is a
+            // single subscript argument bound to a `ParamSpec`-shaped type
+            // variable. inference treats it as one type expression.
+            // EXCEPT when every element is a kw binding (`A[R=str, T=int]`) —
+            // that's per-typevar binding by name, not a parameter spec
+            ast::Expr::Tuple(tuple)
+                if tuple.has_parameter_shape()
+                    && !tuple.elts.iter().all(|e| {
+                        matches!(
+                            e,
+                            ast::Expr::Named(n) if matches!(
+                                n.target.as_ref(),
+                                ast::Expr::Name(name)
+                                    if matches!(name.ctx, ast::ExprContext::Invalid)
+                            )
+                        )
+                    }) =>
+            {
+                (std::slice::from_ref(slice_node), false)
+            }
+            // basedpython: a parenthesized tuple slice like `Iterable[(K, V)]`
+            // is the tuple-literal type sugar (equivalent to
+            // `Iterable[tuple[K, V]]`), a single type argument. unparenthesized
+            // tuples remain the standard multi-arg subscript form
+            // (`dict[K, V]`).
+            ast::Expr::Tuple(tuple) if tuple.parenthesized && self.is_basedpython_file() => {
+                (std::slice::from_ref(slice_node), false)
+            }
             ast::Expr::Tuple(tuple) => {
                 if exactly_one_paramspec && !tuple.elts.is_empty() {
                     (std::slice::from_ref(slice_node), false)
@@ -537,10 +631,110 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => (std::slice::from_ref(slice_node), false),
         };
-        let mut inferred_type_arguments = vec![None; type_arguments.len()];
 
         let typevars = generic_context.variables(db).collect::<Vec<_>>();
         let typevars_len = typevars.len();
+
+        // basedpython: kw-form type subscript like `A[R=str, T=int]`. bind
+        // each kw arg to its named typevar; bare positional args fill the
+        // remaining typevar slots in declaration order. unbound typevars
+        // fall through to their declared default (or error if none).
+        // `bp_kw_slots[i] = Some(expr)` if typevar i has a bound expr,
+        // `None` if it should fall back to the declared default
+        let bp_kw_slots: Option<Vec<Option<&ast::Expr>>> = if self.is_basedpython_file()
+            && type_arguments.iter().any(|e| {
+                matches!(
+                    e,
+                    ast::Expr::Named(n) if matches!(
+                        n.target.as_ref(),
+                        ast::Expr::Name(name) if matches!(name.ctx, ast::ExprContext::Invalid)
+                    )
+                )
+            }) {
+            let mut by_name: rustc_hash::FxHashMap<&str, &ast::Expr> =
+                rustc_hash::FxHashMap::default();
+            let mut positional: Vec<&ast::Expr> = Vec::new();
+            for expr in type_arguments {
+                if let ast::Expr::Named(n) = expr
+                    && let ast::Expr::Name(name) = n.target.as_ref()
+                    && matches!(name.ctx, ast::ExprContext::Invalid)
+                {
+                    by_name.insert(name.id.as_str(), n.value.as_ref());
+                } else {
+                    positional.push(expr);
+                }
+            }
+            let mut slots: Vec<Option<&ast::Expr>> = Vec::with_capacity(typevars_len);
+            let mut positional_iter = positional.into_iter();
+            for tv in &typevars {
+                if let Some(expr) = by_name.remove(tv.name(db).as_str()) {
+                    slots.push(Some(expr));
+                } else if let Some(expr) = positional_iter.next() {
+                    slots.push(Some(expr));
+                } else {
+                    slots.push(None);
+                }
+            }
+            Some(slots)
+        } else {
+            None
+        };
+        // basedpython kw-form: bypass the source-order pipeline and bind by
+        // typevar name directly. unbound typevars use their declared default
+        if let Some(slots) = bp_kw_slots {
+            let mut specialization_types: Vec<Option<Type<'db>>> = Vec::with_capacity(typevars_len);
+            let mut missing_typevars: Vec<_> = Vec::new();
+            for (typevar, slot) in typevars.iter().zip(slots.iter()) {
+                match slot {
+                    Some(expr) => {
+                        let provided_type = self.infer_type_expression(expr);
+                        specialization_types.push(Some(provided_type));
+                        // bound/constraints checks intentionally skipped here;
+                        // the regular path catches them via `infer_type_expression`
+                        // diagnostics on the expr itself
+                        let _ = typevar;
+                    }
+                    None => {
+                        if typevar.default_type(db).is_some() {
+                            specialization_types.push(None);
+                        } else {
+                            missing_typevars.push(*typevar);
+                        }
+                    }
+                }
+            }
+            if !missing_typevars.is_empty() {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, subscript)
+                {
+                    let description = CallableDescription::new(db, value_ty);
+                    let s = if missing_typevars.len() > 1 { "s" } else { "" };
+                    builder.into_diagnostic(format_args!(
+                        "No type argument{s} provided for required type variable{s} `{}`{}",
+                        missing_typevars
+                            .iter()
+                            .map(|tv| tv.typevar(db).name(db))
+                            .format("`, `"),
+                        description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
+                    ));
+                }
+                let unknowns = generic_context
+                    .variables(db)
+                    .map(|tv| {
+                        Some(if tv.is_paramspec(db) {
+                            Type::paramspec_value_callable(db, Parameters::unknown())
+                        } else {
+                            Type::unknown()
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                return specialize(&unknowns);
+            }
+            return specialize(&specialization_types);
+        }
+
+        let mut inferred_type_arguments = vec![None; type_arguments.len()];
 
         let mut expanded_type_arguments = Vec::with_capacity(type_arguments.len());
 
@@ -950,7 +1144,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .inference_flags
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 for param in elts {
-                    let param_type = self.infer_type_expression(param);
+                    // basedpython Parameters spec: a `name: type` field is
+                    // stored as `Expr::Named` (target = name, value = type).
+                    // walking the named expr would treat it as a walrus and
+                    // panic — extract the value-side type expression
+                    let param_type = if let ast::Expr::Named(named) = param {
+                        self.infer_type_expression(&named.value)
+                    } else {
+                        self.infer_type_expression(param)
+                    };
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
@@ -1229,12 +1431,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value: object,
             slice,
             ctx: _,
+            is_typeof: _,
         } = target;
 
         let db = self.db();
 
         let object_ty = self.infer_expression(object, TypeContext::default());
         self.store_typed_dict_key_expected_type(slice, object_ty);
+
+        // basedpython use-site variance: `Container[out T]` rejects writes
+        // outright — the underlying T position in `__setitem__` is
+        // contravariant and projects to `Never` under an `out` projection.
+        // Emit a focused diagnostic and short-circuit before calling the
+        // dunder.
+        if instance_has_covariant_projection(self.db(), object_ty) {
+            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            let rhs_ty = infer_rhs_value(self, TypeContext::default());
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ASSIGNMENT, target.slice.as_ref())
+            {
+                builder.into_diagnostic(format_args!(
+                    "Invalid subscript assignment with key of type `{}` and value of \
+                     type `{}` on object of type `{}`",
+                    slice_ty.display(self.db()),
+                    rhs_ty.display(self.db()),
+                    object_ty.display(self.db()),
+                ));
+            }
+            return false;
+        }
+
         let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
 
         let is_valid_assignment = self.validate_subscript_assignment_impl(
@@ -2133,4 +2360,44 @@ impl AnnotatedExprContext {
             }
         }
     }
+}
+
+/// Returns `true` if `object_ty` is an instance of a generic class whose
+/// specialization carries a covariant (`out`) use-site projection on any of
+/// its typevars. Used by `validate_subscript_assignment` to short-circuit
+/// writes — a covariantly-projected typevar appears in the `__setitem__`
+/// value parameter (a contravariant position), and projects to `Never`,
+/// so no assignment can succeed.
+fn instance_has_covariant_projection<'db>(db: &'db dyn Db, object_ty: Type<'db>) -> bool {
+    use ruff_python_ast::helpers::UseSiteVariance;
+
+    let Some(instance) = object_ty.as_nominal_instance() else {
+        return false;
+    };
+    let crate::types::ClassType::Generic(alias) = instance.class(db) else {
+        return false;
+    };
+    alias
+        .specialization(db)
+        .projections(db)
+        .iter()
+        .any(|p| matches!(p, Some(UseSiteVariance::Out)))
+}
+
+/// Symmetric helper for contravariant (`in`) projection — used by subscript
+/// READS to reject calls to `__getitem__`.
+fn instance_has_contravariant_projection<'db>(db: &'db dyn Db, object_ty: Type<'db>) -> bool {
+    use ruff_python_ast::helpers::UseSiteVariance;
+
+    let Some(instance) = object_ty.as_nominal_instance() else {
+        return false;
+    };
+    let crate::types::ClassType::Generic(alias) = instance.class(db) else {
+        return false;
+    };
+    alias
+        .specialization(db)
+        .projections(db)
+        .iter()
+        .any(|p| matches!(p, Some(UseSiteVariance::In)))
 }

@@ -482,7 +482,7 @@ impl<'db> BoundSuperType<'db> {
     /// - `super(pivot, owner_instance)` is valid only if `isinstance(owner_instance, pivot)`
     ///
     /// However, the checking is skipped when any of the arguments is a dynamic type.
-    pub(super) fn build(
+    pub(crate) fn build(
         db: &'db dyn Db,
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,

@@ -1562,14 +1562,14 @@ a: float<CURSOR> = 3.14
           |    ^^^^^ Clicking here
           |
         info: Found 2 definitions
-           --> stdlib/builtins.pyi:344:7
+           --> stdlib/builtins.byi:306:7
             |
-        344 | class int:
+        306 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:658:7
+           ::: stdlib/builtins.byi:610:7
             |
-        658 | class float:
+        610 | class float:
             |       -----
             |
         ");
@@ -1594,19 +1594,19 @@ a: complex<CURSOR> = 3.14
           |    ^^^^^^^ Clicking here
           |
         info: Found 3 definitions
-           --> stdlib/builtins.pyi:344:7
+           --> stdlib/builtins.byi:306:7
             |
-        344 | class int:
+        306 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:658:7
+           ::: stdlib/builtins.byi:610:7
             |
-        658 | class float:
+        610 | class float:
             |       -----
             |
-           ::: stdlib/builtins.pyi:820:7
+           ::: stdlib/builtins.byi:763:7
             |
-        820 | class complex:
+        763 | class complex:
             |       -------
             |
         ");
@@ -1841,9 +1841,9 @@ x = DynClass<CURSOR>()
           |     ^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:131:9
+           --> stdlib/builtins.byi:106:9
             |
-        131 |     def __new__(cls) -> Self: ...
+        106 |     def __new__(cls) -> Self
             |         -------
             |
         ");
@@ -2077,9 +2077,9 @@ p = Point<CURSOR>(1, 2)
           |     ^^^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:256:9
+           --> stdlib/builtins.byi:226:9
             |
-        256 |     def __dictoffset__(self) -> int: ...
+        226 |     def __dictoffset__(self) -> int: ...
             |         --------------
             |
         ");
@@ -2165,9 +2165,9 @@ p = Point<CURSOR>(1, 2)
           |      ^^^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:256:9
+           --> stdlib/builtins.byi:226:9
             |
-        256 |     def __dictoffset__(self) -> int: ...
+        226 |     def __dictoffset__(self) -> int: ...
             |         --------------
             |
         ");

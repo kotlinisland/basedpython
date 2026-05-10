@@ -140,7 +140,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_body(&function.body);
 
-        if let Some(returns) = function.returns.as_deref() {
+        let enclosing_function_for_return_check =
+            nearest_enclosing_function(db, self.index, self.scope());
+
+        // basedpython: if the function is an overloaded impl with no explicit
+        // return annotation, validate against the union of the overload return
+        // types inherited via `OverloadLiteral::raw_signature`. fall back to
+        // the function name as the secondary diagnostic range. skip when the
+        // impl body is just `...` or a docstring: that shape signals a
+        // placeholder rather than a real implementation, so we don't want to
+        // surface implicit-return-None against the inherited union
+        let inherited_return_range = function.returns.as_ref().map_or_else(
+            || {
+                let enclosing = enclosing_function_for_return_check?;
+                let (overloads, implementation) = enclosing.overloads_and_implementation(db);
+                if overloads.is_empty() || implementation.is_none() {
+                    return None;
+                }
+                if function_body_kind(db, function, |expr| self.expression_type(expr))
+                    == FunctionBodyKind::Stub
+                {
+                    return None;
+                }
+                Some(function.name.range())
+            },
+            |returns| Some(returns.range()),
+        );
+
+        if let Some(returns_range) = inherited_return_range {
             let has_empty_body = self.return_types_and_ranges.is_empty()
                 && function_body_kind(db, function, |expr| self.expression_type(expr))
                     == FunctionBodyKind::Stub;
@@ -155,6 +182,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return;
                 }
                 if self.is_in_type_checking_block(self.scope(), function) {
+                    return;
+                }
+                // basedpython: bodyless `def f(...) -> T` is implicit overload
+                // / stub declaration. the transpiler lowers it to `: ...` and
+                // adds `@overload` for consecutive same-name groups. don't
+                // report empty-body on `.by` source — the runtime form
+                // never actually executes
+                if self.file().source_type(db).is_basedpython() && function.body.is_empty() {
                     return;
                 }
                 if let Some(class) = self.class_context_of_current_method() {
@@ -196,7 +231,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     report_invalid_generator_function_return_type(
                         &self.context,
-                        returns.range(),
+                        returns_range,
                         inferred_return,
                         declared_ty,
                     );
@@ -214,7 +249,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_invalid_return_type(
                             &self.context,
                             invalid.range,
-                            returns.range(),
+                            returns_range,
                             expected_return_ty,
                             invalid.ty,
                         );
@@ -228,7 +263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let no_return = self.return_types_and_ranges.is_empty();
                         report_implicit_return_type(
                             &self.context,
-                            returns.range(),
+                            returns_range,
                             expected_return_ty,
                             false,
                             None,
@@ -259,7 +294,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 report_invalid_return_type(
                     &self.context,
                     invalid.range,
-                    returns.range(),
+                    returns_range,
                     declared_ty,
                     invalid.ty,
                 );
@@ -271,7 +306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
                     &self.context,
-                    returns.range(),
+                    returns_range,
                     declared_ty,
                     has_empty_body,
                     enclosing_class_context,
@@ -322,6 +357,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut final_decorator = None;
 
         for decorator in decorator_list {
+            // basedpython `decorator def` parses as a synthetic decorator whose
+            // expression name is `decorator_keyword` (with `ExprContext::Invalid`).
+            // the transpile expands the function into overloads + a runtime
+            // dispatcher; ty doesn't model that rewrite, so we skip the synthetic
+            // decorator entirely to avoid polluting the function's type
+            if let ast::Expr::Name(n) = &decorator.expression
+                && matches!(n.ctx, ast::ExprContext::Invalid)
+                && n.id.as_str() == "decorator_keyword"
+            {
+                continue;
+            }
+
             let decorator_type = decorator_inference
                 .as_ref()
                 .and_then(|decorator_inference| {
@@ -852,10 +899,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(declared_ty),
             );
         } else {
+            // basedpython: an unannotated parameter on an overload
+            // implementation inherits its type from the union of the matching
+            // overload parameter types. when the impl also supplies a default
+            // value, the default is folded into the inherited base only if it
+            // doesn't already fit
+            let inherited = self.inherited_overload_parameter_type(parameter);
             let ty = if let Some(default_expr) = default_expr {
                 let default_ty = self.file_expression_type(default_expr);
-                UnionType::from_two_elements(db, Type::unknown(), default_ty)
+                if let Some(base) = inherited {
+                    if default_ty.is_assignable_to(db, base) {
+                        base
+                    } else {
+                        UnionType::from_two_elements(db, base, default_ty)
+                    }
+                } else {
+                    UnionType::from_two_elements(db, Type::unknown(), default_ty)
+                }
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
+                ty
+            } else if let Some(ty) = inherited {
                 ty
             } else {
                 Type::unknown()
@@ -863,6 +926,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.add_binding(parameter.into(), definition)
                 .insert(self, ty);
+        }
+    }
+
+    /// basedpython: for an unannotated parameter inside the implementation of
+    /// an overloaded function, look up the corresponding parameter type
+    /// inherited from the sibling overloads via the impl's
+    /// [`OverloadLiteral::raw_signature`]. matching is by name
+    fn inherited_overload_parameter_type(&self, parameter: &ast::Parameter) -> Option<Type<'db>> {
+        let db = self.db();
+        let enclosing = nearest_enclosing_function(db, self.index, self.scope())?;
+        let (overloads, implementation) = enclosing.overloads_and_implementation(db);
+        if overloads.is_empty() || implementation.is_none() {
+            return None;
+        }
+        let signature =
+            enclosing.last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public);
+        let matched = signature
+            .parameters()
+            .iter()
+            .find(|p| p.name() == Some(&parameter.name.id))?;
+        if matched.should_annotation_be_displayed() {
+            Some(matched.annotated_type())
+        } else {
+            None
         }
     }
 
@@ -1106,8 +1193,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::unknown()
         };
 
-        self.add_binding(parameter.into(), definition)
-            .insert(self, ty);
+        // basedpython typed lambdas (`lambda (a: int) -> int: ...`) make the
+        // parameter a `DeclarationAndBinding` because the annotation is set,
+        // matching annotated function parameters. The plain `add_binding`
+        // path looks up `declarations_by_binding` which is only populated for
+        // pure bindings — for declared+bound parameters we go through
+        // `add_declaration_with_binding` instead, otherwise the lookup
+        // panics with "no entry found for key".
+        if parameter.annotation.is_some() {
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                &DeclaredAndInferredType::are_the_same_type(ty),
+            );
+        } else {
+            self.add_binding(parameter.into(), definition)
+                .insert(self, ty);
+        }
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter
@@ -1126,8 +1228,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             Type::homogeneous_tuple(self.db(), Type::unknown())
         };
-        self.add_binding(parameter.into(), definition)
-            .insert(self, ty);
+        // see `infer_lambda_parameter_definition` — annotated `*args` is a
+        // `DeclarationAndBinding`, which doesn't populate
+        // `declarations_by_binding`, so `add_binding` would panic
+        if parameter.annotation.is_some() {
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                &DeclaredAndInferredType::are_the_same_type(ty),
+            );
+        } else {
+            self.add_binding(parameter.into(), definition)
+                .insert(self, ty);
+        }
     }
 
     /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter
@@ -1142,8 +1255,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &[KnownClass::Str.to_instance(self.db()), Type::unknown()],
         );
 
-        self.add_binding(parameter.into(), definition)
-            .insert(self, inferred_ty);
+        if parameter.annotation.is_some() {
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            );
+        } else {
+            self.add_binding(parameter.into(), definition)
+                .insert(self, inferred_ty);
+        }
     }
 
     /// Returns the annotated type of the lambda parameter at the given index in the provided

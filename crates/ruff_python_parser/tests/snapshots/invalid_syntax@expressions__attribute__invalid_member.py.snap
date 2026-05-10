@@ -13,13 +13,26 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 0..1,
-                    value: Name(
-                        ExprName {
+                    range: 0..3,
+                    value: Attribute(
+                        ExprAttribute {
                             node_index: NodeIndex(None),
-                            range: 0..1,
-                            id: Name("x"),
+                            range: 0..3,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("1"),
+                                range: 1..3,
+                                node_index: NodeIndex(None),
+                            },
                             ctx: Load,
+                            optional: false,
                         },
                     ),
                 },
@@ -27,58 +40,39 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 1..3,
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
+                    range: 4..9,
+                    value: Attribute(
+                        ExprAttribute {
                             node_index: NodeIndex(None),
-                            range: 1..3,
-                            value: Float(
-                                0.1,
+                            range: 4..9,
+                            value: Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 4..7,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 4..5,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("1"),
+                                        range: 5..7,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Load,
+                                    optional: false,
+                                },
                             ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 4..5,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 4..5,
-                            id: Name("x"),
+                            attr: Identifier {
+                                id: Name("0"),
+                                range: 7..9,
+                                node_index: NodeIndex(None),
+                            },
                             ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 5..7,
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 5..7,
-                            value: Float(
-                                0.1,
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 7..9,
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 7..9,
-                            value: Float(
-                                0.0,
-                            ),
+                            optional: false,
                         },
                     ),
                 },
@@ -109,6 +103,7 @@ Module(
                                         node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
+                                    optional: false,
                                 },
                             ),
                             slice: NumberLiteral(
@@ -121,6 +116,7 @@ Module(
                                 },
                             ),
                             ctx: Load,
+                            is_typeof: false,
                         },
                     ),
                 },
@@ -133,7 +129,7 @@ Module(
 
   |
 1 | x.1
-  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |  ^^ Syntax Error: tuple-member access `expr.N` is not valid in .py files
 2 | x.1.0
 3 | x.[0]
   |
@@ -142,7 +138,7 @@ Module(
   |
 1 | x.1
 2 | x.1.0
-  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |  ^^ Syntax Error: tuple-member access `expr.N` is not valid in .py files
 3 | x.[0]
   |
 
@@ -150,7 +146,7 @@ Module(
   |
 1 | x.1
 2 | x.1.0
-  |    ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |    ^^ Syntax Error: tuple-member access `expr.N` is not valid in .py files
 3 | x.[0]
   |
 

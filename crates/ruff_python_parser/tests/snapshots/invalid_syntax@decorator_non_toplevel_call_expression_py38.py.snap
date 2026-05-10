@@ -45,6 +45,7 @@ Module(
                                                         args: [],
                                                         keywords: [],
                                                     },
+                                                    is_cast: false,
                                                 },
                                             ),
                                             attr: Identifier {
@@ -53,6 +54,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                     arguments: Arguments {
@@ -61,6 +63,7 @@ Module(
                                         args: [],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                         },

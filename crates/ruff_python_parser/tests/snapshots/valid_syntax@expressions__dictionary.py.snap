@@ -361,6 +361,7 @@ Module(
                                                         kwarg: None,
                                                     },
                                                 ),
+                                                returns: None,
                                                 body: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
@@ -451,6 +452,7 @@ Module(
                                                     kwarg: None,
                                                 },
                                             ),
+                                            returns: None,
                                             body: NoneLiteral(
                                                 ExprNoneLiteral {
                                                     node_index: NodeIndex(None),
@@ -1008,6 +1010,7 @@ Module(
                                                 args: [],
                                                 keywords: [],
                                             },
+                                            is_cast: false,
                                         },
                                     ),
                                 },
@@ -1191,6 +1194,7 @@ Module(
                                                 ],
                                                 keywords: [],
                                             },
+                                            is_cast: false,
                                         },
                                     ),
                                     ifs: [],
@@ -1235,6 +1239,7 @@ Module(
                                                 ],
                                                 keywords: [],
                                             },
+                                            is_cast: false,
                                         },
                                     ),
                                     ifs: [],

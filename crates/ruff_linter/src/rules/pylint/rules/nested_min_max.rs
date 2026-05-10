@@ -139,6 +139,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                     },
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) = arg
             {
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
@@ -209,6 +210,7 @@ pub(crate) fn nested_min_max(
             },
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            is_cast: false,
         });
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(&flattened_expr),

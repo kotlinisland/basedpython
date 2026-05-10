@@ -1,0 +1,57 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..11,
+    body: [
+        AnnAssign(
+            StmtAnnAssign {
+                node_index: NodeIndex(None),
+                range: 0..10,
+                target: Name(
+                    ExprName {
+                        node_index: NodeIndex(None),
+                        range: 0..1,
+                        id: Name("a"),
+                        ctx: Store,
+                    },
+                ),
+                annotation: Subscript(
+                    ExprSubscript {
+                        node_index: NodeIndex(None),
+                        range: 3..10,
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 3..7,
+                                id: Name("list"),
+                                ctx: Load,
+                            },
+                        ),
+                        slice: Starred(
+                            ExprStarred {
+                                node_index: NodeIndex(None),
+                                range: 8..9,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 9..9,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        ctx: Load,
+                        is_typeof: false,
+                    },
+                ),
+                value: None,
+                simple: true,
+            },
+        ),
+    ],
+}

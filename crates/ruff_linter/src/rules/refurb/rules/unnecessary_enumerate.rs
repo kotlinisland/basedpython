@@ -254,6 +254,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
@@ -274,6 +275,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {

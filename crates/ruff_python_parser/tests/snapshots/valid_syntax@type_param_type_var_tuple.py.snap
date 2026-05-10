@@ -189,6 +189,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -244,6 +245,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                                 TypeVarTuple(

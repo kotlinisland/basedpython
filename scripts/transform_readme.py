@@ -48,9 +48,9 @@ def main(target: str) -> None:
     """Modify the README.md to support the given target."""
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
-        if GITHUB not in content:
-            msg = "README.md is not in the expected format."
-            raise ValueError(msg)
+        # if GITHUB not in content:
+        #     msg = "README.md is not in the expected format."
+        #     raise ValueError(msg)
 
     if target == "pypi":
         with Path("README.md").open("w", encoding="utf8") as fp:

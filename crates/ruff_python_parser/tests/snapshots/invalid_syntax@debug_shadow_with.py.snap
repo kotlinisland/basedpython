@@ -59,6 +59,7 @@ Module(
                                         ],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                             optional_vars: Some(

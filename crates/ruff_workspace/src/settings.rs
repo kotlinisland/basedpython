@@ -141,6 +141,8 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
 pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.py"),
     FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("*.by"),
+    FilePattern::Builtin("*.byi"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
 ];
@@ -148,6 +150,8 @@ pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
     FilePattern::Builtin("*.py"),
     FilePattern::Builtin("*.pyi"),
     FilePattern::Builtin("*.pyw"),
+    FilePattern::Builtin("*.by"),
+    FilePattern::Builtin("*.byi"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
     FilePattern::Builtin("*.md"),
@@ -232,7 +236,13 @@ impl FormatterSettings {
             },
         };
 
+        let is_basedpython = path
+            .and_then(|p| p.extension())
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| ext == "by");
+
         PyFormatOptions::from_source_type(source_type)
+            .with_is_basedpython(is_basedpython)
             .with_target_version(target_version)
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)

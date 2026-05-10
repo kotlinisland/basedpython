@@ -394,7 +394,7 @@ impl<'db> AllMembers<'db> {
                     };
 
                     // Filter private symbols from stubs if they appear to be internal types
-                    let is_stub_file = file.path(db).extension() == Some("pyi");
+                    let is_stub_file = matches!(file.path(db).extension(), Some("pyi" | "byi"));
                     let is_private_symbol = match NameKind::classify(symbol_name) {
                         NameKind::Dunder | NameKind::Normal => false,
                         NameKind::Sunder => true,

@@ -141,6 +141,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
             ctx: _,
             range: _,
             node_index: _,
+            is_typeof: _,
         }) if checker.semantic().match_typing_expr(value, "Union") => {
             let Expr::Tuple(tuple_slice) = &**slice else {
                 return;
@@ -191,10 +192,16 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                             range: TextRange::default(),
                                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                             parenthesized: true,
+                                            is_anon_named_tuple: false,
+                                            is_anon_named_tuple_value: false,
+                                            parameter_slash: None,
+                                            parameter_star: None,
+                                            is_parameter_shape: false,
                                         })),
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
                                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                        is_typeof: false,
                                     }))
                             },
                             expr.range(),

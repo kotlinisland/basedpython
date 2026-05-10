@@ -13,7 +13,7 @@ Module(
             FunctionDef(
                 StmtFunctionDef {
                     node_index: NodeIndex(None),
-                    range: 0..23,
+                    range: 0..17,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -59,42 +59,46 @@ Module(
                         kwarg: None,
                     },
                     returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 17..23,
-                                value: Tuple(
-                                    ExprTuple {
+                    body: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 17..23,
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 17..23,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         node_index: NodeIndex(None),
-                                        range: 17..23,
-                                        elts: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 18..19,
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                },
-                                            ),
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 21..22,
-                                                    value: Int(
-                                                        2,
-                                                    ),
-                                                },
-                                            ),
-                                        ],
-                                        ctx: Load,
-                                        parenthesized: true,
+                                        range: 18..19,
+                                        value: Int(
+                                            1,
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 21..22,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
+                        },
+                    ),
                 },
             ),
             Expr(
@@ -129,7 +133,7 @@ Module(
 
   |
 1 | def foo(a, *args=(1, 2)): ...
-  |                        ^ Syntax Error: Expected newline, found `)`
+  |                        ^ Syntax Error: Expected a statement
   |
 
 

@@ -152,9 +152,9 @@ fn run_test(
             assert!(
                 matches!(
                     embedded.lang,
-                    "py" | "pyi" | "python" | "text" | "cfg" | "pth"
+                    "py" | "pyi" | "python" | "by" | "byi" | "bython" | "basedpython" | "text" | "cfg" | "pth"
                 ),
-                "Supported file types are: py (or python), pyi, text, cfg and ignore"
+                "Supported file types are: py (or python), pyi, by, bython, basedpython, byi, text, cfg, pth and ignore"
             );
 
             let mut full_path = embedded.full_path(&project_root);
@@ -166,7 +166,7 @@ fn run_test(
                     has_custom_versions_file = true;
                 } else if relative_path_to_custom_typeshed
                     .extension()
-                    .is_some_and(|ext| ext == "pyi")
+                    .is_some_and(|ext| matches!(ext, "pyi" | "byi"))
                 {
                     typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
@@ -202,7 +202,7 @@ fn run_test(
             db.write_file(&full_path, to_write).unwrap();
 
             if !(full_path.starts_with(&src_path)
-                && matches!(embedded.lang, "py" | "python" | "pyi"))
+                && matches!(embedded.lang, "py" | "python" | "pyi" | "by" | "byi"))
             {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;

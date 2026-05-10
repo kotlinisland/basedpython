@@ -141,6 +141,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    is_typeof: false,
                 });
 
                 if other_exprs.is_empty() {
@@ -180,14 +181,21 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        is_typeof: false,
                     })),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    is_typeof: false,
                 });
 
                 if other_exprs.is_empty() {
@@ -205,10 +213,16 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        is_typeof: false,
                     });
 
                     checker.generator().expr(&union)

@@ -1,0 +1,37 @@
+class A:
+    text = """
+asdf
+"""
+
+def f():
+    x = """
+hello
+    world
+"""
+    return x
+
+# top-level string
+text = """
+hello
+world
+"""
+
+# nested scope
+def outer():
+    def inner():
+        s = """
+content
+    indented
+"""
+        return s
+
+# first line content should be preserved
+x = """first line
+second line
+"""
+
+# already correctly indented — should be idempotent
+y = """
+    already
+    indented
+    """

@@ -1,0 +1,31 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/intersection.by
+---
+## Input
+```bython
+a: A & B
+b: A & B & C
+c: list[A & B]
+d: (A & B) | C
+
+
+def f(x: A & B) -> A & B & C: ...
+
+
+type X = A & B
+```
+
+## Output
+```bython
+a: A & B
+b: A & B & C
+c: list[A & B]
+d: (A & B) | C
+
+
+def f(x: A & B) -> A & B & C: ...
+
+
+type X = A & B
+```

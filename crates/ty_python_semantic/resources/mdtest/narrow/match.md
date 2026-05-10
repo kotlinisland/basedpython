@@ -125,28 +125,28 @@ from collections.abc import Mapping
 
 def test_isinstance(x: dict | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Mapping[object, object])
     else:
-        reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+        reveal_type(x)  # revealed: int & ~Mapping[object, object]
 
 def test_match(x: dict | int) -> None:
     match x:
         case {}:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Mapping[object, object])
         case _:
-            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+            reveal_type(x)  # revealed: int & ~Mapping[object, object]
 
 def test_match_double_star(x: dict | int) -> None:
     match x:
         case {**rest}:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Mapping[object, object])
         case _:
-            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+            reveal_type(x)  # revealed: int & ~Mapping[object, object]
 
 def test_match_refutable(x: dict | int) -> None:
     match x:
         case {"k": _}:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Mapping[object, object])
         case _:
             reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
 ```

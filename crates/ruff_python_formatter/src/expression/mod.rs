@@ -29,6 +29,7 @@ pub(crate) mod expr_bool_op;
 pub(crate) mod expr_boolean_literal;
 pub(crate) mod expr_bytes_literal;
 pub(crate) mod expr_call;
+pub(crate) mod expr_callable_type;
 pub(crate) mod expr_compare;
 pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
@@ -110,6 +111,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Tuple(expr) => expr.format().fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
+            Expr::CallableType(expr) => source_text_slice(expr.range()).fmt(f),
         });
         let parenthesize = match parentheses {
             Parentheses::Preserve => is_expression_parenthesized(
@@ -299,6 +301,7 @@ fn format_with_parentheses_comments(
         Expr::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::IpyEscapeCommand(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::CallableType(expr) => source_text_slice(expr.range()).fmt(f),
     });
 
     leading_comments(leading_outer).fmt(f)?;
@@ -498,6 +501,7 @@ impl NeedsParentheses for Expr {
             Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
             Expr::Slice(expr) => expr.needs_parentheses(parent, context),
             Expr::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
+            Expr::CallableType(_) => OptionalParentheses::Never,
         }
     }
 }
@@ -667,6 +671,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             Expr::Tuple(ast::ExprTuple {
                 parenthesized: true,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
                 ..
             }) => {
                 self.any_parenthesized_expressions = true;
@@ -723,6 +731,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::Call(ast::ExprCall {
                 range: _,
                 node_index: _,
+                is_cast: _,
                 func,
                 arguments: _,
             }) => {
@@ -748,6 +757,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 value,
                 attr: _,
                 ctx: _,
+                optional: _,
             }) => {
                 self.visit_expr(value);
                 if has_parentheses(value, self.context).is_some() {
@@ -794,7 +804,8 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::EllipsisLiteral(_)
             | Expr::Name(_)
             | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => {
+            | Expr::IpyEscapeCommand(_)
+            | Expr::CallableType(_) => {
                 return;
             }
         }
@@ -1233,6 +1244,10 @@ pub(crate) fn has_own_parentheses(
         Expr::Tuple(
             tuple @ ast::ExprTuple {
                 parenthesized: true,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
                 ..
             },
         ) => {
@@ -1325,7 +1340,8 @@ pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> 
         | Expr::BytesLiteral(_)
         | Expr::FString(_)
         | Expr::TString(_)
-        | Expr::EllipsisLiteral(_) => false,
+        | Expr::EllipsisLiteral(_)
+        | Expr::CallableType(_) => false,
     }
 }
 
@@ -1366,6 +1382,7 @@ impl From<Operator> for OperatorPrecedence {
             Operator::BitOr => OperatorPrecedence::BitwiseOr,
             Operator::BitXor => OperatorPrecedence::BitwiseXor,
             Operator::BitAnd => OperatorPrecedence::BitwiseAnd,
+            Operator::Coalesce => OperatorPrecedence::BooleanOperation,
         }
     }
 }
@@ -1440,6 +1457,8 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
                 context.source(),
             ) || is_splittable_expression(expression.as_ref(), context)
         }
+
+        Expr::CallableType(_) => false,
     }
 }
 
@@ -1506,7 +1525,8 @@ pub(crate) fn left_most<'expr>(
             | Expr::Lambda(_)
             | Expr::Named(_)
             | Expr::IpyEscapeCommand(_)
-            | Expr::Generator(_) => None,
+            | Expr::Generator(_)
+            | Expr::CallableType(_) => None,
         };
 
         let Some(left) = left else {

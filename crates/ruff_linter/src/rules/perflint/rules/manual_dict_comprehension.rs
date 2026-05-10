@@ -340,6 +340,11 @@ fn convert_to_dict_comprehension(
     // {... for i in (a, b)}
     let iter_str = if let Expr::Tuple(ast::ExprTuple {
         parenthesized: false,
+        is_anon_named_tuple: false,
+        is_anon_named_tuple_value: false,
+        parameter_slash: None,
+        parameter_star: None,
+        is_parameter_shape: false,
         ..
     }) = &*for_stmt.iter
     {
@@ -376,6 +381,11 @@ fn convert_to_dict_comprehension(
     // If the value is a tuple without parentheses, add them
     let value_str = if let Expr::Tuple(ast::ExprTuple {
         parenthesized: false,
+        is_anon_named_tuple: false,
+        is_anon_named_tuple_value: false,
+        parameter_slash: None,
+        parameter_star: None,
+        is_parameter_shape: false,
         ..
     }) = value
     {

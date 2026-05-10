@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/tests/cli/show_settings.rs
 info:
-  program: ruff
+  program: buff
   args:
     - check
     - "--show-settings"
@@ -54,6 +54,8 @@ file_resolver.force_exclude = false
 file_resolver.include = [
 	"*.py",
 	"*.pyi",
+	"*.by",
+	"*.byi",
 	"*.ipynb",
 	"**/pyproject.toml",
 ]

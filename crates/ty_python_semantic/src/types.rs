@@ -114,9 +114,9 @@ mod context;
 mod context_manager;
 mod cyclic;
 mod diagnostic;
-mod display;
-mod enums;
-mod function;
+pub(crate) mod display;
+pub(crate) mod enums;
+pub(crate) mod function;
 mod generics;
 pub mod ide_support;
 mod infer;
@@ -142,7 +142,7 @@ mod subclass_of;
 #[cfg(test)]
 pub(crate) mod tests;
 mod tuple;
-mod type_alias;
+pub(crate) mod type_alias;
 mod typed_dict;
 mod typevar;
 mod unpacker;
@@ -1183,7 +1183,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn is_dynamic(&self) -> bool {
+    pub const fn is_dynamic(&self) -> bool {
         matches!(
             self,
             Type::Dynamic(_)
@@ -1472,6 +1472,34 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    /// whether `X[…]` where `X` evaluates to this type treats the slice as
+    /// type arguments rather than a runtime subscript key
+    pub const fn is_subscript_type_context(self) -> bool {
+        matches!(
+            self,
+            Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Dynamic(_)
+        )
+    }
+
+    /// whether this type represents a module or type-level object whose
+    /// attributes are likely to be types (used for `base.attr[…]` context detection)
+    pub const fn is_module_or_type(self) -> bool {
+        matches!(
+            self,
+            Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::SubclassOf(_)
+        )
+    }
+
     pub(crate) const fn as_literal_value(self) -> Option<LiteralValueType<'db>> {
         match self {
             Type::LiteralValue(literal) => Some(literal),
@@ -1661,7 +1689,9 @@ impl<'db> Type<'db> {
                 | LiteralValueTypeKind::Bytes(_)
                 | LiteralValueTypeKind::Int(_)
                 | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::Enum(_) => true,
+                | LiteralValueTypeKind::Enum(_)
+                | LiteralValueTypeKind::Float(_)
+                | LiteralValueTypeKind::Complex(_) => true,
                 LiteralValueTypeKind::LiteralString => false,
             },
             Type::NominalInstance(_) => self.is_none(db) || self.is_bool(db) || self.is_enum(db),
@@ -1684,6 +1714,20 @@ impl<'db> Type<'db> {
     /// Create a promotable integer literal.
     pub(crate) fn int_literal(int: i64) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(int))
+    }
+
+    /// basedpython: create a promotable float literal
+    pub(crate) fn float_literal(value: f64) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(
+            literal::FloatLiteralType::from_f64(value),
+        ))
+    }
+
+    /// basedpython: create a promotable complex literal
+    pub(crate) fn complex_literal(db: &'db dyn Db, re: f64, im: f64) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(
+            literal::ComplexLiteralType::from_parts(db, re, im),
+        ))
     }
 
     /// Create a promotable single-character string literal.
@@ -1947,7 +1991,8 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn promote(self, db: &'db dyn Db) -> Type<'db> {
+    #[must_use]
+    pub fn promote(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
             &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
@@ -2206,7 +2251,9 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Int(..)
                 | LiteralValueTypeKind::String(..)
                 | LiteralValueTypeKind::Bytes(..)
-                | LiteralValueTypeKind::LiteralString => {
+                | LiteralValueTypeKind::LiteralString
+                | LiteralValueTypeKind::Float(..)
+                | LiteralValueTypeKind::Complex(..) => {
                     // Note: The literal types included in this pattern are not true singletons.
                     // There can be multiple Python objects (at different memory locations) that
                     // are both of type Literal[345], for example.
@@ -2337,7 +2384,9 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Int(..)
                 | LiteralValueTypeKind::String(..)
                 | LiteralValueTypeKind::Bytes(..)
-                | LiteralValueTypeKind::Bool(_) => true,
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::Float(..)
+                | LiteralValueTypeKind::Complex(..) => true,
 
                 LiteralValueTypeKind::LiteralString => false,
             },
@@ -5368,10 +5417,22 @@ impl<'db> Type<'db> {
         match self {
             // Special cases for `float` and `complex`
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+            //
+            // basedpython opts out: in `.by` files, `float` means `float` and
+            // `complex` means `complex` — the typing-spec promotion is not
+            // applied. when a .by file is transpiled, these annotations
+            // rewrite to `JustFloat` / `JustComplex`, which preserves the
+            // strict meaning for .py consumers
             Type::ClassLiteral(class) => {
+                let is_by_ext = |ext: Option<&str>| matches!(ext, Some("by" | "byi"));
+                let is_by = match scope_id.file(db).path(db) {
+                    ruff_db::files::FilePath::System(p) => is_by_ext(p.extension()),
+                    ruff_db::files::FilePath::SystemVirtual(p) => is_by_ext(p.extension()),
+                    ruff_db::files::FilePath::Vendored(_) => false,
+                };
                 let ty = match class.known(db) {
-                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
-                    Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    Some(KnownClass::Complex) if !is_by => KnownUnion::Complex.to_type(db),
+                    Some(KnownClass::Float) if !is_by => KnownUnion::Float.to_type(db),
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
@@ -5610,6 +5671,8 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
                     KnownClass::Str.to_class_literal(db)
                 }
+                LiteralValueTypeKind::Float(_) => KnownClass::Float.to_class_literal(db),
+                LiteralValueTypeKind::Complex(_) => KnownClass::Complex.to_class_literal(db),
             },
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
@@ -6364,6 +6427,7 @@ impl<'db> Type<'db> {
                     ),
                 ),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Str.to_instance(db),
+                LiteralValueTypeKind::Float(_) | LiteralValueTypeKind::Complex(_) => self.repr(db),
             },
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => {

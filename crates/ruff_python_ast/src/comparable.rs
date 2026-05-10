@@ -50,6 +50,7 @@ pub enum ComparableOperator {
     BitXor,
     BitAnd,
     FloorDiv,
+    Coalesce,
 }
 
 impl From<ast::Operator> for ComparableOperator {
@@ -68,6 +69,7 @@ impl From<ast::Operator> for ComparableOperator {
             ast::Operator::BitXor => Self::BitXor,
             ast::Operator::BitAnd => Self::BitAnd,
             ast::Operator::FloorDiv => Self::FloorDiv,
+            ast::Operator::Coalesce => Self::Coalesce,
         }
     }
 }
@@ -864,6 +866,7 @@ pub struct ExprUnaryOp<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
     parameters: Option<ComparableParameters<'a>>,
+    returns: Option<Box<ComparableExpr<'a>>>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -1036,6 +1039,12 @@ pub struct ExprIpyEscapeCommand<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprCallableType<'a> {
+    args: Vec<ComparableExpr<'a>>,
+    returns: Box<ComparableExpr<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableExpr<'a> {
     BoolOp(ExprBoolOp<'a>),
     NamedExpr(ExprNamed<'a>),
@@ -1072,6 +1081,7 @@ pub enum ComparableExpr<'a> {
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
+    CallableType(ExprCallableType<'a>),
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -1129,11 +1139,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::Lambda(ast::ExprLambda {
                 parameters,
+                returns,
                 body,
                 range: _,
                 node_index: _,
             }) => Self::Lambda(ExprLambda {
                 parameters: parameters.as_ref().map(Into::into),
+                returns: returns.as_ref().map(|r| Box::new(r.as_ref().into())),
                 body: body.into(),
             }),
             ast::Expr::If(ast::ExprIf {
@@ -1237,6 +1249,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 arguments,
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) => Self::Call(ExprCall {
                 func: func.into(),
                 arguments: arguments.into(),
@@ -1293,6 +1306,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 ctx: _,
                 range: _,
                 node_index: _,
+                optional: _,
             }) => Self::Attribute(ExprAttribute {
                 value: value.into(),
                 attr: attr.as_str(),
@@ -1303,6 +1317,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 ctx: _,
                 range: _,
                 node_index: _,
+                is_typeof: _,
             }) => Self::Subscript(ExprSubscript {
                 value: value.into(),
                 slice: slice.into(),
@@ -1330,6 +1345,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 range: _,
                 node_index: _,
                 parenthesized: _,
+                is_anon_named_tuple: _,
+                is_anon_named_tuple_value: _,
+                parameter_slash: _,
+                parameter_star: _,
+                is_parameter_shape: _,
             }) => Self::Tuple(ExprTuple {
                 elts: elts.iter().map(Into::into).collect(),
             }),
@@ -1350,6 +1370,17 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 range: _,
                 node_index: _,
             }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand { kind: *kind, value }),
+            ast::Expr::CallableType(ast::ExprCallableType {
+                args,
+                returns,
+                range: _,
+                node_index: _,
+                parameter_slash: _,
+                parameter_star: _,
+            }) => Self::CallableType(ExprCallableType {
+                args: args.iter().map(ComparableExpr::from).collect(),
+                returns: Box::new(returns.as_ref().into()),
+            }),
         }
     }
 }
@@ -1434,6 +1465,7 @@ impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
                 default,
                 range: _,
                 node_index: _,
+                variance: _,
             }) => Self::TypeVar(TypeParamTypeVar {
                 name: name.as_str(),
                 bound: bound.as_ref().map(Into::into),

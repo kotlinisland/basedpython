@@ -421,6 +421,7 @@ fn bin_op(expr: &ast::ExprBinOp, params: &Parameters) -> Option<&'static str> {
         ast::Operator::BitXor => "xor",
         ast::Operator::BitAnd => "and_",
         ast::Operator::FloorDiv => "floordiv",
+        ast::Operator::Coalesce => return None,
     })
 }
 

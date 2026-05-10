@@ -83,6 +83,7 @@ fn check_patch_call(checker: &Checker, call: &ast::ExprCall, index: usize) {
 
     let Some(ast::ExprLambda {
         parameters,
+        returns: _,
         body,
         range: _,
         node_index: _,

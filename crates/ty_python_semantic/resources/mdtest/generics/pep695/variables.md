@@ -1126,4 +1126,27 @@ class D[T = T]:
 reveal_type(D().x)  # revealed: Unknown
 ```
 
+## basedpython: explicit constraints keyword
+
+in basedpython, `T: (int, str)` is an upper bound of type `tuple[int, str]`, not constraints. use
+`T: constraints (int, str)` to declare constraints explicitly
+
+### `T: (int, str)` is an upper bound
+
+in basedpython, a parenthesized tuple is an upper bound, not constraints
+
+```by
+def f[T: (int, str)]():
+    reveal_type(T.__bound__)        # revealed: (int, str)
+    reveal_type(T.__constraints__)  # revealed: ()
+```
+
+### `T: constraints (int, str)` is constraints
+
+```by
+def f[T: constraints (int, str)]():
+    reveal_type(T.__constraints__)  # revealed: (int, str)
+    reveal_type(T.__bound__)        # revealed: None
+```
+
 [pep 695]: https://peps.python.org/pep-0695/

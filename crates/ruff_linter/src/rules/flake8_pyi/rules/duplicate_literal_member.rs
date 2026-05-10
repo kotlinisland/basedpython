@@ -96,12 +96,18 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
+                    is_anon_named_tuple: false,
+                    is_anon_named_tuple_value: false,
+                    parameter_slash: None,
+                    parameter_star: None,
+                    is_parameter_shape: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
+            is_typeof: false,
         });
         let fix = Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(&subscript), expr.range()),

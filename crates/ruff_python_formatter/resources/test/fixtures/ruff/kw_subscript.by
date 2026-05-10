@@ -1,0 +1,7 @@
+class M[K, V]: ...
+class B[T]: ...
+
+
+x: M[K=int, V=str]
+y: B[T=int]
+z: M[int, V=str]

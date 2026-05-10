@@ -64,6 +64,11 @@ Module(
                                 ],
                                 ctx: Load,
                                 parenthesized: true,
+                                is_anon_named_tuple: false,
+                                is_anon_named_tuple_value: false,
+                                parameter_slash: None,
+                                parameter_star: None,
+                                is_parameter_shape: false,
                             },
                         ),
                     ),
@@ -178,6 +183,7 @@ Module(
                                         kwarg: None,
                                     },
                                 ),
+                                returns: None,
                                 body: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
@@ -318,6 +324,11 @@ Module(
                                 ],
                                 ctx: Load,
                                 parenthesized: true,
+                                is_anon_named_tuple: false,
+                                is_anon_named_tuple_value: false,
+                                parameter_slash: None,
+                                parameter_star: None,
+                                is_parameter_shape: false,
                             },
                         ),
                     ),
@@ -459,6 +470,7 @@ Module(
                                         kwarg: None,
                                     },
                                 ),
+                                returns: None,
                                 body: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),

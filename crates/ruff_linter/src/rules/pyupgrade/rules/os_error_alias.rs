@@ -145,6 +145,11 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
+                is_parameter_shape: false,
             };
             format!("({})", checker.generator().expr(&node.into()))
         };

@@ -37,6 +37,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                                 TypeVar(
@@ -50,6 +51,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                             ],
@@ -108,6 +110,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                                 TypeVar(
@@ -121,6 +124,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                             ],
@@ -179,6 +183,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                                 TypeVar(
@@ -192,6 +197,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                             ],
@@ -250,6 +256,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                             ],
@@ -284,7 +291,7 @@ Module(
             FunctionDef(
                 StmtFunctionDef {
                     node_index: NodeIndex(None),
-                    range: 940..979,
+                    range: 940..976,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -308,6 +315,7 @@ Module(
                                         },
                                         bound: None,
                                         default: None,
+                                        variance: None,
                                     },
                                 ),
                             ],
@@ -323,23 +331,22 @@ Module(
                         kwarg: None,
                     },
                     returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 976..979,
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 976..979,
-                                        value: Int(
-                                            100,
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
+                    body: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 976..979,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 976..979,
+                            value: Int(
+                                100,
+                            ),
+                        },
+                    ),
                 },
             ),
             AnnAssign(
@@ -353,6 +360,11 @@ Module(
                             elts: [],
                             ctx: Store,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                     annotation: EllipsisLiteral(
@@ -441,7 +453,7 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                        ^ Syntax Error: Expected newline, found `]`
+   |                                        ^ Syntax Error: Expected a statement
    |
 
 

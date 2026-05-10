@@ -156,6 +156,11 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
                             elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
                             ctx: ast::ExprContext::Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         })))
                     }
                     Some(TypeVarRestriction::AnyStr) => {
@@ -178,11 +183,17 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
                             ],
                             ctx: ast::ExprContext::Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         })))
                     }
                     None => None,
                 },
                 default,
+                variance: None,
             }),
             TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),

@@ -297,6 +297,17 @@ where
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
 pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    // basedpython `enum class Foo(...)` is parsed with a synthetic
+    // `@enum_class` decorator. The transpiler later adds an `Enum` base
+    if class_def.decorator_list.iter().any(|decorator| {
+        matches!(
+            &decorator.expression,
+            ast::Expr::Name(name) if name.id.as_str() == "enum_class"
+        )
+    }) {
+        return true;
+    }
+
     any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),

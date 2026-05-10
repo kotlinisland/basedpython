@@ -203,6 +203,7 @@ pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic
         &SourceKind::Python {
             code: contents.into_owned(),
             is_stub: false,
+            is_basedpython: false,
         },
         path,
         settings,

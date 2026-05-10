@@ -11,6 +11,15 @@ pub fn is_pyproject_toml(path: &Path) -> bool {
 pub fn is_module_file(path: &Path) -> bool {
     matches!(
         path.file_name().and_then(OsStr::to_str),
-        Some("__init__.py" | "__init__.pyi" | "__main__.py" | "__main__.pyi")
+        Some(
+            "__init__.py"
+                | "__init__.pyi"
+                | "__init__.by"
+                | "__init__.byi"
+                | "__main__.py"
+                | "__main__.pyi"
+                | "__main__.by"
+                | "__main__.byi"
+        )
     )
 }

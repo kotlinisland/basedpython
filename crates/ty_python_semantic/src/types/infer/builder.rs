@@ -32,16 +32,21 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    explicit_global_symbol, is_basedpython_implicit_typing_name, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol, typing_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
+use crate::subscript::PyIndex;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral,
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, MethodDecorator, NamedTupleField,
+    NamedTupleSpec,
+};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
@@ -336,6 +341,11 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
+
+    /// basedpython: set by a `ty_extensions.Top` / `Bottom` reference inside a
+    /// subscript slice. the enclosing subscript reads and clears this on exit
+    /// to apply the corresponding materialization to the result
+    slice_materialization: Option<crate::types::MaterializationKind>,
 }
 
 /// An expression cache shared across builders during multi-inference.
@@ -380,6 +390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
+            slice_materialization: None,
         }
     }
 
@@ -623,6 +634,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn defer_annotations(&self) -> bool {
         self.index.has_future_annotations()
             || self.in_stub()
+            || self.is_basedpython_file()
             || Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY314
     }
 
@@ -2370,6 +2382,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> bool {
         let db = self.db();
 
+        // basedpython use-site variance: writes to an attribute typed with a
+        // covariantly-projected (`out`) typevar are statically rejected. The
+        // attribute's declared type on the unspecialized class is inspected
+        // for any covariantly-projected typevar; if found, the projected T
+        // would substitute to `Never` here, so no value can satisfy the write.
+        if attribute_has_covariant_projected_typevar(db, object_ty, attribute) {
+            let value_ty = infer_value_ty(self, TypeContext::default());
+            if emit_diagnostics
+                && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Cannot assign value of type `{}` to attribute `{attribute}` on \
+                     covariantly-projected object of type `{}`",
+                    value_ty.display(db),
+                    object_ty.display(db),
+                ));
+            }
+            return false;
+        }
+
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
         let ensure_assignable_to =
             |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
@@ -3487,7 +3519,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
                     self.infer_standalone_expression_impl(value, standalone_expression, tcx)
-                } else if let ast::Expr::Call(call_expr) = value {
+                } else if let ast::Expr::Call(call_expr) = value
+                    && !call_expr.is_cast
+                {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
@@ -4242,6 +4276,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
+
+        // basedpython `newtype Foo = int` parses as AnnAssign with annotation
+        // `__newtype__` and the underlying type stored as the value. produce a
+        // `KnownInstanceType::NewType` directly so `Foo` behaves like a NewType
+        // without going through the regular `Foo = NewType("Foo", int)` path
+        if let ast::Expr::Name(ann_name) = annotation
+            && ann_name.id.as_str() == "__newtype__"
+            && let ast::Expr::Name(target_name) = target
+            && let Some(value_expr) = value
+        {
+            let base_ty = self.infer_type_expression(value_expr);
+            let eager_base = match base_ty {
+                Type::NominalInstance(nominal) => Some(
+                    crate::types::newtype::NewTypeBase::ClassType(nominal.class(self.db())),
+                ),
+                Type::NewTypeInstance(nt) => Some(crate::types::newtype::NewTypeBase::NewType(nt)),
+                Type::Union(union) => match union.known(self.db()) {
+                    Some(crate::types::KnownUnion::Float) => {
+                        Some(crate::types::newtype::NewTypeBase::Float)
+                    }
+                    Some(crate::types::KnownUnion::Complex) => {
+                        Some(crate::types::newtype::NewTypeBase::Complex)
+                    }
+                    _ => None,
+                },
+                _ => None,
+            };
+            let newtype = crate::types::newtype::NewType::new(
+                self.db(),
+                target_name.id.clone(),
+                definition,
+                eager_base,
+            );
+            let inferred_ty = Type::KnownInstance(KnownInstanceType::NewType(newtype));
+            self.store_expression_type(annotation, Type::unknown());
+            self.store_qualifiers(annotation, TypeQualifiers::empty());
+            self.store_expression_type(target, inferred_ty);
+            self.add_declaration_with_binding(
+                target.into(),
+                definition,
+                &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            );
+            return;
+        }
 
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
@@ -5074,6 +5152,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression,
         } = decorator;
 
+        // basedpython modifier keywords (`final def`, `abstract def`, ...) parse as
+        // synthetic decorators whose source text starts with the keyword letter
+        // instead of `@`. resolve them to the equivalent stdlib decorator type so
+        // downstream type checking treats them like the user wrote `@typing.final`
+        if let Some(target) = crate::types::function::synthetic_decorator_target_type(
+            self.db(),
+            self.file(),
+            decorator,
+        ) {
+            self.store_expression_type(expression, target);
+            return target;
+        }
+
+        let source = source_text(self.db(), self.file());
+        let start = usize::from(decorator.range().start());
+        if source.as_bytes().get(start).copied() != Some(b'@') {
+            let ty = Type::unknown();
+            self.store_expression_type(expression, ty);
+            return ty;
+        }
+
         self.infer_expression(expression, TypeContext::default())
     }
 
@@ -5808,6 +5907,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::IpyEscapeCommand(_) => {
                 todo_type!("Ipy escape command support")
             }
+            ast::Expr::CallableType(_) => {
+                // callable-type syntax only valid in annotation position; in value context
+                // the type expression inference path is responsible
+                todo_type!("CallableType in value context")
+            }
         };
 
         // Avoid promoting explicitly annotated literal values.
@@ -5901,8 +6005,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_i64()
                 .map(Type::int_literal)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
-            ast::Number::Float(_) => KnownClass::Float.to_instance(db),
-            ast::Number::Complex { .. } => KnownClass::Complex.to_instance(db),
+            ast::Number::Float(v) => {
+                if self.is_basedpython_file() {
+                    Type::float_literal(*v)
+                } else {
+                    KnownClass::Float.to_instance(db)
+                }
+            }
+            ast::Number::Complex { real, imag } => {
+                if self.is_basedpython_file() {
+                    Type::complex_literal(db, *real, *imag)
+                } else {
+                    KnownClass::Complex.to_instance(db)
+                }
+            }
         }
     }
 
@@ -6051,6 +6167,253 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         KnownClass::EllipsisType.to_instance(self.db())
     }
 
+    /// Build a synthesized `typing.NamedTuple` class for an anonymous named
+    /// tuple expression, returning the class as a `Type::ClassLiteral`.
+    /// Field types come from the AST via `infer_type_expression` for the
+    /// type form (`(name: T, ...)`) and from `infer_expression` (with literal
+    /// promotion) for the value form (`(name=v, ...)`).
+    ///
+    /// Identity is shape-based: the salsa-interned `NamedTupleSpec` is
+    /// derived from the field list, and the anchor uses a constant offset
+    /// at module scope so two structurally identical anonymous named tuples
+    /// resolve to the *same* `DynamicNamedTupleLiteral`.
+    /// Lowers a basedpython parameter-shape tuple in type position to a
+    /// real `tuple[...]` type when it contains variadic markers. Returns
+    /// `None` if the tuple has no variadic — caller falls back to the
+    /// named-tuple synthesis path so the surface syntax round-trips
+    pub(super) fn lower_parameter_shape_to_tuple_type(
+        &mut self,
+        tuple: &ast::ExprTuple,
+    ) -> Option<Type<'db>> {
+        use crate::types::tuple::TupleType;
+
+        // detect variadic up-front without inferring — type inference must
+        // be performed exactly once per expression, so we only enter the
+        // inference loop after committing to the tuple-type path
+        enum Kind {
+            Fixed,
+            Variadic,
+            KwVariadic,
+        }
+        fn classify(elt: &ast::Expr) -> Kind {
+            match elt {
+                ast::Expr::Named(named) => match named.target.as_ref() {
+                    ast::Expr::Starred(starred) => match starred.value.as_ref() {
+                        ast::Expr::Starred(_) => Kind::KwVariadic,
+                        _ => Kind::Variadic,
+                    },
+                    _ => Kind::Fixed,
+                },
+                ast::Expr::Starred(s) => match s.value.as_ref() {
+                    ast::Expr::Starred(_) => Kind::KwVariadic,
+                    _ => Kind::Variadic,
+                },
+                _ => Kind::Fixed,
+            }
+        }
+        let kinds: Vec<Kind> = tuple.elts.iter().map(classify).collect();
+        let has_variadic = kinds.iter().any(|k| matches!(k, Kind::Variadic));
+        if !has_variadic {
+            return None;
+        }
+
+        let db = self.db();
+        let mut entries: Vec<(Kind, Type<'db>)> = Vec::with_capacity(tuple.elts.len());
+        for (elt, kind) in tuple.elts.iter().zip(kinds) {
+            let ty = match elt {
+                ast::Expr::Named(named) => self.infer_type_expression(&named.value),
+                ast::Expr::Starred(s) => match s.value.as_ref() {
+                    ast::Expr::Starred(inner) => self.infer_type_expression(&inner.value),
+                    _ => self.infer_type_expression(&s.value),
+                },
+                _ => self.infer_type_expression(elt),
+            };
+            entries.push((kind, ty));
+        }
+
+        // split around the variadic. only one variadic supported per tuple
+        // type; subsequent variadics fold into the suffix as fixed `Todo`s
+        // (this matches python's `tuple[*Ts]` constraint of one variable
+        // segment)
+        let mut prefix: Vec<Type<'db>> = Vec::new();
+        let mut variable: Option<Type<'db>> = None;
+        let mut suffix: Vec<Type<'db>> = Vec::new();
+        for (kind, ty) in entries {
+            match kind {
+                Kind::Fixed => {
+                    if variable.is_some() {
+                        suffix.push(ty);
+                    } else {
+                        prefix.push(ty);
+                    }
+                }
+                Kind::Variadic => {
+                    if variable.is_some() {
+                        // additional variadic merges into the existing
+                        // variable-length type via union (degraded form)
+                        let existing = variable.take().unwrap();
+                        variable = Some(crate::types::UnionType::from_elements(db, [existing, ty]));
+                    } else {
+                        variable = Some(ty);
+                    }
+                }
+                Kind::KwVariadic => {
+                    // kwargs has no positional tuple equivalent — drop
+                }
+            }
+        }
+
+        let variable = variable.unwrap_or_else(Type::object);
+        let tt = if prefix.is_empty() && suffix.is_empty() {
+            Some(TupleType::homogeneous(db, variable))
+        } else {
+            TupleType::mixed(db, prefix, variable, suffix)
+        };
+        Some(Type::tuple(tt))
+    }
+
+    /// basedpython: synthesize a `TypedDict` class from a `{"key": T, ...}`
+    /// dict-literal type expression. Returns `None` if any key is not a
+    /// string-literal expression — in that case the caller falls through
+    /// to the standard "dict literal not allowed in type position"
+    /// diagnostic.
+    fn synthesize_typed_dict_literal(&mut self, dict: &ast::ExprDict) -> Option<Type<'db>> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema};
+        use ty_python_core::global_scope;
+
+        if dict.items.is_empty() {
+            return None;
+        }
+
+        let db = self.db();
+        let mut schema = TypedDictSchema::default();
+        let mut hasher = DefaultHasher::new();
+        for item in &dict.items {
+            let Some(key_expr) = item.key.as_ref() else {
+                // `**: T` extra-items marker — encoded as `Starred(Starred(T))`.
+                // TODO: wire this into `TypedDictSchema.extra_items` once
+                // PEP 728 support lands. for now we accept the syntax and
+                // infer the type so user-visible diagnostics still fire, but
+                // we don't yet enforce extra-key matching
+                if let ast::Expr::Starred(outer) = &item.value
+                    && let ast::Expr::Starred(inner) = outer.value.as_ref()
+                {
+                    let _ = self.infer_type_expression(&inner.value);
+                    "**".hash(&mut hasher);
+                    continue;
+                }
+                return None;
+            };
+            let ast::Expr::StringLiteral(s) = key_expr else {
+                return None;
+            };
+            let name = Name::new(s.value.to_str());
+            let field_ty = self.infer_type_expression(&item.value);
+            name.as_str().hash(&mut hasher);
+            field_ty.display(db).to_string().hash(&mut hasher);
+            schema.insert(
+                name,
+                TypedDictFieldBuilder::new(field_ty).required(true).build(),
+            );
+        }
+
+        #[expect(clippy::cast_possible_truncation)]
+        let truncated = hasher.finish() as u32;
+        let class_name = Name::new(format!("_TypedDict_{truncated:08x}"));
+
+        let module_scope = global_scope(db, self.file());
+        let anchor = DynamicTypedDictAnchor::Synthesized {
+            scope: module_scope,
+            range: dict.range(),
+            schema,
+        };
+        let td = DynamicTypedDictLiteral::new(db, class_name, anchor);
+        Some(td.to_instance())
+    }
+
+    fn synthesize_anon_named_tuple_class(
+        &mut self,
+        tuple: &ast::ExprTuple,
+        is_type_form: bool,
+    ) -> Type<'db> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        use ty_python_core::global_scope;
+
+        let db = self.db();
+        let mut fields: Vec<NamedTupleField<'db>> = Vec::with_capacity(tuple.elts.len());
+        for (i, elt) in tuple.elts.iter().enumerate() {
+            let (field_name, ty) = match elt {
+                ast::Expr::Named(named) => {
+                    let name_str = named
+                        .target
+                        .as_name_expr()
+                        .map(|n| n.id.as_str().to_owned())
+                        .unwrap_or_else(|| format!("arg{i}"));
+                    let ty = if is_type_form {
+                        self.infer_type_expression(&named.value)
+                    } else {
+                        // value form preserves literal types so a tuple
+                        // literal like `(1, name="a")` reveals
+                        // `(1, name="a")` not `(int, name=str)`
+                        self.infer_expression(&named.value, TypeContext::default())
+                    };
+                    (name_str, ty)
+                }
+                other => {
+                    let ty = if is_type_form {
+                        self.infer_type_expression(other)
+                    } else {
+                        self.infer_expression(other, TypeContext::default())
+                    };
+                    (format!("arg{i}"), ty)
+                }
+            };
+            fields.push(NamedTupleField {
+                name: ruff_python_ast::name::Name::new(&field_name),
+                ty,
+                default: None,
+                definition: None,
+            });
+        }
+
+        let spec = NamedTupleSpec::known(db, fields.into_boxed_slice());
+
+        // Shape-based identity: hash the field-name + display-string of the
+        // field type to derive the synthesized class name. Two anonymous
+        // named tuples with the same shape produce the same name and the
+        // same anchor (which itself is keyed off the salsa-interned spec
+        // plus a constant scope+offset), so they resolve to the same
+        // `DynamicNamedTupleLiteral`.
+        let mut hasher = DefaultHasher::new();
+        for field in spec.fields(db) {
+            field.name.as_str().hash(&mut hasher);
+            field.ty.display(db).to_string().hash(&mut hasher);
+        }
+        #[expect(clippy::cast_possible_truncation)]
+        let truncated = hasher.finish() as u32;
+        let class_name =
+            ruff_python_ast::name::Name::new(format!("_AnonNamedTuple_{truncated:08x}"));
+
+        // Anchor at the module-scope with a constant offset of 0 so structural
+        // identity (driven entirely by `spec`) determines the synthesized
+        // class. Different shapes produce different specs; identical shapes
+        // unify across the file.
+        let module_scope = global_scope(db, self.file());
+        let anchor = DynamicNamedTupleAnchor::ScopeOffset {
+            scope: module_scope,
+            offset: 0,
+            spec,
+        };
+
+        let nt = DynamicNamedTupleLiteral::new(db, class_name, anchor);
+        Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(nt))
+    }
+
     fn infer_tuple_expression(
         &mut self,
         tuple: &ast::ExprTuple,
@@ -6061,12 +6424,121 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         /// This provides a huge speedup on files that have very large unannotated tuple literals.
         const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
 
+        // basedpython anonymous named tuple type literal in value position.
+        // E.g. `a = (name: str, age: int)` is a type-alias-like expression
+        // whose value is the class object for the synthesized `NamedTuple`.
+        if tuple.is_anon_named_tuple {
+            let class_lit =
+                self.synthesize_anon_named_tuple_class(tuple, /* is_type_form = */ true);
+            return class_lit;
+        }
+        // basedpython anonymous named tuple value literal: `(name=v, ...)`.
+        // Each field's value type is inferred from the value expression; the
+        // result type is an *instance* of the synthesized `NamedTuple` class
+        // so attribute access (`a.name`) resolves the correct field type.
+        if tuple.is_anon_named_tuple_value {
+            let class_lit =
+                self.synthesize_anon_named_tuple_class(tuple, /* is_type_form = */ false);
+            return class_lit.to_instance(self.db()).unwrap_or(class_lit);
+        }
+        // basedpython parameter-shape tuple literal in value position is not
+        // a runtime type itself — infer each contained field for diagnostics
+        // and return `Unknown`. (Type-position handling is in
+        // `type_expression.rs`.)
+        if tuple.has_parameter_shape() {
+            for elt in &tuple.elts {
+                if let ast::Expr::Named(named) = elt {
+                    let _ = self.infer_type_expression(&named.value);
+                } else {
+                    let _ = self.infer_type_expression(elt);
+                }
+            }
+            return Type::unknown();
+        }
+        // basedpython: a *plain* tuple literal in a position whose expected
+        // type (via bidirectional inference) is an anonymous-named-tuple
+        // instance gets inferred AS that instance — matching the transpiler's
+        // implicit constructor coercion. This makes `def f() -> (name: str,
+        // age: int): return ("a", 1)` type-check, since at runtime the
+        // returned value is wrapped as `_AnonNamedTuple_xxx("a", 1)`.
+        // Find an anon-NT instance candidate in the expected type. Accept the
+        // direct case (`x: anon-NT`) and any union member (`x: anon-NT | None`,
+        // `x: anon-NT | Other`, …). The first matching union member wins.
+        #[expect(clippy::items_after_statements, reason = "helper colocated with use")]
+        fn find_anon_nt_target<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Type<'db>> {
+            if let Type::NominalInstance(instance) = ty
+                && let crate::types::class::ClassLiteral::DynamicNamedTuple(nt) =
+                    instance.class(db).class_literal(db)
+                && nt.name(db).as_str().starts_with("_AnonNamedTuple_")
+            {
+                return Some(ty);
+            }
+            if let Type::Union(union) = ty {
+                for member in union.elements(db).iter().copied() {
+                    if let Some(found) = find_anon_nt_target(db, member) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+        if let Some(target_instance) = tcx
+            .annotation
+            .and_then(|a| find_anon_nt_target(self.db(), a))
+            && let Type::NominalInstance(instance) = target_instance
+            && let crate::types::class::ClassLiteral::DynamicNamedTuple(nt) =
+                instance.class(self.db()).class_literal(self.db())
+            && nt.name(self.db()).as_str().starts_with("_AnonNamedTuple_")
+        {
+            let spec = match nt.anchor(self.db()) {
+                crate::types::class::DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => {
+                    Some(*spec)
+                }
+                _ => None,
+            };
+            if let Some(spec) = spec {
+                let fields = spec.fields(self.db());
+                if fields.len() == tuple.elts.len()
+                    && tuple
+                        .elts
+                        .iter()
+                        .all(|e| !matches!(e, ast::Expr::Starred(_)))
+                {
+                    // type-check element-wise against the expected field
+                    // types. when every element is assignable, return the
+                    // anon-NT instance so attribute access works; otherwise
+                    // build a plain heterogeneous tuple from the inferred
+                    // types (each element has already been inferred, so we
+                    // can't re-call `infer_expression` in a fall-through
+                    // branch)
+                    let mut elt_tys: Vec<Type<'db>> = Vec::with_capacity(tuple.elts.len());
+                    let mut all_assignable = true;
+                    for (elt, field) in tuple.elts.iter().zip(fields.iter()) {
+                        let elt_ty = self.infer_expression(elt, TypeContext::new(Some(field.ty)));
+                        if !elt_ty.is_assignable_to(self.db(), field.ty) {
+                            all_assignable = false;
+                        }
+                        elt_tys.push(elt_ty);
+                    }
+                    if all_assignable {
+                        return target_instance;
+                    }
+                    return Type::heterogeneous_tuple(self.db(), elt_tys);
+                }
+            }
+        }
+
         let ast::ExprTuple {
             range: _,
             node_index: _,
             elts,
             ctx: _,
             parenthesized: _,
+            is_anon_named_tuple: _,
+            is_anon_named_tuple_value: _,
+            parameter_slash: _,
+            parameter_star: _,
+            is_parameter_shape: _,
         } = tuple;
 
         // Remove any union elements of the annotation that are unrelated to the tuple type.
@@ -7287,6 +7759,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
+        // basedpython: a Named with `Invalid` ctx target is not a walrus —
+        // it's an anon-NT field label, parameter-spec field, or kw subscription.
+        // it has no walrus definition; just infer the value type.
+        if let ast::Expr::Name(n) = named.target.as_ref()
+            && matches!(n.ctx, ast::ExprContext::Invalid)
+        {
+            return self.infer_expression(&named.value, TypeContext::default());
+        }
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
@@ -7360,6 +7840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             parameters,
+            returns,
             body: _,
         } = lambda_expression;
 
@@ -7392,21 +7873,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         .map(Parameter::annotated_type);
 
+        // resolve parameter type: prefer explicit annotation, then callable_tcx, else unannotated
+        let resolve_param_annotation = |builder: &mut Self,
+                                        param: &ast::ParameterWithDefault,
+                                        ctx_ty: Option<Type<'db>>|
+         -> Option<Type<'db>> {
+            if let Some(annotation) = &param.parameter.annotation {
+                Some(
+                    builder
+                        .infer_annotation_expression(
+                            annotation,
+                            DeferredExpressionState::from(builder.defer_annotations()),
+                        )
+                        .inner_type(),
+                )
+            } else {
+                ctx_ty
+            }
+        };
+
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
                 .posonlyargs
                 .iter()
                 .map(|param| {
-                    let parameter = Parameter::positional_only(Some(param.name().id.clone()))
+                    let ctx_ty = parameter_types.next();
+                    let parameter_base = Parameter::positional_only(Some(param.name().id.clone()))
                         .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
                         }));
-
-                    if let Some(annotated_type) = parameter_types.next() {
-                        parameter.with_annotated_type(annotated_type)
+                    if let Some(ty) = resolve_param_annotation(self, param, ctx_ty) {
+                        parameter_base.with_annotated_type(ty)
                     } else {
-                        parameter
+                        parameter_base
                     }
                 })
                 .collect::<Vec<_>>();
@@ -7414,16 +7914,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .args
                 .iter()
                 .map(|param| {
-                    let parameter = Parameter::positional_or_keyword(param.name().id.clone())
+                    let ctx_ty = parameter_types.next();
+                    let parameter_base = Parameter::positional_or_keyword(param.name().id.clone())
                         .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
                         }));
-
-                    if let Some(annotated_type) = parameter_types.next() {
-                        parameter.with_annotated_type(annotated_type)
+                    if let Some(ty) = resolve_param_annotation(self, param, ctx_ty) {
+                        parameter_base.with_annotated_type(ty)
                     } else {
-                        parameter
+                        parameter_base
                     }
                 })
                 .collect::<Vec<_>>();
@@ -7431,16 +7931,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .vararg
                 .as_ref()
                 .map(|param| Parameter::variadic(param.name().id.clone()));
+            // `Callable[[...], R]` parameter types only apply to positional
+            // parameters — keyword-only parameters never consume from
+            // `parameter_types`. The explicit annotation on a typed lambda
+            // (basedpython) parameter still takes priority via
+            // `resolve_param_annotation`
             let keyword_only = parameters
                 .kwonlyargs
                 .iter()
                 .map(|param| {
-                    Parameter::keyword_only(param.name().id.clone()).with_optional_default_type(
-                        param.default().map(|default_expr| {
+                    let parameter_base = Parameter::keyword_only(param.name().id.clone())
+                        .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
-                        }),
-                    )
+                        }));
+                    if let Some(ty) = resolve_param_annotation(self, param, None) {
+                        parameter_base.with_annotated_type(ty)
+                    } else {
+                        parameter_base
+                    }
                 })
                 .collect::<Vec<_>>();
             let keyword_variadic = parameters
@@ -7471,9 +7980,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let scope = scope_id.to_scope_id(self.db(), self.file());
 
-        // If we have a direct `Callable` type context, we can infer the body with the annotated
-        // return type as type context.
-        let return_tcx = if let Some(signature) = callable_tcx {
+        // explicit `-> return_type` annotation takes priority over Callable context
+        let declared_return_ty = if let Some(returns_expr) = returns {
+            let ty = self
+                .infer_annotation_expression(
+                    returns_expr,
+                    DeferredExpressionState::from(self.defer_annotations()),
+                )
+                .inner_type();
+            Some(ty)
+        } else {
+            None
+        };
+
+        let return_tcx = if let Some(ty) = declared_return_ty {
+            TypeContext::new(Some(ty))
+        } else if let Some(signature) = callable_tcx {
             match signature.return_ty {
                 Type::Dynamic(DynamicType::Unknown) => TypeContext::new(None),
                 _ => TypeContext::new(Some(signature.return_ty)),
@@ -7488,7 +8010,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let return_ty = if let Some(ty) = declared_return_ty {
+            ty
+        } else {
+            inference.expression_type(lambda_expression.body.as_ref())
+        };
         Type::Callable(CallableType::new(
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
@@ -7685,6 +8211,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        // basedpython `<value> cast <type>` parses as `ExprCall { is_cast: true,
+        // func: Name("cast"), arguments: [type, value] }`. The synthetic `cast`
+        // name is unresolved by design, so dispatch on the flag: infer the
+        // target as a type expression and walk the value for declarations
+        if call_expression.is_cast
+            && let [type_arg, value_arg] = &*call_expression.arguments.args
+        {
+            self.infer_expression(value_arg, TypeContext::default());
+            return self.infer_type_expression(type_arg);
+        }
+
         let callable_type =
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
 
@@ -7732,6 +8269,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             func,
             arguments,
+            is_cast: _,
         } = call_expression;
 
         if callable_type
@@ -8548,6 +9086,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     Place::Undefined.into()
                 }
+            })
+            // basedpython only: `typing` members are implicitly available
+            // and emitted as `from typing import …` by the transpiler.
+            // version-gated names (e.g. `Self`, `LiteralString`) aren't in
+            // the older-version typing stub — fall through to
+            // `typing_extensions` so the implicit name still resolves
+            .or_fall_back_to(db, || {
+                if self.is_basedpython_file() && is_basedpython_implicit_typing_name(symbol_name) {
+                    typing_symbol(db, symbol_name)
+                        .or_fall_back_to(db, || typing_extensions_symbol(db, symbol_name))
+                } else {
+                    Place::Undefined.into()
+                }
             });
 
         let ty =
@@ -9085,6 +9636,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// basedpython: compute the bound-super type for `super` / `super[T]`
+    /// when used as an attribute base. returns `None` when `value` does not
+    /// match the sugar form, when there is no enclosing class, or when the
+    /// supplied target class is not in the enclosing class' MRO.
+    fn basedpython_super_value_type(&mut self, value: &ast::Expr) -> Option<Type<'db>> {
+        let db = self.db();
+
+        let target_class: Option<ClassType<'db>> = match value {
+            ast::Expr::Name(n) if n.id.as_str() == "super" => None,
+            ast::Expr::Subscript(s) => {
+                let ast::Expr::Name(n) = s.value.as_ref() else {
+                    return None;
+                };
+                if n.id.as_str() != "super" {
+                    return None;
+                }
+                Some(self.expression_type(s.slice.as_ref()).to_class_type(db)?)
+            }
+            _ => return None,
+        };
+
+        let enclosing = nearest_enclosing_class(db, self.index, self.scope())?;
+        let enclosing_class = ClassLiteral::Static(enclosing).default_specialization(db);
+        let owner_type = Type::instance(db, enclosing_class);
+
+        let pivot_class_type = match target_class {
+            None => Type::from(enclosing_class),
+            Some(target) => {
+                let target_lit = target.class_literal(db);
+                let mut prev: Option<ClassType<'db>> = None;
+                let mut found: Option<ClassType<'db>> = None;
+                for entry in enclosing_class.class_literal(db).iter_mro(db) {
+                    if let crate::types::ClassBase::Class(c) = entry {
+                        if c.class_literal(db) == target_lit {
+                            found = prev;
+                            break;
+                        }
+                        prev = Some(c);
+                    }
+                }
+                Type::from(found?)
+            }
+        };
+
+        crate::types::bound_super::BoundSuperType::build(db, pivot_class_type, owner_type).ok()
+    }
+
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let value_type =
@@ -9117,6 +9715,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let mut constraint_keys = vec![];
+
+        // basedpython `a?.b`: short-circuits to `None` when `a is None`.
+        // narrow value_type to its non-None component for the attribute
+        // lookup, then re-union with None at the end. records whether we
+        // performed the narrowing so we know to re-add None
+        let mut none_chain_was_optional = false;
+        if self.is_basedpython_file() && attribute.optional {
+            let none = Type::none(db);
+            let narrowed = match value_type {
+                Type::Union(u) => u.map(db, |elem| {
+                    if elem.is_subtype_of(db, none) {
+                        Type::Never
+                    } else {
+                        *elem
+                    }
+                }),
+                ty if ty.is_subtype_of(db, none) => Type::Never,
+                ty => ty,
+            };
+            if !narrowed.is_equivalent_to(db, value_type) {
+                value_type = narrowed;
+                none_chain_was_optional = true;
+            }
+        }
+
+        // basedpython: `super.x` and `super[T].x` sugar in `.by` files.
+        // overrides value_type with the corresponding bound-super type so that
+        // attribute lookup is performed against the MRO, mirroring what the
+        // transpile produces (`super().x` / `super(<predecessor>, self).x`)
+        if self.is_basedpython_file()
+            && let Some(super_value_type) = self.basedpython_super_value_type(value)
+        {
+            value_type = super_value_type;
+        }
+
+        // basedpython: `expr.N` is tuple-member dot access. the parser only
+        // produces ExprAttribute with a digit-only attr id in `.by` files, so
+        // a successful lookup short-circuits the regular attribute resolution
+        if self.is_basedpython_file()
+            && !attr.id.as_str().is_empty()
+            && attr.id.as_str().bytes().all(|b| b.is_ascii_digit())
+            && let Ok(index) = attr.id.as_str().parse::<i32>()
+            && let Some(spec) = value_type.exact_tuple_instance_spec(db)
+            && let Ok(element_ty) = (&*spec).py_index(db, index)
+        {
+            return element_ty;
+        }
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
@@ -9387,7 +10032,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
-        assigned_type.unwrap_or(resolved_type)
+        let final_type = assigned_type.unwrap_or(resolved_type);
+
+        // basedpython `?.`: short-circuit returns None on a None receiver, so
+        // the overall expression type is the attribute type unioned with None
+        if none_chain_was_optional {
+            return UnionType::from_two_elements(db, final_type, Type::none(db));
+        }
+        final_type
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -9397,6 +10049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             ctx,
+            optional: _,
         } = attribute;
 
         match ctx {
@@ -9524,6 +10177,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                 LiteralValueTypeKind::Bool(value) => Type::int_literal(-i64::from(value)),
+                LiteralValueTypeKind::Float(value) => Type::float_literal(-value.as_f64()),
+                LiteralValueTypeKind::Complex(c) => {
+                    Type::complex_literal(self.db(), -c.re(self.db()), -c.im(self.db()))
+                }
                 _ => fallback_unary_expression_type(),
             },
 
@@ -9857,6 +10514,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             dataclass_field_specifiers: _,
+            slice_materialization: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -9949,6 +10607,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             dataclass_field_specifiers: _,
+            slice_materialization: _,
             typevar_binding_context: _,
             deferred_state: _,
             index: _,
@@ -10054,6 +10713,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
+            slice_materialization: _,
             undecorated_type: _,
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
@@ -10101,6 +10761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             dataclass_field_specifiers: _,
+            slice_materialization: _,
             typevar_binding_context: _,
             deferred_state: _,
             index: _,
@@ -10198,6 +10859,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Builder only state
             expression_cache: _,
             dataclass_field_specifiers: _,
+            slice_materialization: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
@@ -10255,6 +10917,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ref expression_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
+            slice_materialization: _,
 
             // These fields are type inference results, but do not affect the inference of a given
             // expression.
@@ -10310,6 +10973,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             dataclass_field_specifiers: _,
+            slice_materialization: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -10898,4 +11562,74 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 enum BoundOrConstraintsNodes<'ast> {
     Bound(&'ast ast::Expr),
     Constraints(&'ast [ast::Expr]),
+}
+
+/// basedpython: returns `true` if `object_ty` is an instance whose
+/// specialization has at least one `out` (covariant) projection on a typevar
+/// AND the named `attribute` on the unspecialized class declares its type
+/// referring to that very typevar (directly or nested). Under an `out`
+/// projection the typevar's contravariant occurrences materialize to
+/// `Never`, so any value assignment fails.
+fn attribute_has_covariant_projected_typevar<'db>(
+    db: &'db dyn crate::Db,
+    object_ty: Type<'db>,
+    attribute: &str,
+) -> bool {
+    use ruff_python_ast::helpers::UseSiteVariance;
+
+    let Some(instance) = object_ty.as_nominal_instance() else {
+        return false;
+    };
+    let crate::types::ClassType::Generic(alias) = instance.class(db) else {
+        return false;
+    };
+    let specialization = alias.specialization(db);
+    let projections = specialization.projections(db);
+    if projections.is_empty() {
+        return false;
+    }
+
+    let class_literal = alias.origin(db);
+    let Some(generic_context) = class_literal.generic_context(db) else {
+        return false;
+    };
+
+    // Collect identities of typevars that are covariantly projected at use site.
+    let covariant_typevar_indices: Vec<usize> = projections
+        .iter()
+        .enumerate()
+        .filter_map(|(i, p)| matches!(p, Some(UseSiteVariance::Out)).then_some(i))
+        .collect();
+    if covariant_typevar_indices.is_empty() {
+        return false;
+    }
+
+    let typevars: Vec<_> = generic_context.variables(db).collect();
+    let target_typevar_identities: Vec<_> = covariant_typevar_indices
+        .iter()
+        .filter_map(|i| typevars.get(*i).map(|tv| tv.identity(db)))
+        .collect();
+
+    // Look up the attribute's declared type on the unspecialized class. If
+    // the declared type contains any of the covariantly-projected typevars,
+    // the assignment must be rejected.
+    // Look up the attribute on the unspecialized identity specialization so
+    // typevar references in the field declaration are preserved.
+    let identity_class_type = class_literal.identity_specialization(db);
+    let unspecialized_member = identity_class_type
+        .instance_member(db, attribute)
+        .place
+        .ignore_possibly_undefined();
+    let Some(declared_ty) = unspecialized_member else {
+        return false;
+    };
+
+    crate::types::any_over_type(db, declared_ty, false, |ty| {
+        if let Type::TypeVar(typevar) = ty {
+            let identity = typevar.identity(db);
+            target_typevar_identities.contains(&identity)
+        } else {
+            false
+        }
+    })
 }

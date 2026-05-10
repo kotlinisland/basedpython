@@ -1,0 +1,88 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..18,
+    body: [
+        AnnAssign(
+            StmtAnnAssign {
+                node_index: NodeIndex(None),
+                range: 0..17,
+                target: Name(
+                    ExprName {
+                        node_index: NodeIndex(None),
+                        range: 0..1,
+                        id: Name("a"),
+                        ctx: Store,
+                    },
+                ),
+                annotation: Subscript(
+                    ExprSubscript {
+                        node_index: NodeIndex(None),
+                        range: 3..17,
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 3..4,
+                                id: Name("X"),
+                                ctx: Load,
+                            },
+                        ),
+                        slice: Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 5..16,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 5..8,
+                                            id: Name("int"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 10..11,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 11..11,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 13..16,
+                                            id: Name("str"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                                is_anon_named_tuple: false,
+                                is_anon_named_tuple_value: false,
+                                parameter_slash: None,
+                                parameter_star: None,
+                                is_parameter_shape: false,
+                            },
+                        ),
+                        ctx: Load,
+                        is_typeof: false,
+                    },
+                ),
+                value: None,
+                simple: true,
+            },
+        ),
+    ],
+}

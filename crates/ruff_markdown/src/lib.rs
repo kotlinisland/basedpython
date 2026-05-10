@@ -109,7 +109,8 @@ pub fn format_code_blocks(
                 let unformatted_code = dedent(&source[TextRange::new(start, end)]);
 
                 let formatted_code = match language.as_str() {
-                    "python" | "py" | "python3" | "py3" | "pyi" => {
+                    "python" | "py" | "python3" | "py3" | "pyi" | "by" | "byi" | "bython"
+                    | "basedpython" => {
                         let options =
                             settings.to_format_options(py_source_type, &unformatted_code, path);
                         // Using `Printed::into_code` requires adding `ruff_formatter` as a direct

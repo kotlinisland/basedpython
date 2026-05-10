@@ -1,0 +1,102 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..14,
+    body: [
+        AnnAssign(
+            StmtAnnAssign {
+                node_index: NodeIndex(None),
+                range: 0..13,
+                target: Name(
+                    ExprName {
+                        node_index: NodeIndex(None),
+                        range: 0..1,
+                        id: Name("a"),
+                        ctx: Store,
+                    },
+                ),
+                annotation: Subscript(
+                    ExprSubscript {
+                        node_index: NodeIndex(None),
+                        range: 3..13,
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 3..4,
+                                id: Name("X"),
+                                ctx: Load,
+                            },
+                        ),
+                        slice: Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 5..12,
+                                elts: [
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 5..6,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 6..6,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 8..9,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 9..9,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 11..12,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 12..12,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                                is_anon_named_tuple: false,
+                                is_anon_named_tuple_value: false,
+                                parameter_slash: None,
+                                parameter_star: None,
+                                is_parameter_shape: false,
+                            },
+                        ),
+                        ctx: Load,
+                        is_typeof: false,
+                    },
+                ),
+                value: None,
+                simple: true,
+            },
+        ),
+    ],
+}

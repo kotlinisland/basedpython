@@ -1035,6 +1035,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: contents,
             is_stub: false,
+            is_basedpython: false,
         };
 
         let diagnostics = test_contents_syntax_errors(
@@ -1096,6 +1097,7 @@ mod tests {
             &SourceKind::Python {
                 code: std::fs::read_to_string(&path)?,
                 is_stub: false,
+                is_basedpython: false,
             },
             &path,
             &LinterSettings::for_rule(rule),
@@ -1222,6 +1224,7 @@ mod tests {
             &SourceKind::Python {
                 code: contents.into_owned(),
                 is_stub: true,
+                is_basedpython: false,
             },
             path,
             settings,

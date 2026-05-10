@@ -294,6 +294,7 @@ impl<'db> ConstructorBinding<'db> {
                         types,
                         specialization.materialization_kind(db),
                         None,
+                        specialization.projections(db).to_vec().into_boxed_slice(),
                     )
                 });
             let specialization = if return_specialization_is_informative {
@@ -493,6 +494,7 @@ impl<'db> ConstructorBinding<'db> {
             types,
             specialization.materialization_kind(db),
             None,
+            specialization.projections(db).to_vec().into_boxed_slice(),
         )
     }
 

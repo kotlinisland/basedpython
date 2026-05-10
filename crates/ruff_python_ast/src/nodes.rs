@@ -371,6 +371,15 @@ impl Deref for InterpolatedStringLiteralElement {
     }
 }
 
+/// variance annotation on a type parameter: `out T`, `in T`, `in out T`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum Variance {
+    Covariant,
+    Contravariant,
+    Bivariant,
+}
+
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -2534,6 +2543,36 @@ impl ExprTuple {
     pub fn is_empty(&self) -> bool {
         self.elts.is_empty()
     }
+
+    /// basedpython: tuple uses extended callable-parameter syntax —
+    /// positional-only `/`, keyword-only `*`, named-only `name: T`,
+    /// variadic `*: T` / `*name: T`, or kwargs catch-all `**: T` /
+    /// `**name: T`. when true, the tuple is interpretable as a callable
+    /// parameter list in addition to a tuple type. derived from the
+    /// `is_parameter_shape` field, marker positions, and named-field
+    /// presence, so callers don't have to set the flag manually
+    pub fn has_parameter_shape(&self) -> bool {
+        // a Named expression in `elts` only counts as a parameter-spec
+        // field label when its target name has `Invalid` ctx — real walrus
+        // expressions have `Store`/`Load` ctx and must not be misread as
+        // tuple fields
+        self.is_parameter_shape
+            || self.parameter_slash.is_some()
+            || self.parameter_star.is_some()
+            || self.elts.iter().any(|e| {
+                if let Expr::Named(n) = e {
+                    if let Expr::Name(name) = n.target.as_ref() {
+                        return matches!(name.ctx, ExprContext::Invalid);
+                    }
+                    if let Expr::Starred(s) = n.target.as_ref() {
+                        if let Expr::Name(name) = s.value.as_ref() {
+                            return matches!(name.ctx, ExprContext::Invalid);
+                        }
+                    }
+                }
+                false
+            })
+    }
 }
 
 impl<'a> IntoIterator for &'a ExprTuple {
@@ -2595,6 +2634,8 @@ pub enum Operator {
     BitXor,
     BitAnd,
     FloorDiv,
+    /// basedpython: `a ?? b` — None-coalescing operator
+    Coalesce,
 }
 
 impl Operator {
@@ -2613,6 +2654,7 @@ impl Operator {
             Operator::BitXor => "^",
             Operator::BitAnd => "&",
             Operator::FloorDiv => "//",
+            Operator::Coalesce => "??",
         }
     }
 
@@ -2632,6 +2674,7 @@ impl Operator {
             Operator::BitXor => "__xor__",
             Operator::BitAnd => "__and__",
             Operator::FloorDiv => "__floordiv__",
+            Operator::Coalesce => "__coalesce__",
         }
     }
 
@@ -2651,6 +2694,7 @@ impl Operator {
             Operator::BitXor => "__ixor__",
             Operator::BitAnd => "__iand__",
             Operator::FloorDiv => "__ifloordiv__",
+            Operator::Coalesce => "__icoalesce__",
         }
     }
 
@@ -2670,6 +2714,7 @@ impl Operator {
             Operator::BitXor => "__rxor__",
             Operator::BitAnd => "__rand__",
             Operator::FloorDiv => "__rfloordiv__",
+            Operator::Coalesce => "__rcoalesce__",
         }
     }
 }
@@ -3903,7 +3948,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 80);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
-        assert_eq!(std::mem::size_of::<Expr>(), 80);
+        assert_eq!(std::mem::size_of::<Expr>(), 72);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
@@ -3919,7 +3964,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
-        assert_eq!(std::mem::size_of::<ExprLambda>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 40);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprName>(), 40);
@@ -3932,7 +3977,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
         assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 64);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
-        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 64);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 24);
         assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 24);

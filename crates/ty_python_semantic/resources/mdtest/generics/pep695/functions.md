@@ -1234,5 +1234,28 @@ def f(l: list[tuple[Any | str, Any | str]]) -> None:
     reveal_type(dict(l))
 ```
 
+## basedpython explicit type arguments
+
+basedpython allows explicit type arguments at generic function call sites: `f[T](args)`. the type
+argument specializes the function, and the return type reflects the explicit binding.
+
+```py
+def f[T](t1: T, t2: T) -> T:
+    return t1
+
+result = f[object](1, "a")
+reveal_type(result)  # revealed: object
+```
+
+multiple type parameters are also supported:
+
+```py
+def pair[A, B](a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+result = pair[int, str](1, "a")
+reveal_type(result)  # revealed: tuple[int, str]
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

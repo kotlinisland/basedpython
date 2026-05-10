@@ -43,6 +43,16 @@ pub(super) const fn token_kind_to_cmp_op(
         (TokenKind::Not, Some(TokenKind::In)) => CmpOp::NotIn,
         (TokenKind::In, _) => CmpOp::In,
         (TokenKind::EqEqual, _) => CmpOp::Eq,
+        // basedpython: `===` is the identity comparison (Python's `is`).
+        // we map it to CmpOp::Is so the AST matches Python semantics; the
+        // forward transpile distinguishes it from the basedpython `is`
+        // keyword by looking at the source text
+        (TokenKind::EqEqEqual, _) => CmpOp::Is,
+        // basedpython: `!==` is the negated identity comparison (Python's
+        // `is not`). mapped to CmpOp::IsNot; the forward transpile
+        // distinguishes it from the basedpython `is not` keyword pair by
+        // looking at the source text
+        (TokenKind::BangEqEqual, _) => CmpOp::IsNot,
         (TokenKind::NotEqual, _) => CmpOp::NotEq,
         (TokenKind::Less, _) => CmpOp::Lt,
         (TokenKind::LessEqual, _) => CmpOp::LtE,
@@ -105,6 +115,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::Named(_) => "assignment expression",
         Expr::Subscript(_) => "subscript expression",
         Expr::IpyEscapeCommand(_) => "IPython escape command",
+        Expr::CallableType(_) => "callable type expression",
     };
 
     Some((RelaxedDecoratorError::Other(description), expr.range()))

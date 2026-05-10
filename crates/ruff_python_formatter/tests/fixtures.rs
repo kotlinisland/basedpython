@@ -191,7 +191,8 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
     let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
-    let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
+    let lang = language_for_extension(input_path.extension().unwrap_or("py"));
+    let mut snapshot = format!("## Input\n{}", CodeFrame::new(lang, &content));
     let options_path = input_path.with_extension("options.json");
 
     if let Ok(options_file) = fs::File::open(&options_path) {
@@ -211,7 +212,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
                 "### Output {}\n{}{}",
                 i + 1,
                 CodeFrame::new("", &DisplayPyOptions(&options)),
-                CodeFrame::new("python", &formatted_code)
+                CodeFrame::new(lang, &formatted_code)
             )
             .unwrap();
 
@@ -265,7 +266,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
             writeln!(
                 snapshot,
                 "## Output\n{}",
-                CodeFrame::new("python", &formatted_code)
+                CodeFrame::new(lang, &formatted_code)
             )
             .unwrap();
         } else {
@@ -274,7 +275,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
             writeln!(
                 snapshot,
                 "## Output\n{}\n## Preview changes\n{}",
-                CodeFrame::new("python", &formatted_code),
+                CodeFrame::new(lang, &formatted_code),
                 CodeFrame::new(
                     "diff",
                     TextDiff::from_lines(&formatted_code, &formatted_preview)
@@ -312,8 +313,8 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
 }
 
 datatest_stable::harness! {
-    { test = black_compatibility, root = "./resources/test/fixtures/black", pattern = r".+\.pyi?$" },
-    { test = format, root="./resources/test/fixtures/ruff", pattern = r".+\.pyi?$" }
+    { test = black_compatibility, root = "./resources/test/fixtures/black", pattern = r".+\.[bp]yi?$" },
+    { test = format, root="./resources/test/fixtures/ruff", pattern = r".+\.[bp]yi?$" }
 }
 
 fn format_file(
@@ -544,6 +545,13 @@ impl std::fmt::Display for Header<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "## {}", self.title)?;
         writeln!(f)
+    }
+}
+
+fn language_for_extension(ext: &str) -> &str {
+    match ext {
+        "by" => "bython",
+        _ => "python",
     }
 }
 

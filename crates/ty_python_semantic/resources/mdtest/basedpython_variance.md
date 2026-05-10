@@ -1,0 +1,142 @@
+# basedpython: use-site variance with `out` and `in`
+
+basedpython supports use-site variance keywords on subscript elements:
+
+- `Container[out T]` — covariant read-only view. Reading returns `T`; writing is rejected.
+- `Container[in T]` — contravariant write-only projection. Accepts writes of `T`; reads project to
+    `object`.
+- `Container[in out T]` — invariant read-write view. Equivalent to plain `Container[T]` for
+    read/write purposes.
+
+The outer container's identity is preserved — `Container[out T]` is still a `Container`, with member
+access projected according to the use-site variance, just like Kotlin's `Container<out T>` or Java's
+`Container<? extends T>`.
+
+## generic attribute write under `out`
+
+```by
+class Box[T]:
+    value: T
+
+def f(box: Box[out object]):
+    # error: [invalid-assignment] "Cannot assign value of type `"asdf"` to attribute `value` on covariantly-projected object of type `Box[out object]`"
+    box.value = "asdf"
+```
+
+## covariant `out`
+
+```by
+def f(data: list[out int]):
+    reveal_type(data[0])  # revealed: int
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `0` and value of type `1` on object of type `list[out int]`"
+    data[0] = 1
+```
+
+The annotation also reveals the variance projection directly:
+
+```by
+def f(data: list[out int]):
+    reveal_type(data)  # revealed: list[out int]
+```
+
+## contravariant `in`
+
+`in T` allows writing `T` and projects reads through to `object`.
+
+```by
+def f(data: list[in int]):
+    data[0] = 1  # ok: int accepted
+    # error: [invalid-assignment]
+    data[0] = "bad"
+```
+
+Reads return `object`, so a narrower-typed target rejects the read:
+
+```by
+def f(data: list[in int]):
+    reveal_type(data[0])  # revealed: object
+    b: object = data[0]  # ok
+    # error: [invalid-assignment]
+    a: int = data[0]
+```
+
+## invariant `in out`
+
+`in out T` reads and writes as `T`, like the plain subscript form:
+
+```by
+def f(data: list[in out int]):
+    reveal_type(data[0])  # revealed: int
+    data[0] = 1  # ok
+    # error: [invalid-assignment]
+    data[0] = "bad"
+```
+
+## complex inner types
+
+The inner type expression can be arbitrarily complex:
+
+```by
+def _(a: list[out int | str]):
+    reveal_type(a[0])  # revealed: int | str
+```
+
+## subtyping under projection
+
+Use-site projections promote an invariant generic to covariant or contravariant *at the call site*,
+matching Kotlin's `Container<out T>` / `Container<in T>` rules.
+
+`Container[out X]` is a supertype of `Container[Y]` whenever `Y <: X`:
+
+```by
+def widening(bools: list[bool]):
+    # list[bool] <: list[out int] because bool <: int
+    y: list[out int] = bools
+```
+
+`Container[in X]` is a supertype of `Container[Y]` whenever `Y :> X`:
+
+```by
+def widening_in(objs: list[object]):
+    # list[object] <: list[in int] because int <: object
+    y: list[in int] = objs
+```
+
+A projection is itself a wider set than the concrete form, so narrowing from a projection back to
+the concrete form is rejected:
+
+```by
+def reject_narrowing(out_ints: list[out int]):
+    # error: [invalid-assignment]
+    y: list[int] = out_ints
+```
+
+`out` and `in` projections describe variance in opposite directions and have no subtyping relation:
+
+```by
+def reject_opposite(out_ints: list[out int]):
+    # error: [invalid-assignment]
+    y: list[in int] = out_ints
+```
+
+Two `out` projections relate by the inner type:
+
+```by
+def out_to_out(out_bools: list[out bool]):
+    # list[out bool] <: list[out int] because bool <: int
+    y: list[out int] = out_bools
+```
+
+## definition-site variance is independent
+
+`out`/`in`/`in out` on type-parameter declarations is unrelated machinery that controls how each
+instantiation specializes the underlying class:
+
+```by
+class Box[out T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(box: Box[int]):
+    reveal_type(box.get())  # revealed: int
+```

@@ -96,6 +96,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
             }
             Expr::Lambda(ast::ExprLambda {
                 parameters,
+                returns: _,
                 body,
                 range: _,
                 node_index: _,

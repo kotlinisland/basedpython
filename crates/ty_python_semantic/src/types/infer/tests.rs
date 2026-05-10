@@ -232,6 +232,73 @@ fn pep695_type_params() {
     check_typevar("Y", "TypeVar", None, None, None);
 }
 
+#[test]
+fn pep695_type_params_based() {
+    let mut db = setup_db();
+
+    db.write_dedented(
+        "src/a.by",
+        "
+            def f[T, U: A, V: constraints (A, B), W = A, X: A = A1, Y: constraints (int,)]():
+                pass
+
+            class A: ...
+            class B: ...
+            class A1(A): ...
+            ",
+    )
+    .unwrap();
+
+    let check_typevar = |var: &'static str,
+                         display: &'static str,
+                         upper_bound: Option<&'static str>,
+                         constraints: Option<&[&'static str]>,
+                         default: Option<&'static str>| {
+        let var_ty = get_symbol(&db, "src/a.by", &["f"], var).expect_type();
+        assert_eq!(var_ty.display(&db).to_string(), display);
+
+        let expected_name_ty = format!(r#"Literal["{var}"]"#);
+        let name_ty = var_ty.member(&db, "__name__").place.expect_type();
+        assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
+
+        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = var_ty else {
+            panic!("expected TypeVar");
+        };
+
+        assert_eq!(
+            typevar
+                .upper_bound(&db)
+                .map(|ty| ty.display(&db).to_string()),
+            upper_bound.map(std::borrow::ToOwned::to_owned)
+        );
+        assert_eq!(
+            typevar.constraints(&db).map(|tys| tys
+                .iter()
+                .map(|ty| ty.display(&db).to_string())
+                .collect::<Vec<_>>()),
+            constraints.map(|strings| strings
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<_>>())
+        );
+        assert_eq!(
+            typevar
+                .default_type(&db)
+                .map(|ty| ty.display(&db).to_string()),
+            default.map(std::borrow::ToOwned::to_owned)
+        );
+    };
+
+    check_typevar("T", "TypeVar", None, None, None);
+    check_typevar("U", "TypeVar", Some("A"), None, None);
+    check_typevar("V", "TypeVar", None, Some(&["A", "B"]), None);
+    check_typevar("W", "TypeVar", None, None, Some("A"));
+    check_typevar("X", "TypeVar", Some("A"), None, Some("A1"));
+
+    // a typevar with less than two constraints is treated as unconstrained
+    check_typevar("Y", "TypeVar", None, None, None);
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]

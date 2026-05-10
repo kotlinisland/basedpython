@@ -80,6 +80,7 @@ Module(
                                 node_index: NodeIndex(None),
                             },
                             ctx: Store,
+                            optional: false,
                         },
                     ),
                     annotation: Name(
@@ -120,6 +121,7 @@ Module(
                                 },
                             ),
                             ctx: Store,
+                            is_typeof: false,
                         },
                     ),
                     annotation: Name(

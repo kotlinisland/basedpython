@@ -37,6 +37,7 @@ fn is_simple_call(expr: &Expr) -> bool {
                 },
             range: _,
             node_index: _,
+            is_cast: _,
         }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
         _ => false,
     }

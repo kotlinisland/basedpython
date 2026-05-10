@@ -10,8 +10,13 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+default-run = "by"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "by"
+path = "src/main.rs"
 
 [lib]
 doctest = false
@@ -19,7 +24,9 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
+by_transforms = { workspace = true }
 ty_combine = { workspace = true }
+ty_module_resolver = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_server = { workspace = true }
@@ -39,9 +46,11 @@ rayon = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-flame = { workspace = true }
 tracing-subscriber = { workspace = true }
+walkdir = { workspace = true }
 wild = { workspace = true }
 
 [target.'cfg(all(not(target_os = "macos"), not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]

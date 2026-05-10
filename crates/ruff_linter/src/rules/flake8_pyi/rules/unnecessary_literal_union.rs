@@ -144,10 +144,16 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
                 parenthesized: true,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
+                is_parameter_shape: false,
             })),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
+            is_typeof: false,
         });
 
         let edit = if other_exprs.is_empty() {
@@ -168,10 +174,16 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             ctx: ExprContext::Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         })),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         ctx: ExprContext::Load,
+                        is_typeof: false,
                     }))
             } else {
                 checker.generator().expr(&pep_604_union(&elts))

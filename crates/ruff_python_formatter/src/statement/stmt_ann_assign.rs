@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::StmtAnnAssign;
+use ruff_python_ast::{Expr, StmtAnnAssign};
 
 use crate::expression::is_splittable_expression;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
@@ -12,6 +12,50 @@ use crate::statement::trailing_semicolon;
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;
 
+/// detect a synthetic basedpython `let` annotation: returns `None` for bare `__let__`,
+/// or `Some(type_expr)` for the typed form `__let__[T]`
+#[allow(clippy::option_option)]
+fn synthetic_let(ann: &Expr) -> Option<Option<&Expr>> {
+    match ann {
+        Expr::Name(n) if n.id.as_str() == "__let__" => Some(None),
+        Expr::Subscript(s) if matches!(s.value.as_ref(), Expr::Name(n) if n.id.as_str() == "__let__") => {
+            Some(Some(s.slice.as_ref()))
+        }
+        _ => None,
+    }
+}
+
+/// detect a synthetic basedpython annotation marker name (classvar / newtype / sentinel)
+fn synthetic_marker(ann: &Expr) -> Option<&'static str> {
+    if let Expr::Name(n) = ann {
+        match n.id.as_str() {
+            "__classvar__" => return Some("class"),
+            "__newtype__" => return Some("newtype"),
+            "__sentinel__" => return Some("sentinel"),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// detect a synthetic basedpython modifier annotation (`abstract` / visibility)
+/// — produced by the parser for `abstract a: T`, `private a: T`, `public a: T`,
+/// and `export a: T`. The synthetic `annotation` is a Name with a special id;
+/// the user-typed annotation expression is stashed in `value`. The original
+/// source-text keyword lives at the annotation's range
+fn synthetic_modifier_annot<'a>(ann: &Expr, src: &'a str) -> Option<&'a str> {
+    let Expr::Name(name) = ann else {
+        return None;
+    };
+    let id = name.id.as_str();
+    if id != "__abstract_annot__" && id != "__visibility_annot__" {
+        return None;
+    }
+    let start = u32::from(name.range.start()) as usize;
+    let end = u32::from(name.range.end()) as usize;
+    Some(src.get(start..end)?.trim())
+}
+
 impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
     fn fmt_fields(&self, item: &StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAnnAssign {
@@ -22,6 +66,42 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
             value,
             simple: _,
         } = item;
+
+        // basedpython synthetic annotations — format back to the surface syntax
+        if let Some(type_ann) = synthetic_let(annotation) {
+            write!(f, [token("let"), space(), target.format()])?;
+            if let Some(t) = type_ann {
+                write!(f, [token(":"), space(), t.format()])?;
+            }
+            if let Some(v) = value {
+                write!(f, [space(), token("="), space(), v.format()])?;
+            }
+            return Ok(());
+        }
+        if let Some(keyword) = synthetic_marker(annotation) {
+            write!(f, [text(keyword), space(), target.format()])?;
+            if let Some(v) = value {
+                write!(f, [space(), token("="), space(), v.format()])?;
+            }
+            return Ok(());
+        }
+        if f.options().is_basedpython()
+            && let Some(modifier_src) = synthetic_modifier_annot(annotation, f.context().source())
+        {
+            // `<modifier> <target>: <ann> [= value]`. the original
+            // user-typed annotation is in `value` (when no `= value`) or used
+            // as the annotation directly (when there is an `= value`)
+            let modifier_kw: &str = modifier_src;
+            write!(f, [text(modifier_kw), space(), target.format()])?;
+            // when the source had no `= value` the parser stored the
+            // user-typed annotation in `value` instead. that's the form we
+            // need to recover here as the annotation
+            if let Some(v) = value {
+                write!(f, [token(":"), space(), v.format()])?;
+            }
+            return Ok(());
+        }
+
         let comments = f.context().comments().clone();
         let annotation_parentheses = annotation
             .as_ref()

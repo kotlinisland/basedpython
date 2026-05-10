@@ -215,6 +215,7 @@ impl Workspace {
         let source_kind = SourceKind::Python {
             code: contents.to_string(),
             is_stub: source_type.is_stub(),
+            is_basedpython: false,
         };
 
         // Use the unresolved version because we don't have a file path.

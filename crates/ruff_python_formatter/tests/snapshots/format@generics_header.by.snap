@@ -1,0 +1,39 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/generics_header.by
+---
+## Input
+```bython
+class Box[T]:
+    value: T
+
+
+class Pair[K, V]:
+    key: K
+    value: V
+
+
+def identity[T](x: T) -> T:
+    return x
+
+
+class Constrained[T: (int, str)]: ...
+```
+
+## Output
+```bython
+class Box[T]:
+    value: T
+
+
+class Pair[K, V]:
+    key: K
+    value: V
+
+
+def identity[T](x: T) -> T:
+    return x
+
+
+class Constrained[T: (int, str)]: ...
+```

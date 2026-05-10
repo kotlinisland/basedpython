@@ -328,7 +328,8 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::YieldFrom(_)
         | Expr::Starred(_)
         | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_) => false,
+        | Expr::IpyEscapeCommand(_)
+        | Expr::CallableType(_) => false,
     }
 }
 

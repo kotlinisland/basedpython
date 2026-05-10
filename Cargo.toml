@@ -1,18 +1,23 @@
 [workspace]
 members = ["crates/*"]
+# the distribution crate is built only by maturin (scoped, `-p basedpython`); it
+# is excluded here because its `by`/`buff` bins collide with the same-named bins
+# in crates/ty and crates/ruff under a workspace-wide build
+exclude = ["crates/basedpython"]
 resolver = "2"
 
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
 rust-version = "1.94"
-homepage = "https://docs.astral.sh/ruff"
-documentation = "https://docs.astral.sh/ruff"
-repository = "https://github.com/astral-sh/ruff"
-authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+homepage = "https://kotlinisland.github.io/basedpython"
+documentation = "https://kotlinisland.github.io/basedpython"
+repository = "https://github.com/KotlinIsland/basedpython"
+authors = ["KotlinIsland"]
 license = "MIT"
 
 [workspace.dependencies]
+by_transforms = { path = "crates/by_transforms" }
 ruff = { path = "crates/ruff" }
 ruff_annotate_snippets = { path = "crates/ruff_annotate_snippets" }
 ruff_cache = { path = "crates/ruff_cache" }

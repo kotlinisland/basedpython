@@ -186,6 +186,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        optional: false,
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `set.discard(element)`
@@ -199,6 +200,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {

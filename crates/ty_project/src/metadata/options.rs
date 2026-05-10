@@ -315,6 +315,8 @@ impl Options {
             let is_package = |dir: &SystemPath| {
                 system.is_file(&dir.join("__init__.py"))
                     || system.is_file(&dir.join("__init__.pyi"))
+                    || system.is_file(&dir.join("__init__.by"))
+                    || system.is_file(&dir.join("__init__.byi"))
             };
 
             // Check for `./src` directory (src-layout)

@@ -92,6 +92,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                             &SourceKind::Python {
                                 code: case.code().to_string(),
                                 is_stub: py_source_type.is_stub(),
+                                is_basedpython: false,
                             },
                             py_source_type,
                             ParseSource::Precomputed(parsed),

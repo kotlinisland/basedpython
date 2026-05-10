@@ -317,6 +317,11 @@ fn assignment_targets_from_expr<'a>(
             range: _,
             node_index: _,
             parenthesized: _,
+            is_anon_named_tuple: _,
+            is_anon_named_tuple_value: _,
+            parameter_slash: _,
+            parameter_star: _,
+            is_parameter_shape: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),

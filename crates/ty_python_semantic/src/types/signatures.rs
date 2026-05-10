@@ -625,6 +625,21 @@ impl<'db> PartialApplication<'db> {
     }
 }
 
+/// bucket parameter kinds for overload-impl inheritance matching. positional
+/// only and positional-or-keyword share a bucket so that an overload declared
+/// with PEP-570 `/` matches an impl that uses the default kind. the four other
+/// kinds (keyword-only, variadic, keyword-variadic) are kept separate so we
+/// don't inherit, e.g. a regular keyword type onto a `*args` parameter that
+/// happens to share its name
+fn parameter_kind_tag(kind: &ParameterKind<'_>) -> u8 {
+    match kind {
+        ParameterKind::PositionalOnly { .. } | ParameterKind::PositionalOrKeyword { .. } => 0,
+        ParameterKind::Variadic { .. } => 1,
+        ParameterKind::KeywordOnly { .. } => 2,
+        ParameterKind::KeywordVariadic { .. } => 3,
+    }
+}
+
 impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
@@ -906,6 +921,58 @@ impl<'db> Signature<'db> {
                     }
                 }
             }
+        }
+    }
+
+    /// basedpython: for the implementation of an overloaded function, fill in
+    /// any parameter whose type was not explicitly annotated with the union of
+    /// the corresponding parameter types from the sibling overload signatures
+    /// (matched by name and kind bucket). if `inherit_return` is true, also replace the return
+    /// type with the union of the overload return types. used to make
+    /// ```by
+    /// def foo(i: str) -> int
+    /// def foo(i: int) -> str
+    /// def foo(i): ...
+    /// ```
+    /// type-check `i` as `str | int` and validate `return` statements against
+    /// `int | str`
+    pub(crate) fn inherit_unannotated_from_overloads(
+        &mut self,
+        db: &'db dyn Db,
+        overload_signatures: &[Signature<'db>],
+        inherit_return: bool,
+    ) {
+        for impl_param in &mut self.parameters.value {
+            // skip explicit annotations, and any parameter that already has a
+            // resolved type (e.g. `self`/`cls` after
+            // `add_implicit_self_annotation`, or a `*args` whose annotated
+            // type was previously filled in elsewhere)
+            if !impl_param.inferred_annotation || !impl_param.annotated_type.is_unknown() {
+                continue;
+            }
+            let Some(name) = impl_param.name().cloned() else {
+                continue;
+            };
+            let impl_kind = parameter_kind_tag(&impl_param.kind);
+            let mut tys: Vec<Type<'db>> = Vec::new();
+            for sig in overload_signatures {
+                if let Some(matched) =
+                    sig.parameters.value.iter().find(|p| {
+                        p.name() == Some(&name) && parameter_kind_tag(&p.kind) == impl_kind
+                    })
+                    && !matched.inferred_annotation
+                {
+                    tys.push(matched.annotated_type);
+                }
+            }
+            if !tys.is_empty() {
+                impl_param.annotated_type = UnionType::from_elements(db, tys);
+                impl_param.inferred_annotation = false;
+            }
+        }
+        if inherit_return && !overload_signatures.is_empty() {
+            self.return_ty =
+                UnionType::from_elements(db, overload_signatures.iter().map(|s| s.return_ty));
         }
     }
 

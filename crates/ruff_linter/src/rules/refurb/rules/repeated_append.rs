@@ -345,6 +345,11 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         parenthesized: true,
+        is_anon_named_tuple: false,
+        is_anon_named_tuple_value: false,
+        parameter_slash: None,
+        parameter_star: None,
+        is_parameter_shape: false,
     };
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.
@@ -353,6 +358,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        optional: false,
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
@@ -366,6 +372,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {

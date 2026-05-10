@@ -1,0 +1,7 @@
+class A
+
+class B[T]
+
+def f1()
+
+def f2[T]()

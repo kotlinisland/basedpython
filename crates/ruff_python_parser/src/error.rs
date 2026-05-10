@@ -53,6 +53,14 @@ impl ParseError {
     pub fn error(self) -> ParseErrorType {
         self.error
     }
+
+    /// Returns true if this error was raised because a basedpython-only
+    /// surface syntax (anonymous named tuples, `let` modifiers, `?.`/`??`
+    /// operators, etc.) appeared in a `.py` file or was otherwise malformed
+    /// in `.by` mode
+    pub fn is_basedpython_only(&self) -> bool {
+        matches!(self.error, ParseErrorType::BasedPythonOnly(_))
+    }
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string or t-string.
@@ -106,6 +114,11 @@ impl std::fmt::Display for InterpolatedStringErrorType {
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
+    /// basedpython-only surface syntax (anonymous named tuples, `let`
+    /// modifiers, `?.`/`??` operators, etc.) used in a `.py` file. carries
+    /// the rendered message; consumers may match the variant to distinguish
+    /// these from generic syntax errors
+    BasedPythonOnly(String),
 
     /// An error specific to stringified annotations occurred.
     StringAnnotationError(&'static str),
@@ -225,7 +238,9 @@ impl std::error::Error for ParseErrorType {}
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::OtherError(msg) => f.write_str(msg),
+            ParseErrorType::OtherError(msg) | ParseErrorType::BasedPythonOnly(msg) => {
+                write!(f, "{msg}")
+            }
             ParseErrorType::StringAnnotationError(msg) => f.write_str(msg),
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}")

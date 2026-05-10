@@ -58,6 +58,7 @@ Module(
                                             kwarg: None,
                                         },
                                     ),
+                                    returns: None,
                                     body: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),

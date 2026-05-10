@@ -36,7 +36,7 @@ mod tests {
             zip::ZipArchive::new(io::Cursor::new(TYPESHED_ZIP_BYTES)).unwrap();
 
         let mut functools_module_stub = typeshed_zip_archive
-            .by_name("stdlib/functools.pyi")
+            .by_name("stdlib/functools.byi")
             .unwrap();
         assert!(functools_module_stub.is_file());
 

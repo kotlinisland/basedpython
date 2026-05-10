@@ -13,7 +13,7 @@ Module(
             FunctionDef(
                 StmtFunctionDef {
                     node_index: NodeIndex(None),
-                    range: 0..36,
+                    range: 0..20,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -59,90 +59,89 @@ Module(
                         ),
                     },
                     returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 20..36,
-                                value: Dict(
-                                    ExprDict {
-                                        node_index: NodeIndex(None),
-                                        range: 20..36,
-                                        items: [
-                                            DictItem {
-                                                key: Some(
-                                                    StringLiteral(
-                                                        ExprStringLiteral {
-                                                            node_index: NodeIndex(None),
+                    body: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 20..36,
+                    value: Dict(
+                        ExprDict {
+                            node_index: NodeIndex(None),
+                            range: 20..36,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 21..24,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
                                                             range: 21..24,
-                                                            value: StringLiteralValue {
-                                                                inner: Single(
-                                                                    StringLiteral {
-                                                                        range: 21..24,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "b",
-                                                                        flags: StringLiteralFlags {
-                                                                            quote_style: Single,
-                                                                            prefix: Empty,
-                                                                            triple_quoted: false,
-                                                                            unclosed: false,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                            },
-                                                        },
-                                                    ),
-                                                ),
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 26..27,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                            DictItem {
-                                                key: Some(
-                                                    StringLiteral(
-                                                        ExprStringLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 29..32,
-                                                            value: StringLiteralValue {
-                                                                inner: Single(
-                                                                    StringLiteral {
-                                                                        range: 29..32,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "c",
-                                                                        flags: StringLiteralFlags {
-                                                                            quote_style: Single,
-                                                                            prefix: Empty,
-                                                                            triple_quoted: false,
-                                                                            unclosed: false,
-                                                                        },
-                                                                    },
-                                                                ),
+                                                            value: "b",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Single,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
                                                             },
                                                         },
                                                     ),
-                                                ),
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 34..35,
-                                                        value: Int(
-                                                            2,
-                                                        ),
-                                                    },
-                                                ),
+                                                },
                                             },
-                                        ],
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 26..27,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 29..32,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 29..32,
+                                                            node_index: NodeIndex(None),
+                                                            value: "c",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Single,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 34..35,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
                 },
             ),
             Expr(
@@ -177,7 +176,7 @@ Module(
 
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                                     ^ Syntax Error: Expected newline, found `)`
+  |                                     ^ Syntax Error: Expected a statement
   |
 
 

@@ -150,6 +150,7 @@ fn match_named_tuple_assign<'a>(
         arguments: Arguments { args, keywords, .. },
         range: _,
         node_index: _,
+        is_cast: _,
     }) = value
     else {
         return None;

@@ -45,6 +45,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -92,6 +93,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: If(
                                 ExprIf {
                                     node_index: NodeIndex(None),
@@ -160,6 +162,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: Await(
                                 ExprAwait {
                                     node_index: NodeIndex(None),
@@ -213,6 +216,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: Lambda(
                                 ExprLambda {
                                     node_index: NodeIndex(None),
@@ -244,6 +248,7 @@ Module(
                                             kwarg: None,
                                         },
                                     ),
+                                    returns: None,
                                     body: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -308,6 +313,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: Yield(
                                 ExprYield {
                                     node_index: NodeIndex(None),
@@ -368,6 +374,7 @@ Module(
                                                 kwarg: None,
                                             },
                                         ),
+                                        returns: None,
                                         body: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
@@ -396,6 +403,11 @@ Module(
                             ],
                             ctx: Load,
                             parenthesized: false,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                 },

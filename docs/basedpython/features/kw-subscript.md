@@ -1,0 +1,54 @@
+# keyword arguments in subscripts
+
+basedpython allows keyword arguments inside subscriptions:
+
+```by
+result = x[a, z=1]
+```
+
+transpiles to:
+
+```python
+result = x.__getitem__(a, z=1)
+```
+
+python's subscript grammar doesn't accept keyword args (PEP 637 was rejected),
+so basedpython lowers the call to the explicit `__getitem__` method. positional
+and keyword args are forwarded in source order
+
+## type subscripts
+
+when the value is a known generic class, kw subscripts lower to a positional
+type subscript instead of a `__getitem__` call. unbound typevars fall back to
+their declared defaults:
+
+```by
+class A[T = int, R = str]: ...
+
+a: A[T=bool]    # → a: A[bool, str]
+b: A[R=int]     # → b: A[int, int]
+c: A[R=int, T=bool]    # → c: A[bool, int]
+```
+
+ty's type-checking sees the reordered positional form, so type errors point at
+the declared typevar order
+
+## single-arg form
+
+`A[T=int]` (no surrounding tuple) is also accepted for single- and multi-typevar
+classes. For multi-typevar classes the same defaults rule applies; for
+single-typevar classes the keyword name is dropped:
+
+```by
+class B[T]: ...
+b: B[T=int]     # → b: B[int]
+```
+
+## scope
+
+the rewrite fires for any subscription containing at least one keyword binding.
+all-positional subscripts are untouched
+
+## see also
+
+- [tuple member access (`expr.N`)](tuple-index.md) — dot-indexing companion form

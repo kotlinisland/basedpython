@@ -1,0 +1,19 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/typed_lambda.by
+---
+## Input
+```bython
+a = lambda (a: int, b: str) -> int: a + 1
+b = lambda (x: int = 0) -> int: x
+c = lambda (*args: int) -> None: None
+d = lambda (a: int, /, b: str, *, c: float) -> int: 0
+```
+
+## Output
+```bython
+a = lambda (a: int, b: str) -> int: a + 1
+b = lambda (x: int = 0) -> int: x
+c = lambda (*args: int) -> None: None
+d = lambda (a: int, /, b: str, *, c: float) -> int: 0
+```

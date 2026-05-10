@@ -40,6 +40,9 @@ pub struct ParseOptions {
     pub(crate) mode: Mode,
     /// Target version for detecting version-related syntax errors.
     pub(crate) target_version: PythonVersion,
+    /// When true, basedpython-specific syntax is accepted without errors.
+    /// When false (default), basedpython syntax is a parse error.
+    pub(crate) is_basedpython: bool,
     /// Maximum recursion depth for the parser. The parser aborts with a
     /// [`crate::ParseErrorType::RecursionLimitExceeded`] error once this many
     /// nested expression / statement / pattern nodes are on the parser's call
@@ -56,6 +59,13 @@ impl ParseOptions {
 
     pub fn target_version(&self) -> PythonVersion {
         self.target_version
+    }
+
+    /// Marks the source as a basedpython (`.by`) file, enabling basedpython-specific syntax.
+    #[must_use]
+    pub fn with_basedpython(mut self, is_basedpython: bool) -> Self {
+        self.is_basedpython = is_basedpython;
+        self
     }
 
     /// Set the maximum recursion depth for the parser.
@@ -75,6 +85,7 @@ impl From<Mode> for ParseOptions {
         Self {
             mode,
             target_version: PythonVersion::default(),
+            is_basedpython: false,
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
         }
     }
@@ -85,6 +96,7 @@ impl From<PySourceType> for ParseOptions {
         Self {
             mode: source_type.as_mode(),
             target_version: PythonVersion::default(),
+            is_basedpython: source_type.is_basedpython(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
         }
     }

@@ -101,6 +101,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 
         // Ex) `foo(**{**bar})`
         if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
+            // Skip the basedpython `**: T` extra-items marker, which is
+            // encoded as `Starred(Starred(T))` and is meaningless here
+            if let Expr::Starred(outer) = value
+                && matches!(outer.value.as_ref(), Expr::Starred(_))
+            {
+                continue;
+            }
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),

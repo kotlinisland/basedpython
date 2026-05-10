@@ -9,7 +9,7 @@ use std::env::set_current_dir;
 use std::process::Command;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-const BIN_NAME: &str = "ruff";
+const BIN_NAME: &str = "buff";
 
 #[test]
 fn check_in_deleted_directory_errors() {

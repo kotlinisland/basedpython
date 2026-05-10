@@ -3437,6 +3437,49 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 Some of the tests in the *Class and instance variables* section draw inspiration from
 [pyright's documentation] on this topic.
 
+## basedpython: `static def` and `class def` modifiers
+
+in basedpython, `static def` and `class def` carry the same semantics as `@staticmethod` and
+`@classmethod` without needing the decorator syntax
+
+### `static def` binding
+
+```by
+class A:
+    static def helper(x: int) -> int:
+        return x + 1
+
+reveal_type(A.helper)  # revealed: def helper(x: int) -> int
+reveal_type(A.helper(1))  # revealed: int
+```
+
+### `class def` binding
+
+```by
+class A:
+    class def make(cls) -> A:
+        return cls()
+
+reveal_type(A.make())  # revealed: A
+```
+
+## basedpython: `class` declaration is `ClassVar`
+
+inside a class body, `class a = v` is equivalent to `a: ClassVar = v`
+
+### `class` decl marks attribute as ClassVar
+
+```by
+class Foo:
+    class count = 0
+
+reveal_type(Foo.count)  # revealed: Unknown | 0
+
+# instance assignment of a ClassVar is rejected
+f = Foo()
+f.count = 1  # error: [invalid-attribute-access]
+```
+
 [descriptor protocol tests]: descriptor_protocol.md
 [pyright's documentation]: https://microsoft.github.io/pyright/#/type-concepts-advanced?id=class-and-instance-variables
 [typing spec on `classvar`]: https://typing.python.org/en/latest/spec/class-compat.html#classvar

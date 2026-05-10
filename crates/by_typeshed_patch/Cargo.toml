@@ -1,0 +1,24 @@
+[package]
+name = "by_typeshed_patch"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "by_typeshed_patch"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+walkdir = { workspace = true }
+
+[lints]
+workspace = true

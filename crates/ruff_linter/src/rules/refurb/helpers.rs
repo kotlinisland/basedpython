@@ -25,6 +25,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         attr: ast::Identifier::new(method.to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        optional: false,
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make it into a call `name.method()`
@@ -38,6 +39,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {

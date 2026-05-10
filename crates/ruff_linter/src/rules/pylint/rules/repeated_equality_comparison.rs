@@ -192,6 +192,11 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                     node_index: AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: true,
+                    is_anon_named_tuple: false,
+                    is_anon_named_tuple_value: false,
+                    parameter_slash: None,
+                    parameter_star: None,
+                    is_parameter_shape: false,
                 })
             };
 

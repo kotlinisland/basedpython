@@ -311,6 +311,7 @@ Module(
                                                             node_index: NodeIndex(None),
                                                         },
                                                         ctx: Load,
+                                                        optional: false,
                                                     },
                                                 ),
                                             },

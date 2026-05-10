@@ -1,0 +1,10 @@
+a: A & B
+b: A & B & C
+c: list[A & B]
+d: (A & B) | C
+
+
+def f(x: A & B) -> A & B & C: ...
+
+
+type X = A & B

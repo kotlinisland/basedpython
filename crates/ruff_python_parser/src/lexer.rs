@@ -411,7 +411,13 @@ impl<'src> Lexer<'src> {
             '\'' | '"' => self.lex_string(c),
             '=' => {
                 if self.cursor.eat_char('=') {
-                    TokenKind::EqEqual
+                    // basedpython: `===` is the identity-comparison
+                    // operator
+                    if self.cursor.eat_char('=') {
+                        TokenKind::EqEqEqual
+                    } else {
+                        TokenKind::EqEqual
+                    }
                 } else {
                     self.state = State::AfterEqual;
                     return TokenKind::Equal;
@@ -465,6 +471,16 @@ impl<'src> Lexer<'src> {
             }
 
             '?' if self.mode == Mode::Ipython => TokenKind::Question,
+
+            '?' => {
+                if self.cursor.eat_char('?') {
+                    TokenKind::DoubleQuestion
+                } else if self.cursor.eat_char('.') {
+                    TokenKind::QuestionDot
+                } else {
+                    TokenKind::Unknown
+                }
+            }
 
             '/' => {
                 if self.cursor.eat_char('=') {
@@ -525,7 +541,13 @@ impl<'src> Lexer<'src> {
             }
             '!' => {
                 if self.cursor.eat_char('=') {
-                    TokenKind::NotEqual
+                    // basedpython: `!==` is the negated identity-comparison
+                    // operator (counterpart to `===`)
+                    if self.cursor.eat_char('=') {
+                        TokenKind::BangEqEqual
+                    } else {
+                        TokenKind::NotEqual
+                    }
                 } else {
                     TokenKind::Exclamation
                 }

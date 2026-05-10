@@ -214,6 +214,96 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     write!(f, [quotes])
 }
 
+/// Format a triple-quoted based multiline string, adjusting indentation to match the current
+/// scope without changing string content (no chaperone spaces, no whitespace trimming).
+///
+/// based multiline strings auto-dedent at runtime, so the formatter reindents content to match
+/// the current block level — the inverse of what the runtime will strip.
+pub(crate) fn format_multiline_string(
+    normalized: &NormalizedString,
+    f: &mut PyFormatter,
+) -> FormatResult<()> {
+    let docstring = &normalized.text();
+
+    if contains_unescaped_newline(docstring) {
+        return normalized.fmt(f);
+    }
+
+    let already_normalized = matches!(docstring, Cow::Borrowed(_));
+    let mut lines = docstring.split('\n').peekable();
+
+    let kind = normalized.flags();
+    let quotes = StringQuotes::from(kind);
+    write!(f, [kind.prefix(), quotes])?;
+    let mut offset = normalized.start();
+
+    let first = lines.next().unwrap_or_default();
+    if !first.is_empty() {
+        if already_normalized {
+            source_text_slice(TextRange::at(offset, first.text_len())).fmt(f)?;
+        } else {
+            text(first).fmt(f)?;
+        }
+    }
+    offset += first.text_len();
+
+    if docstring[first.len()..].trim().is_empty() {
+        write!(f, [quotes])?;
+        return Ok(());
+    }
+
+    hard_line_break().fmt(f)?;
+    offset += "\n".text_len();
+
+    let stripped_indentation = lines
+        .clone()
+        .filter(|line| !line.trim().is_empty())
+        .map(Indentation::from_str)
+        .min_by_key(|indentation| indentation.columns())
+        .unwrap_or_default();
+
+    let stripped_indentation_len = stripped_indentation.text_len();
+    // closing """ is on its own line only when the last split element is empty/whitespace
+    let closing_on_own_line = lines.clone().last().is_some_and(|l| l.trim().is_empty());
+
+    while let Some(line) = lines.next() {
+        let is_last = lines.peek().is_none();
+
+        if line.trim().is_empty() {
+            if !is_last {
+                empty_line().fmt(f)?;
+            }
+            offset += line.text_len() + "\n".text_len();
+            continue;
+        }
+
+        // one indentation level deeper than the block, matching basedpython's auto-dedent
+        text("    ").fmt(f)?;
+
+        // strip only the shared leading indentation, preserving content including trailing whitespace
+        if already_normalized {
+            let content_start = stripped_indentation_len;
+            let line_len = TextSize::try_from(line.len()).unwrap();
+            let trimmed_range = TextRange::at(offset, line_len).add_start(content_start);
+            source_text_slice(trimmed_range).fmt(f)?;
+        } else {
+            let content = &line[stripped_indentation_len.to_usize()..];
+            text(content).fmt(f)?;
+        }
+
+        if !is_last {
+            hard_line_break().fmt(f)?;
+        }
+
+        offset += TextSize::try_from(line.len()).unwrap() + "\n".text_len();
+    }
+
+    if closing_on_own_line {
+        text("    ").fmt(f)?;
+    }
+    write!(f, [quotes])
+}
+
 fn contains_unescaped_newline(haystack: &str) -> bool {
     let mut rest = haystack;
 

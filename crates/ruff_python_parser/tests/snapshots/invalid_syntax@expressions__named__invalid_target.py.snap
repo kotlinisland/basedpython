@@ -36,6 +36,7 @@ Module(
                                         node_index: NodeIndex(None),
                                     },
                                     ctx: Store,
+                                    optional: false,
                                 },
                             ),
                             value: NumberLiteral(
@@ -80,6 +81,7 @@ Module(
                                         },
                                     ),
                                     ctx: Store,
+                                    is_typeof: false,
                                 },
                             ),
                             value: NumberLiteral(

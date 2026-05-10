@@ -41,6 +41,7 @@ types_requiring_crate_prefix = {
     "Alias",
     "Singleton",
     "PatternArguments",
+    "Variance",
 }
 
 
@@ -144,6 +145,7 @@ class Node:
     doc: str | None
     fields: list[Field] | None
     derives: list[str]
+    attrs: list[str]
     custom_source_order: bool
     source_order: list[str] | None
 
@@ -157,6 +159,7 @@ class Node:
             self.fields = [Field(f) for f in fields]
         self.custom_source_order = node.get("custom_source_order", False)
         self.derives = node.get("derives", [])
+        self.attrs = node.get("attrs", [])
         self.doc = node.get("doc")
         self.source_order = node.get("source_order")
 
@@ -183,6 +186,7 @@ class Node:
 class Field:
     name: str
     ty: str
+    doc: str | None
     _skip_visit: bool
     is_annotation: bool
     parsed_ty: FieldType
@@ -193,6 +197,7 @@ class Field:
         self.parsed_ty = FieldType(self.ty)
         self._skip_visit = field.get("skip_visit", False)
         self.is_annotation = field.get("is_annotation", False)
+        self.doc = field.get("doc")
 
     def skip_source_order(self) -> bool:
         return self._skip_visit or self.parsed_ty.inner in [
@@ -979,11 +984,15 @@ def write_node(out: list[str], ast: Ast) -> None:
                 + ")]"
             )
             out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
+            for attr in node.attrs:
+                out.append(f"#[{attr}]")
             name = node.name
             out.append(f"pub struct {name} {{")
             out.append("pub node_index: crate::AtomicNodeIndex,")
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
+                if field.doc is not None:
+                    write_rustdoc(out, field.doc)
                 field_str = f"pub {field.name}: "
                 ty = field.parsed_ty
 

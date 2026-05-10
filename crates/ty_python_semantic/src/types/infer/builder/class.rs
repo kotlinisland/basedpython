@@ -36,9 +36,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            let in_stub = self.in_stub();
+            let defer_class_args = self.in_stub() || self.is_basedpython_file();
             let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+                std::mem::replace(&mut self.deferred_state, defer_class_args.into());
             let mut call_arguments =
                 CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
@@ -79,8 +79,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
             Vec::with_capacity(decorator_list.len());
+        let source = ruff_db::source::source_text(db, self.file());
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
+            // basedpython `enum class Foo` / `protocol Foo` parse to synthetic
+            // `enum_class` / `protocol_class` marker decorators (no `@` in the
+            // source). their effect — the injected `Enum` / `Protocol` base — is
+            // applied in `explicit_bases`; the marker itself is not a runtime
+            // decorator, so applying it here would resolve to `Unknown` and poison
+            // the whole class type
+            if let ast::Expr::Name(name) = &decorator.expression
+                && matches!(name.id.as_str(), "enum_class" | "protocol_class")
+                && source
+                    .as_bytes()
+                    .get(usize::from(decorator.range.start()))
+                    .copied()
+                    != Some(b'@')
+            {
+                continue;
+            }
             decorator_types_and_nodes.push((decorator_ty, decorator));
         }
 
@@ -343,10 +360,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // if there are type parameters, then the keywords and bases are within that scope
         // and we don't need to run inference here
         if type_params.is_none() {
-            // In stub files, keyword values may reference names that are defined later in the file.
-            let in_stub = self.in_stub();
+            // In stub files (and basedpython files, where self-refs are auto-quoted by the
+            // transpiler), keyword values may reference names that are defined later.
+            let defer_class_args = self.in_stub() || self.is_basedpython_file();
             let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+                std::mem::replace(&mut self.deferred_state, defer_class_args.into());
             for keyword in class_node.keywords() {
                 if keyword.arg.as_deref() != Some("extra_items") {
                     self.infer_expression(&keyword.value, TypeContext::default());
@@ -354,8 +372,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             self.deferred_state = previous_deferred_state;
 
-            // Inference of bases deferred in stubs, or if any are string literals.
-            if self.in_stub()
+            // Inference of bases deferred in stubs/basedpython, or if any are string literals.
+            if defer_class_args
                 || class_node
                     .bases()
                     .iter()
@@ -384,8 +402,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         class: &ast::StmtClassDef,
     ) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        let defer_class_args = self.in_stub() || self.is_basedpython_file();
         for base in class.bases() {
-            if self.in_stub() {
+            if defer_class_args {
                 self.infer_expression_with_state(
                     base,
                     TypeContext::default(),
@@ -404,7 +423,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .is_some_and(|class_literal| class_literal.is_typed_dict(self.db()))
             {
                 self.infer_extra_items_kwarg(&extra_items_keyword.value);
-            } else if self.in_stub() {
+            } else if defer_class_args {
                 self.infer_expression_with_state(
                     &extra_items_keyword.value,
                     TypeContext::default(),

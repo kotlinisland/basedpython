@@ -103,9 +103,13 @@ extra_css:
   - stylesheets/extra.css
 extra_javascript:
   - js/extra.js
+exclude_docs: |
+  /basedpython/
 not_in_nav: |
   /rules/*
   /formatter/*
+  /index.md
+  /developer/ruff-upstream-sync.md
 extra:
   analytics:
     provider: fathom

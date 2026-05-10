@@ -199,6 +199,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        optional: false,
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::ExprCall {
@@ -211,6 +212,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
     let node4 = expected_var.clone();
     let node5 = ast::StmtAssign {
@@ -308,6 +310,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        optional: false,
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let fixed_node = ast::ExprCall {
@@ -320,6 +323,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     };
 
     let contents = checker.generator().expr(&fixed_node.into());

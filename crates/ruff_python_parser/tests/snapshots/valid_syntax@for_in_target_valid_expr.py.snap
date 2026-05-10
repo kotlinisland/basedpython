@@ -55,6 +55,7 @@ Module(
                                 },
                             ),
                             ctx: Store,
+                            is_typeof: false,
                         },
                     ),
                     iter: Name(
@@ -128,6 +129,7 @@ Module(
                                 },
                             ),
                             ctx: Store,
+                            is_typeof: false,
                         },
                     ),
                     iter: Name(
@@ -197,6 +199,7 @@ Module(
                                 node_index: NodeIndex(None),
                             },
                             ctx: Store,
+                            optional: false,
                         },
                     ),
                     iter: Name(

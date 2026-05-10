@@ -1,6 +1,20 @@
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{ModModule, Stmt};
 
-use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
+use crate::{Mode, ParseErrorType, ParseOptions, Parsed, parse, parse_expression, parse_module};
+
+/// Parse a module in basedpython mode so tests for `.by`-only syntax don't
+/// trigger the `error_if_not_basedpython` parse-error gates.
+fn parse_basedpython_module(source: &str) -> Parsed<ModModule> {
+    crate::Parser::new(
+        source,
+        ParseOptions::from(Mode::Module).with_basedpython(true),
+    )
+    .parse()
+    .try_into_module()
+    .unwrap()
+    .into_result()
+    .unwrap()
+}
 
 #[test]
 fn test_modes() {
@@ -180,6 +194,200 @@ fn test_tstring_fstring_middle_fuzzer() {
     let error = parsed.unwrap_err();
 
     insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_anon_named_tuple_alias() {
+    let source = "a = (name: str, age: int)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_decorated_modifier_method() {
+    // `@overload class def open(...)` (a real decorator before a `class def` /
+    // `static def` modifier) must parse — the real decorator is kept and the
+    // modifier becomes a synthetic decorator, so each method carries two. this
+    // is the `tarfile.open` shape that previously failed to parse.
+    let parsed = parse_basedpython_module(
+        "\
+class C:
+    @overload
+    class def open(cls, x: int) -> int: ...
+    @overload
+    static def make(x: str) -> str: ...
+",
+    );
+    let Some(Stmt::ClassDef(class)) = parsed.syntax().body.first() else {
+        panic!("expected a class definition");
+    };
+    let methods: Vec<_> = class
+        .body
+        .iter()
+        .filter_map(|stmt| match stmt {
+            Stmt::FunctionDef(func) => Some(func),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(methods.len(), 2);
+    for method in methods {
+        // `@overload` plus the synthetic modifier decorator (`classmethod` /
+        // `static`)
+        assert_eq!(method.decorator_list.len(), 2);
+    }
+}
+
+#[test]
+fn test_modifier_async_def() {
+    // a modifier keyword on an `async def` — e.g. `contextlib`'s
+    // `abstract async def __aexit__(...)`. previously the modifier was parsed as
+    // a bare name and `async def` as a separate compound statement.
+    let parsed = parse_basedpython_module(
+        "\
+class C:
+    abstract async def f(self) -> int: ...
+    final async def g(self) -> int: ...
+",
+    );
+    let Some(Stmt::ClassDef(class)) = parsed.syntax().body.first() else {
+        panic!("expected a class definition");
+    };
+    let methods: Vec<_> = class
+        .body
+        .iter()
+        .filter_map(|stmt| match stmt {
+            Stmt::FunctionDef(func) => Some(func),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(methods.len(), 2);
+    for method in methods {
+        assert!(method.is_async, "the modifier must apply to an async def");
+        // the modifier becomes one synthetic decorator
+        assert_eq!(method.decorator_list.len(), 1);
+    }
+}
+
+#[test]
+fn test_anon_named_tuple_in_annotation() {
+    let source = "a: (name: str, age: int)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_function_signature() {
+    let source = "def f(x: (name: str, age: int)) -> (name: str, age: int): pass\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_single_field() {
+    let source = "a: (name: str)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_trailing_comma() {
+    let source = "a: (name: str, age: int,)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_value_construction() {
+    let source = "a = (name=\"asdf\", age=20)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_value_complex_value() {
+    let source = "a = (name=foo() + 1, age=x.y)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_value_trailing_comma() {
+    let source = "a = (name=\"asdf\", age=20,)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_mixed_value() {
+    let source = "a = (1, name=\"a\")\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_anon_named_tuple_mixed_type() {
+    let source = "a: (int, name: str)\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript() {
+    let source = "a: list[*]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_attribute() {
+    let source = "a: collections.abc.Mapping[*]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_multi() {
+    let source = "a: dict[*, *]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_triple() {
+    let source = "a: X[*, *, *]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_mixed_str_then_star() {
+    let source = "a: dict[str, *]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_mixed_star_then_int() {
+    let source = "a: dict[*, int]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_mixed_middle_star() {
+    let source = "a: X[int, *, str]\n";
+    let parsed = parse_basedpython_module(source);
+    insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_top_star_subscript_in_py_errors() {
+    let parsed = crate::parse_unchecked("a: list[*]\n", ParseOptions::from(Mode::Module));
+    let errors: Vec<_> = parsed.errors().iter().map(ToString::to_string).collect();
+    assert!(
+        errors.iter().any(|e| e.contains("bare `*`")),
+        "expected parse error mentioning bare `*`, got: {errors:?}"
+    );
 }
 
 #[test]

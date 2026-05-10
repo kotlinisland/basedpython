@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `C`
+ --> F821_basedpython.by:7:9
+  |
+5 |     pass
+6 |
+7 | class C(C):
+  |         ^
+8 |     pass
+  |
+
+F821 Undefined name `Z`
+  --> F821_basedpython.by:10:14
+   |
+ 8 |     pass
+ 9 |
+10 | class D(list[Z]):
+   |              ^
+11 |     pass
+   |

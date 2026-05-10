@@ -454,10 +454,38 @@ impl<'db> StaticClassLiteral<'db> {
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        expanded_class_base_entries(db, self.known(db), class_stmt, class_definition)
-            .into_iter()
-            .map(ExpandedClassBaseEntry::ty)
-            .collect()
+        let mut bases: Vec<Type<'db>> =
+            expanded_class_base_entries(db, self.known(db), class_stmt, class_definition)
+                .into_iter()
+                .map(ExpandedClassBaseEntry::ty)
+                .collect();
+
+        // basedpython `enum class Foo` and `protocol Foo` parse to a class with a
+        // synthetic decorator (`enum_class` / `protocol_class`). inject the matching
+        // base so ty treats the class as an Enum/Protocol subclass without needing the
+        // transpile step
+        let source = ruff_db::source::source_text(db, self.file(db));
+        for decorator in &class_stmt.decorator_list {
+            let start = usize::from(decorator.range.start());
+            if source.as_bytes().get(start).copied() == Some(b'@') {
+                continue;
+            }
+            let ast::Expr::Name(name) = &decorator.expression else {
+                continue;
+            };
+            let injected = match name.id.as_str() {
+                "enum_class" => Some(KnownClass::Enum.to_class_literal(db)),
+                "protocol_class" => {
+                    Some(Type::SpecialForm(crate::types::SpecialFormType::Protocol))
+                }
+                _ => None,
+            };
+            if let Some(ty) = injected {
+                bases.push(ty);
+            }
+        }
+
+        bases.into_boxed_slice()
     }
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
@@ -536,6 +564,13 @@ impl<'db> StaticClassLiteral<'db> {
             .decorator_list
             .iter()
             .map(|decorator_node| {
+                if let Some(target) = crate::types::function::synthetic_decorator_target_type(
+                    db,
+                    self.file(db),
+                    decorator_node,
+                ) {
+                    return target;
+                }
                 definition_expression_type(db, class_definition, &decorator_node.expression)
             })
             .collect()

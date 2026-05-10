@@ -1423,3 +1423,77 @@ class Abstract(ABC):
     @abstractmethod
     def kkkkkkkkkk(self) -> int: ...
 ```
+
+## basedpython: `final` modifier
+
+in basedpython, the `final` keyword before `class` or `def` carries the same semantics as
+`@typing.final` without needing the import
+
+### `final def` makes a method un-overridable
+
+```by
+class Parent:
+    final def foo(self) -> int:
+        return 0
+
+class Child(Parent):
+    def foo(self) -> int:  # error: [override-of-final-method]
+        return 1
+```
+
+### `final class` cannot be subclassed
+
+```by
+final class Foo: ...
+
+class Bar(Foo): ...  # error: [subclass-of-final-class]
+```
+
+### `final def` is rejected on non-method functions
+
+```by
+final def top_level() -> int:  # error: [final-on-non-method]
+    return 0
+```
+
+## basedpython: `let` declaration
+
+at module scope, `let x = v` is equivalent to `x: Final = v`. inside a class body, the `Final`
+qualifier is dropped (matches transpiler behavior)
+
+### `let` at module scope is `Final`
+
+```by
+let MAX = 100
+
+reveal_type(MAX)  # revealed: 100
+
+MAX = 200  # error: [invalid-assignment]
+```
+
+### `let` typed at module scope
+
+```by
+let NAME: str = "alice"
+
+reveal_type(NAME)  # revealed: "alice"
+
+NAME = "bob"  # error: [invalid-assignment]
+```
+
+### `let` inside class body has no qualifier
+
+```by
+class A:
+    let foo = 100
+
+a = A()
+a.foo = 200  # ok — no Final qualifier inside class
+```
+
+### `final x = v` is bare assignment
+
+```by
+final a = 1
+a = 2  # ok — `final` keyword on assignment is erased
+```

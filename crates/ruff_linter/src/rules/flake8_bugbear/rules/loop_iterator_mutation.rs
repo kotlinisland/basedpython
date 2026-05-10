@@ -260,6 +260,7 @@ impl<'a> LoopMutationsVisitor<'a> {
                 value,
                 slice: _,
                 ctx: _,
+                is_typeof: _,
             }) = target
             {
                 // Find, e.g., `del items[0]`.
@@ -279,6 +280,7 @@ impl<'a> LoopMutationsVisitor<'a> {
                 value,
                 slice,
                 ctx: _,
+                is_typeof: _,
             }) = target
             {
                 // Find, e.g., `items[0] = 1`.
@@ -309,6 +311,7 @@ impl<'a> LoopMutationsVisitor<'a> {
             value,
             attr,
             ctx: _,
+            optional: _,
         }) = func
         {
             if is_mutating_function(attr.as_str()) {

@@ -751,10 +751,17 @@ impl SemanticSyntaxChecker {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
 
+        let basedpython = ctx.is_basedpython();
         for parameter in parameters {
             let range = parameter.name().range();
             let param_name = parameter.name().as_str();
             if !all_arg_names.insert(param_name) {
+                // basedpython allows repeated `_` parameters; the transpiler
+                // renames trailing occurrences to a fresh name so the lowered
+                // python is valid
+                if basedpython && param_name == "_" {
+                    continue;
+                }
                 // test_err params_duplicate_names
                 // def foo(a, a=10, *a, a, a: str, **a): ...
                 Self::add_error(
@@ -2312,6 +2319,61 @@ where
 {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
+            // basedpython anonymous named tuples store each field as an
+            // `ExprNamed` (target = field name, value = type/value), not a
+            // walrus assignment. Recursing into the `ExprNamed` would
+            // trigger the named-expression error below, so we walk only the
+            // field VALUES (which is what should actually be validated).
+            Expr::Tuple(ast::ExprTuple {
+                elts,
+                is_anon_named_tuple,
+                is_anon_named_tuple_value,
+                parameter_slash,
+                parameter_star,
+                ..
+            }) if *is_anon_named_tuple
+                || *is_anon_named_tuple_value
+                || parameter_slash.is_some()
+                || parameter_star.is_some() || elts.iter().any(|e| {
+                matches!(e, Expr::Named(_))
+                    || matches!(e, Expr::Starred(s) if !matches!(s.value.as_ref(), Expr::Name(_)))
+            }) =>
+            {
+                for elt in elts {
+                    if let Expr::Named(ast::ExprNamed { value, .. }) = elt {
+                        self.visit_expr(value);
+                    } else {
+                        self.visit_expr(elt);
+                    }
+                }
+                return;
+            }
+            // basedpython callable type `(int, name: str) -> R` stores each
+            // named parameter as `ExprNamed`. visit only the value side so
+            // the named-expression check below doesn't fire on the labels.
+            Expr::CallableType(ast::ExprCallableType { args, returns, .. }) => {
+                for arg in args {
+                    if let Expr::Named(ast::ExprNamed { value, .. }) = arg {
+                        self.visit_expr(value);
+                    } else {
+                        self.visit_expr(arg);
+                    }
+                }
+                self.visit_expr(returns);
+                return;
+            }
+            // basedpython keyword type-arg in subscript (`A[T=int]`) stores
+            // the binding as `ExprNamed` with `Invalid`-ctx target. don't
+            // diagnose it as a walrus.
+            Expr::Named(ast::ExprNamed { target, value, .. })
+                if matches!(
+                    target.as_ref(),
+                    Expr::Name(n) if matches!(n.ctx, ast::ExprContext::Invalid)
+                ) =>
+            {
+                self.visit_expr(value);
+                return;
+            }
             Expr::Named(ast::ExprNamed { range, .. }) => {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
@@ -2521,6 +2583,14 @@ pub trait SemanticSyntaxContext {
 
     /// Returns `true` if `name` is a bound parameter in the current function or lambda scope.
     fn is_bound_parameter(&self, name: &str) -> bool;
+
+    /// Returns `true` if the source file is basedpython (`.by` or `.byi`).
+    ///
+    /// basedpython relaxes a few python rules — currently this gates the
+    /// repeated `_` parameter check (so `def f(_, _): ...` is allowed)
+    fn is_basedpython(&self) -> bool {
+        false
+    }
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

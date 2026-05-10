@@ -203,6 +203,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             range: _,
             node_index: _,
             parenthesized: _,
+            is_anon_named_tuple: _,
+            is_anon_named_tuple_value: _,
+            parameter_slash: _,
+            parameter_star: _,
+            is_parameter_shape: _,
         })
         | Expr::List(ast::ExprList {
             elts,
@@ -538,6 +543,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     },
                 range: _,
                 node_index: _,
+                is_cast: _,
             },
         ) => {
             if checker.any_rule_enabled(&[

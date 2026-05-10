@@ -175,6 +175,10 @@ pub enum TokenKind {
     EndOfFile,
     /// Token kind for a question mark `?`.
     Question,
+    /// Token kind for `??` (basedpython None-coalescing operator).
+    DoubleQuestion,
+    /// Token kind for `?.` (basedpython None-chaining operator).
+    QuestionDot,
     /// Token kind for an exclamation mark `!`.
     Exclamation,
     /// Token kind for a left parenthesis `(`.
@@ -219,6 +223,13 @@ pub enum TokenKind {
     Rbrace,
     /// Token kind for double equal `==`.
     EqEqual,
+    /// basedpython: token kind for triple equal `===` (identity comparison;
+    /// in basedpython, `is` swaps to `isinstance` and `===` takes its place
+    /// for object identity checks)
+    EqEqEqual,
+    /// basedpython: token kind for `!==` (negated identity comparison;
+    /// counterpart to `===`, transpiles to Python's `is not`)
+    BangEqEqual,
     /// Token kind for not equal `!=`.
     NotEqual,
     /// Token kind for less than or equal `<=`.
@@ -391,6 +402,8 @@ impl TokenKind {
                 | TokenKind::Lbrace
                 | TokenKind::Rbrace
                 | TokenKind::EqEqual
+                | TokenKind::EqEqEqual
+                | TokenKind::BangEqEqual
                 | TokenKind::NotEqual
                 | TokenKind::LessEqual
                 | TokenKind::GreaterEqual
@@ -551,6 +564,7 @@ impl TokenKind {
             TokenKind::CircumFlex => Operator::BitXor,
             TokenKind::LeftShift => Operator::LShift,
             TokenKind::RightShift => Operator::RShift,
+            TokenKind::DoubleQuestion => Operator::Coalesce,
             _ => return None,
         })
     }
@@ -617,6 +631,7 @@ impl From<Operator> for TokenKind {
             Operator::BitXor => TokenKind::CircumFlex,
             Operator::BitAnd => TokenKind::Amper,
             Operator::FloorDiv => TokenKind::DoubleSlash,
+            Operator::Coalesce => TokenKind::DoubleQuestion,
         }
     }
 }
@@ -644,6 +659,8 @@ impl fmt::Display for TokenKind {
             TokenKind::IpyEscapeCommand => "IPython escape command",
             TokenKind::Comment => "comment",
             TokenKind::Question => "`?`",
+            TokenKind::DoubleQuestion => "`??`",
+            TokenKind::QuestionDot => "`?.`",
             TokenKind::Exclamation => "`!`",
             TokenKind::Lpar => "`(`",
             TokenKind::Rpar => "`)`",
@@ -675,6 +692,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Less => "`<`",
             TokenKind::Greater => "`>`",
             TokenKind::EqEqual => "`==`",
+            TokenKind::EqEqEqual => "`===`",
+            TokenKind::BangEqEqual => "`!==`",
             TokenKind::NotEqual => "`!=`",
             TokenKind::LessEqual => "`<=`",
             TokenKind::GreaterEqual => "`>=`",

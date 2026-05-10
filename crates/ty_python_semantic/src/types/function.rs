@@ -206,6 +206,63 @@ impl FunctionDecorators {
     }
 }
 
+/// basedpython modifier keywords (`final`, `abstract`, `override`, `static`,
+/// `class def`, `data class`, `frozen data class`) parse as synthetic decorators
+/// whose source text starts with the keyword letter rather than `@`. resolve
+/// them to the equivalent stdlib decorator type so `ty` treats them like the
+/// user wrote `@typing.final` etc
+pub(crate) fn synthetic_decorator_target_type<'db>(
+    db: &'db dyn Db,
+    file: File,
+    decorator: &ast::Decorator,
+) -> Option<Type<'db>> {
+    let source = ruff_db::source::source_text(db, file);
+    let start = usize::from(decorator.range.start());
+    if source.as_bytes().get(start).copied() == Some(b'@') {
+        return None;
+    }
+    let ast::Expr::Name(name) = &decorator.expression else {
+        return None;
+    };
+
+    // dataclass kw produce a fully applied `@dataclass(...)` equivalent — same shape
+    // as ty already builds when it walks a `Call(dataclass, ...)` decorator
+    if let Some(flags) = match name.id.as_str() {
+        "data_class" => {
+            Some(crate::types::DataclassFlags::default() | crate::types::DataclassFlags::SLOTS)
+        }
+        "frozen_data_class" => Some(
+            crate::types::DataclassFlags::default()
+                | crate::types::DataclassFlags::SLOTS
+                | crate::types::DataclassFlags::FROZEN,
+        ),
+        _ => None,
+    } {
+        let params = crate::types::DataclassParams::from_flags(db, flags);
+        return Some(Type::DataclassDecorator(params));
+    }
+
+    let (modules, member): (&[KnownModule], &str) = match name.id.as_str() {
+        "final" => (
+            &[KnownModule::Typing, KnownModule::TypingExtensions],
+            "final",
+        ),
+        "abstract" => (&[KnownModule::Abc], "abstractmethod"),
+        "override" => (
+            &[KnownModule::Typing, KnownModule::TypingExtensions],
+            "override",
+        ),
+        "static" => (&[KnownModule::Builtins], "staticmethod"),
+        "classmethod" => (&[KnownModule::Builtins], "classmethod"),
+        _ => return None,
+    };
+    modules.iter().find_map(|module| {
+        crate::place::known_module_symbol(db, *module, member)
+            .place
+            .ignore_possibly_undefined()
+    })
+}
+
 bitflags! {
     /// Used for the return type of `dataclass_transform(…)` calls. Keeps track of the
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
@@ -314,7 +371,57 @@ impl<'db> OverloadLiteral<'db> {
     }
 
     pub(crate) fn is_overload(self, db: &dyn Db) -> bool {
-        self.has_known_decorator(db, FunctionDecorators::OVERLOAD)
+        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+            return true;
+        }
+        // basedpython: a bodyless `def` whose name is later redefined in the
+        // same scope is an *implicit* overload entry (the lowering pass adds
+        // `@overload` decorators automatically). recognise it here so ty's
+        // overload chain follows the same shape as the emitted Python output
+        self.is_implicit_overload(db)
+    }
+
+    /// Recognise the basedpython implicit-overload pattern: a function whose
+    /// body is either absent (`def f(...) -> T` with no `:` and no statements)
+    /// or only a docstring belongs to a same-name run in the enclosing scope.
+    /// The lowering pass rewrites such runs to `@overload`-decorated stubs (+
+    /// optional final implementation), so ty must see them as overloads here
+    /// for type checks to align with the emitted Python output
+    fn is_implicit_overload(self, db: &dyn Db) -> bool {
+        let module = parsed_module(db, self.file(db)).load(db);
+        let func_node = self.body_scope(db).node(db).expect_function().node(&module);
+        let body_is_stub_shaped = func_node.body.is_empty()
+            || matches!(
+                func_node.body.as_slice(),
+                [ast::Stmt::Expr(e)] if matches!(e.value.as_ref(), ast::Expr::StringLiteral(_))
+            );
+        if !body_is_stub_shaped {
+            return false;
+        }
+        let scope = self.definition(db).scope(db);
+        let index = semantic_index(db, scope.file(db));
+        let use_def = index.use_def_map(scope.file_scope_id(db));
+        let Some(symbol_id) = index
+            .place_table(scope.file_scope_id(db))
+            .symbol_id(self.name(db))
+        else {
+            return false;
+        };
+        // any other def of the same name in the same scope makes this a
+        // member of an implicit-overload group (the lowering rewrites runs
+        // of bodyless defs of the same name to `@overload` decorations).
+        // walk *all* reachable bindings — `end_of_scope_symbol_bindings`
+        // hides shadowed earlier bindings, so it would miss the previous
+        // bodyless `def` from the perspective of the latest definition
+        for binding in use_def.reachable_symbol_bindings(symbol_id) {
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+            if definition != self.definition(db) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
@@ -654,6 +761,29 @@ impl<'db> OverloadLiteral<'db> {
                 }
             }
         });
+
+        // basedpython: if this is the implementation of an overloaded function
+        // (i.e. preceded by `@overload` stubs), infer unannotated parameter
+        // types and an unannotated return type from the union of the sibling
+        // overloads. this lets `def foo(i)` after `def foo(i: str) -> int`
+        // and `def foo(i: int) -> str` see `i` as `str | int` and have its
+        // return statements checked against `int | str`
+        if !self.is_overload(db)
+            && let Some(previous) = self.previous_overload(db)
+        {
+            let (overload_list, _) = previous.overloads_and_implementation(db);
+            if !overload_list.is_empty() {
+                let overload_sigs: Vec<Signature<'db>> = overload_list
+                    .iter()
+                    .map(|ol| ol.raw_signature(db, ReturnCallableTypeVarScope::Public))
+                    .collect();
+                raw_signature.inherit_unannotated_from_overloads(
+                    db,
+                    &overload_sigs,
+                    function_stmt_node.returns.is_none(),
+                );
+            }
+        }
 
         raw_signature
     }

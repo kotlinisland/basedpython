@@ -150,6 +150,7 @@ Module(
                                                 args: [],
                                                 keywords: [],
                                             },
+                                            is_cast: false,
                                         },
                                     ),
                                     iter: Name(
@@ -440,6 +441,7 @@ Module(
                                                     kwarg: None,
                                                 },
                                             ),
+                                            returns: None,
                                             body: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
@@ -921,6 +923,7 @@ Module(
                                                         kwarg: None,
                                                     },
                                                 ),
+                                                returns: None,
                                                 body: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),

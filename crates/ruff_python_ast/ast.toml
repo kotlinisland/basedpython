@@ -347,6 +347,7 @@ fields = [
 doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
 fields = [
   { name = "parameters", type = "Box<crate::Parameters>?" },
+  { name = "returns", type = "Expr?", is_annotation = true },
   { name = "body", type = "Expr" },
 ]
 
@@ -425,6 +426,11 @@ doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
 fields = [
   { name = "func", type = "Expr" },
   { name = "arguments", type = "Arguments" },
+  { name = "is_cast", type = "bool", doc = """basedpython: when true, this call represents a `<value> cast <type>`
+expression. The `func` is a synthetic `Name(\"cast\")`, and `arguments` holds
+`[type, value]` in `typing.cast` order. The parentheses are not present in the
+source — surface form is `<value> cast <type>`. Lowered to `cast(<type>, <value>)`
+with an injected `from typing import cast`""" },
 ]
 
 [Expr.nodes.ExprFString]
@@ -486,6 +492,7 @@ fields = [
   { name = "value", type = "Expr" },
   { name = "attr", type = "Identifier" },
   { name = "ctx", type = "ExprContext" },
+  { name = "optional", type = "bool", doc = "basedpython: `true` when written `a?.b` (None-chaining)" },
 ]
 
 [Expr.nodes.ExprSubscript]
@@ -494,6 +501,10 @@ fields = [
   { name = "value", type = "Expr" },
   { name = "slice", type = "Expr" },
   { name = "ctx", type = "ExprContext" },
+  { name = "is_typeof", type = "bool", doc = """basedpython: when true, this subscript represents a `typeof X`
+expression. The `value` is `Name(\"typeof\")` and the `slice` holds the
+inner expression `X`. The square-bracket tokens are not present in the
+source — surface form is `typeof X`. Lowered to `ty_extensions.TypeOf[X]`""" },
 ]
 
 [Expr.nodes.ExprStarred]
@@ -519,10 +530,31 @@ fields = [
 
 [Expr.nodes.ExprTuple]
 doc = "See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
+attrs = ["allow(clippy::struct_excessive_bools)"]
 fields = [
   { name = "elts", type = "Expr*" },
   { name = "ctx", type = "ExprContext" },
   { name = "parenthesized", type = "bool" },
+  { name = "is_anon_named_tuple", type = "bool", doc = """basedpython: when true, this tuple is an anonymous named tuple type
+expression like `(name: str, age: int)`. Its `elts` are `Expr::Named`
+nodes where `target` is the field name (an `Expr::Name`) and `value`
+is the type expression for that field.""" },
+  { name = "is_anon_named_tuple_value", type = "bool", doc = """basedpython: when true, this tuple is an anonymous named tuple value
+expression like `(name=\"asdf\", age=20)`. Its `elts` are `Expr::Named`
+nodes where `target` is the field name (an `Expr::Name`) and `value`
+is the value expression for that field. Mutually exclusive with
+`is_anon_named_tuple` (which is the type-expression form).""" },
+  { name = "parameter_slash", type = "Option<u32>", doc = """basedpython: index in `elts` of the `/` positional-only marker, if
+present. tuples in basedpython carry full callable-parameter shape;
+fields before this index are positional-only""" },
+  { name = "parameter_star", type = "Option<u32>", doc = """basedpython: index in `elts` of the bare `*` keyword-only marker,
+if present. fields after this index are keyword-only""" },
+  { name = "is_parameter_shape", type = "bool", doc = """basedpython: tuple uses extended callable-parameter syntax —
+markers (`/`, `*`), variadic (`*: T` / `*name: T`), kwargs catch-all
+(`**: T` / `**name: T`), or named-only fields (`name: T`). set by
+the parser whenever any of those forms is encountered. when true,
+the tuple is interpretable as a callable parameter list AND a tuple
+type""" },
 ]
 
 [Expr.nodes.ExprSlice]
@@ -549,6 +581,15 @@ see [`StmtIpyEscapeCommand`]."""
 fields = [
   { name = "kind", type = "IpyEscapeKind" },
   { name = "value", type = "Box<str>" },
+]
+
+[Expr.nodes.ExprCallableType]
+doc = "callable type expression: `(int, str) -> bool`"
+fields = [
+  { name = "args", type = "Expr*" },
+  { name = "returns", type = "Expr" },
+  { name = "parameter_slash", type = "Option<u32>", doc = "basedpython: index in `args` of the `/` positional-only marker" },
+  { name = "parameter_star", type = "Option<u32>", doc = "basedpython: index in `args` of the bare `*` keyword-only marker" },
 ]
 
 [ExceptHandler]
@@ -617,6 +658,7 @@ fields = [
   { name = "name", type = "Identifier" },
   { name = "bound", type = "Box<Expr>?" },
   { name = "default", type = "Box<Expr>?" },
+  { name = "variance", type = "Variance?", skip_visit = true },
 ]
 
 [TypeParam.nodes.TypeParamTypeVarTuple]

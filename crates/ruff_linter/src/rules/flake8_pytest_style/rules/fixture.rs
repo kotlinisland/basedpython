@@ -723,6 +723,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             arguments,
             range: _,
             node_index: _,
+            is_cast: _,
         }) => {
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings().flake8_pytest_style.fixture_parentheses

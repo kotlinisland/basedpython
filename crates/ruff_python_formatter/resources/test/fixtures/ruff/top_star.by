@@ -1,0 +1,29 @@
+a: list[*]
+
+b: dict[*, *]
+
+c: collections.abc.Mapping[*, *]
+
+def f(x: list[*]) -> set[*]: ...
+
+d: list[*] | int
+
+e: tuple[*]
+
+f: dict[str, *]
+
+g: dict[*, int]
+
+h: X[int, *, str]
+
+def fn(data: dict[str, *]) -> dict[*, list[int]]: ...
+
+i: list[int | *]
+
+j: list[* | int]
+
+k: list[int | * | str]
+
+l: dict[str, int | *]
+
+def fn2(a: list[int | *]) -> set[* | str]: ...

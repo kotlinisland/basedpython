@@ -55,6 +55,8 @@ fn find_pyproject_config(
     pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
+        FilePattern::Builtin("*.by"),
+        FilePattern::Builtin("*.byi"),
     ])
     .unwrap();
     Ok(pyproject_config)

@@ -1,0 +1,19 @@
+---
+source: crates/ty/tests/cli/api_lockfile.rs
+info:
+  program: by
+  args:
+    - generate-api-file
+    - "--stdout"
+---
+success: true
+exit_code: 0
+----- stdout -----
+#api-lock:v=1
+#tool:by=0.0.0
+#python:default
+#modules:1
+ta.Plain:t=builtins.int | builtins.str
+ta.Wrapper:t<T>=builtins.list[<unresolved>]
+
+----- stderr -----

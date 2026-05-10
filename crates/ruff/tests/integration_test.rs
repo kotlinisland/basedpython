@@ -24,7 +24,7 @@ use ruff::args::Args;
 #[cfg(unix)]
 use ruff::run;
 
-const BIN_NAME: &str = "ruff";
+const BIN_NAME: &str = "buff";
 
 fn ruff_cmd() -> Command {
     Command::new(get_cargo_bin(BIN_NAME))

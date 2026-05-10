@@ -256,13 +256,20 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         && preceding
                             .as_function_def_stmt()
                             .is_some_and(|preceding_stub| {
-                                contains_only_an_ellipsis(
-                                    &preceding_stub.body,
-                                    f.context().comments(),
-                                ) && lines_after_ignoring_end_of_line_trivia(
-                                    preceding_stub.end(),
-                                    f.context().source(),
-                                ) < 2
+                                // basedpython bodyless overloads (`def f(x: int) -> int`
+                                // with no colon and no body) also count — the body is
+                                // an empty `Vec` rather than `[Ellipsis]`
+                                let is_basedpython_bodyless =
+                                    source_type.is_basedpython() && preceding_stub.body.is_empty();
+                                (is_basedpython_bodyless
+                                    || contains_only_an_ellipsis(
+                                        &preceding_stub.body,
+                                        f.context().comments(),
+                                    ))
+                                    && lines_after_ignoring_end_of_line_trivia(
+                                        preceding_stub.end(),
+                                        f.context().source(),
+                                    ) < 2
                             })
                         && !preceding_comments.has_trailing_own_line();
 
@@ -294,10 +301,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         match lines_after(end, source) {
                             0..=2 => empty_line().fmt(f)?,
                             _ => match source_type {
-                                PySourceType::Stub => {
+                                PySourceType::Stub | PySourceType::BasedPythonStub => {
                                     empty_line().fmt(f)?;
                                 }
-                                PySourceType::Python | PySourceType::Ipynb => {
+                                PySourceType::Python
+                                | PySourceType::BasedPython
+                                | PySourceType::Ipynb => {
                                     write!(f, [empty_line(), empty_line()])?;
                                 }
                             },
@@ -335,10 +344,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     2 => empty_line().fmt(f)?,
                     _ => match self.kind {
                         SuiteKind::TopLevel => match source_type {
-                            PySourceType::Stub => {
+                            PySourceType::Stub | PySourceType::BasedPythonStub => {
                                 empty_line().fmt(f)?;
                             }
-                            PySourceType::Python | PySourceType::Ipynb => {
+                            PySourceType::Python
+                            | PySourceType::BasedPython
+                            | PySourceType::Ipynb => {
                                 write!(f, [empty_line(), empty_line()])?;
                             }
                         },
@@ -387,10 +398,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         0 | 1 => hard_line_break().fmt(f)?,
                         2 => empty_line().fmt(f)?,
                         _ => match source_type {
-                            PySourceType::Stub => {
+                            PySourceType::Stub | PySourceType::BasedPythonStub => {
                                 empty_line().fmt(f)?;
                             }
-                            PySourceType::Python | PySourceType::Ipynb => {
+                            PySourceType::Python
+                            | PySourceType::BasedPython
+                            | PySourceType::Ipynb => {
                                 write!(f, [empty_line(), empty_line()])?;
                             }
                         },
@@ -736,7 +749,16 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
         .is_some_and(|function| contains_only_an_ellipsis(&function.body, f.context().comments()))
         && following.is_function_def_stmt();
 
-    class_sequences_with_ellipsis_only || function_with_ellipsis
+    // basedpython: a bodyless `def f(...) -> T` (no colon, body is empty vec)
+    // followed by another function definition — same intent as the
+    // `def f(...): ...` stub form, so should group tightly
+    let basedpython_bodyless = f.options().source_type().is_basedpython()
+        && preceding
+            .as_function_def_stmt()
+            .is_some_and(|function| function.body.is_empty())
+        && following.is_function_def_stmt();
+
+    class_sequences_with_ellipsis_only || function_with_ellipsis || basedpython_bodyless
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.

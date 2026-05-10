@@ -3689,6 +3689,48 @@ Add tests for:
 - Protocols decorated with `@final`
 - Equivalence and subtyping between `Callable` types and protocols that define `__call__`
 
+## basedpython: `protocol` modifier
+
+in basedpython, `protocol Foo` parses to a class with a synthetic `protocol_class` decorator. ty
+injects `typing.Protocol` as a base so structural typing kicks in without needing the explicit
+`(Protocol)` arg
+
+### structural matching
+
+```by
+protocol Sized:
+    def __len__(self) -> int: ...
+
+class Bag:
+    def __len__(self) -> int:
+        return 0
+
+def takes_sized(s: Sized) -> int:
+    return len(s)
+
+takes_sized(Bag())  # ok
+```
+
+### protocol with extra base
+
+```by
+protocol Sized:
+    def __len__(self) -> int: ...
+
+protocol Named(Sized):
+    name: str
+
+class Person:
+    name: str
+    def __len__(self) -> int:
+        return 0
+
+def takes_named(n: Named) -> str:
+    return n.name
+
+takes_named(Person())  # ok
+```
+
 [mypy_protocol_docs]: https://mypy.readthedocs.io/en/stable/protocols.html#protocols-and-structural-subtyping
 [mypy_protocol_tests]: https://github.com/python/mypy/blob/master/test-data/unit/check-protocols.test
 [protocol conformance tests]: https://github.com/python/typing/tree/main/conformance/tests

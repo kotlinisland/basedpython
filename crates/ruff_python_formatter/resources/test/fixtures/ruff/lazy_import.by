@@ -1,0 +1,4 @@
+lazy import os
+lazy import os.path as p
+lazy from os import path
+lazy from os import path, getcwd

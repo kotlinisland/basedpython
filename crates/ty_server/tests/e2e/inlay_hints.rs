@@ -53,14 +53,14 @@ y = foo(1)
           {
             "value": "int",
             "location": {
-              "uri": "file://<typeshed>/stdlib/builtins.pyi",
+              "uri": "file://<typeshed>/stdlib/builtins.byi",
               "range": {
                 "start": {
-                  "line": 343,
+                  "line": 305,
                   "character": 6
                 },
                 "end": {
-                  "line": 343,
+                  "line": 305,
                   "character": 9
                 }
               }

@@ -1,4 +1,5 @@
 mod analysis_options;
+mod api_lockfile;
 mod config_option;
 mod exit_code;
 mod file_selection;
@@ -898,7 +899,7 @@ impl CliTest {
             _temp_dir: temp_dir,
             settings,
             settings_scope: Some(settings_scope),
-            ty_binary_path: get_cargo_bin("ty"),
+            ty_binary_path: get_cargo_bin("by"),
         })
     }
 

@@ -1,0 +1,4 @@
+city = user?.address
+name = user?.name ?? "anon"
+result = a ?? b ?? c
+x = a?.b?.c

@@ -19,6 +19,7 @@ Module(
                             node_index: NodeIndex(None),
                             range: 0..9,
                             parameters: None,
+                            returns: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
                                     node_index: NodeIndex(None),

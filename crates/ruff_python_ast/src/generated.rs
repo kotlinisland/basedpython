@@ -1329,6 +1329,7 @@ pub enum Expr {
     Tuple(crate::ExprTuple),
     Slice(crate::ExprSlice),
     IpyEscapeCommand(crate::ExprIpyEscapeCommand),
+    CallableType(crate::ExprCallableType),
 }
 
 impl From<crate::ExprBoolOp> for Expr {
@@ -1529,6 +1530,12 @@ impl From<crate::ExprIpyEscapeCommand> for Expr {
     }
 }
 
+impl From<crate::ExprCallableType> for Expr {
+    fn from(node: crate::ExprCallableType) -> Self {
+        Self::CallableType(node)
+    }
+}
+
 impl ruff_text_size::Ranged for Expr {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
@@ -1565,6 +1572,7 @@ impl ruff_text_size::Ranged for Expr {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
+            Self::CallableType(node) => node.range(),
         }
     }
 }
@@ -1605,6 +1613,7 @@ impl crate::HasNodeIndex for Expr {
             Self::Tuple(node) => node.node_index(),
             Self::Slice(node) => node.node_index(),
             Self::IpyEscapeCommand(node) => node.node_index(),
+            Self::CallableType(node) => node.node_index(),
         }
     }
 }
@@ -2831,6 +2840,43 @@ impl Expr {
             _ => None,
         }
     }
+
+    #[inline]
+    pub const fn is_callable_type_expr(&self) -> bool {
+        matches!(self, Self::CallableType(_))
+    }
+
+    #[inline]
+    pub fn callable_type_expr(self) -> Option<crate::ExprCallableType> {
+        match self {
+            Self::CallableType(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_callable_type_expr(self) -> crate::ExprCallableType {
+        match self {
+            Self::CallableType(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_callable_type_expr_mut(&mut self) -> Option<&mut crate::ExprCallableType> {
+        match self {
+            Self::CallableType(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_callable_type_expr(&self) -> Option<&crate::ExprCallableType> {
+        match self {
+            Self::CallableType(val) => Some(val),
+            _ => None,
+        }
+    }
 }
 
 /// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
@@ -3924,6 +3970,12 @@ impl ruff_text_size::Ranged for crate::ExprIpyEscapeCommand {
     }
 }
 
+impl ruff_text_size::Ranged for crate::ExprCallableType {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
 impl ruff_text_size::Ranged for crate::ExceptHandlerExceptHandler {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -4488,6 +4540,12 @@ impl crate::HasNodeIndex for crate::ExprIpyEscapeCommand {
     }
 }
 
+impl crate::HasNodeIndex for crate::ExprCallableType {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
+        &self.node_index
+    }
+}
+
 impl crate::HasNodeIndex for crate::ExceptHandlerExceptHandler {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
@@ -4781,6 +4839,7 @@ impl Expr {
             Expr::Tuple(node) => node.visit_source_order(visitor),
             Expr::Slice(node) => node.visit_source_order(visitor),
             Expr::IpyEscapeCommand(node) => node.visit_source_order(visitor),
+            Expr::CallableType(node) => node.visit_source_order(visitor),
         }
     }
 }
@@ -5262,6 +5321,8 @@ pub enum ExprRef<'a> {
     Slice(&'a crate::ExprSlice),
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
+    #[is(name = "callable_type_expr")]
+    CallableType(&'a crate::ExprCallableType),
 }
 
 impl<'a> From<&'a Expr> for ExprRef<'a> {
@@ -5300,6 +5361,7 @@ impl<'a> From<&'a Expr> for ExprRef<'a> {
             Expr::Tuple(node) => ExprRef::Tuple(node),
             Expr::Slice(node) => ExprRef::Slice(node),
             Expr::IpyEscapeCommand(node) => ExprRef::IpyEscapeCommand(node),
+            Expr::CallableType(node) => ExprRef::CallableType(node),
         }
     }
 }
@@ -5502,6 +5564,12 @@ impl<'a> From<&'a crate::ExprIpyEscapeCommand> for ExprRef<'a> {
     }
 }
 
+impl<'a> From<&'a crate::ExprCallableType> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprCallableType) -> Self {
+        Self::CallableType(node)
+    }
+}
+
 impl ruff_text_size::Ranged for ExprRef<'_> {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
@@ -5538,6 +5606,7 @@ impl ruff_text_size::Ranged for ExprRef<'_> {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
+            Self::CallableType(node) => node.range(),
         }
     }
 }
@@ -5578,6 +5647,7 @@ impl crate::HasNodeIndex for ExprRef<'_> {
             Self::Tuple(node) => node.node_index(),
             Self::Slice(node) => node.node_index(),
             Self::IpyEscapeCommand(node) => node.node_index(),
+            Self::CallableType(node) => node.node_index(),
         }
     }
 }
@@ -5895,6 +5965,7 @@ pub enum AnyNodeRef<'a> {
     ExprTuple(&'a crate::ExprTuple),
     ExprSlice(&'a crate::ExprSlice),
     ExprIpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
+    ExprCallableType(&'a crate::ExprCallableType),
     ExceptHandlerExceptHandler(&'a crate::ExceptHandlerExceptHandler),
     InterpolatedElement(&'a crate::InterpolatedElement),
     InterpolatedStringLiteralElement(&'a crate::InterpolatedStringLiteralElement),
@@ -6094,6 +6165,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
             Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+            Expr::CallableType(node) => AnyNodeRef::ExprCallableType(node),
         }
     }
 }
@@ -6134,6 +6206,7 @@ impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
             ExprRef::Tuple(node) => AnyNodeRef::ExprTuple(node),
             ExprRef::Slice(node) => AnyNodeRef::ExprSlice(node),
             ExprRef::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+            ExprRef::CallableType(node) => AnyNodeRef::ExprCallableType(node),
         }
     }
 }
@@ -6174,6 +6247,7 @@ impl<'a> AnyNodeRef<'a> {
             Self::ExprTuple(node) => Some(ExprRef::Tuple(node)),
             Self::ExprSlice(node) => Some(ExprRef::Slice(node)),
             Self::ExprIpyEscapeCommand(node) => Some(ExprRef::IpyEscapeCommand(node)),
+            Self::ExprCallableType(node) => Some(ExprRef::CallableType(node)),
 
             _ => None,
         }
@@ -6684,6 +6758,12 @@ impl<'a> From<&'a crate::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a crate::ExprCallableType> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprCallableType) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprCallableType(node)
+    }
+}
+
 impl<'a> From<&'a crate::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a crate::ExceptHandlerExceptHandler) -> AnyNodeRef<'a> {
         AnyNodeRef::ExceptHandlerExceptHandler(node)
@@ -6951,6 +7031,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.range(),
+            AnyNodeRef::ExprCallableType(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::InterpolatedElement(node) => node.range(),
             AnyNodeRef::InterpolatedStringLiteralElement(node) => node.range(),
@@ -7052,6 +7133,7 @@ impl crate::HasNodeIndex for AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(node) => node.node_index(),
             AnyNodeRef::ExprSlice(node) => node.node_index(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.node_index(),
+            AnyNodeRef::ExprCallableType(node) => node.node_index(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.node_index(),
             AnyNodeRef::InterpolatedElement(node) => node.node_index(),
             AnyNodeRef::InterpolatedStringLiteralElement(node) => node.node_index(),
@@ -7153,6 +7235,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprCallableType(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::InterpolatedElement(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::InterpolatedStringLiteralElement(node) => {
@@ -7260,6 +7343,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprTuple(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprSlice(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprCallableType(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.visit_source_order(visitor),
             AnyNodeRef::InterpolatedElement(node) => node.visit_source_order(visitor),
             AnyNodeRef::InterpolatedStringLiteralElement(node) => node.visit_source_order(visitor),
@@ -7377,6 +7461,7 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::ExprTuple(_)
                 | AnyNodeRef::ExprSlice(_)
                 | AnyNodeRef::ExprIpyEscapeCommand(_)
+                | AnyNodeRef::ExprCallableType(_)
         )
     }
 }
@@ -8112,6 +8197,16 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIpyEscapeCommand {
     }
 }
 
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCallableType {
+    type Error = ();
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprCallableType, ()> {
+        match node {
+            AnyRootNodeRef::Expr(Expr::CallableType(node)) => Ok(node),
+            _ => Err(()),
+        }
+    }
+}
+
 impl<'a> From<&'a ExceptHandler> for AnyRootNodeRef<'a> {
     fn from(node: &'a ExceptHandler) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ExceptHandler(node)
@@ -8810,6 +8905,7 @@ pub enum NodeKind {
     ExprTuple,
     ExprSlice,
     ExprIpyEscapeCommand,
+    ExprCallableType,
     ExceptHandlerExceptHandler,
     InterpolatedElement,
     InterpolatedStringLiteralElement,
@@ -8909,6 +9005,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
             AnyNodeRef::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
+            AnyNodeRef::ExprCallableType(_) => NodeKind::ExprCallableType,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::InterpolatedElement(_) => NodeKind::InterpolatedElement,
             AnyNodeRef::InterpolatedStringLiteralElement(_) => {
@@ -9341,6 +9438,7 @@ pub struct ExprLambda {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub parameters: Option<Box<crate::Parameters>>,
+    pub returns: Option<Box<Expr>>,
     pub body: Box<Expr>,
 }
 
@@ -9461,6 +9559,12 @@ pub struct ExprCall {
     pub range: ruff_text_size::TextRange,
     pub func: Box<Expr>,
     pub arguments: crate::Arguments,
+    /// basedpython: when true, this call represents a `<value> cast <type>`
+    /// expression. The `func` is a synthetic `Name("cast")`, and `arguments` holds
+    /// `[type, value]` in `typing.cast` order. The parentheses are not present in the
+    /// source — surface form is `<value> cast <type>`. Lowered to `cast(<type>, <value>)`
+    /// with an injected `from typing import cast`
+    pub is_cast: bool,
 }
 
 /// An AST node that represents either a single-part f-string literal
@@ -9554,6 +9658,8 @@ pub struct ExprAttribute {
     pub value: Box<Expr>,
     pub attr: crate::Identifier,
     pub ctx: crate::ExprContext,
+    /// basedpython: `true` when written `a?.b` (None-chaining)
+    pub optional: bool,
 }
 
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
@@ -9565,6 +9671,11 @@ pub struct ExprSubscript {
     pub value: Box<Expr>,
     pub slice: Box<Expr>,
     pub ctx: crate::ExprContext,
+    /// basedpython: when true, this subscript represents a `typeof X`
+    /// expression. The `value` is `Name("typeof")` and the `slice` holds the
+    /// inner expression `X`. The square-bracket tokens are not present in the
+    /// source — surface form is `typeof X`. Lowered to `ty_extensions.TypeOf[X]`
+    pub is_typeof: bool,
 }
 
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
@@ -9600,12 +9711,38 @@ pub struct ExprList {
 /// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ExprTuple {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
     pub parenthesized: bool,
+    /// basedpython: when true, this tuple is an anonymous named tuple type
+    /// expression like `(name: str, age: int)`. Its `elts` are `Expr::Named`
+    /// nodes where `target` is the field name (an `Expr::Name`) and `value`
+    /// is the type expression for that field.
+    pub is_anon_named_tuple: bool,
+    /// basedpython: when true, this tuple is an anonymous named tuple value
+    /// expression like `(name="asdf", age=20)`. Its `elts` are `Expr::Named`
+    /// nodes where `target` is the field name (an `Expr::Name`) and `value`
+    /// is the value expression for that field. Mutually exclusive with
+    /// `is_anon_named_tuple` (which is the type-expression form).
+    pub is_anon_named_tuple_value: bool,
+    /// basedpython: index in `elts` of the `/` positional-only marker, if
+    /// present. tuples in basedpython carry full callable-parameter shape;
+    /// fields before this index are positional-only
+    pub parameter_slash: Option<u32>,
+    /// basedpython: index in `elts` of the bare `*` keyword-only marker,
+    /// if present. fields after this index are keyword-only
+    pub parameter_star: Option<u32>,
+    /// basedpython: tuple uses extended callable-parameter syntax —
+    /// markers (`/`, `*`), variadic (`*: T` / `*name: T`), kwargs catch-all
+    /// (`**: T` / `**name: T`), or named-only fields (`name: T`). set by
+    /// the parser whenever any of those forms is encountered. when true,
+    /// the tuple is interpretable as a callable parameter list AND a tuple
+    /// type
+    pub is_parameter_shape: bool,
 }
 
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
@@ -9637,6 +9774,20 @@ pub struct ExprIpyEscapeCommand {
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,
+}
+
+/// callable type expression: `(int, str) -> bool`
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct ExprCallableType {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub args: Vec<Expr>,
+    pub returns: Box<Expr>,
+    /// basedpython: index in `args` of the `/` positional-only marker
+    pub parameter_slash: Option<u32>,
+    /// basedpython: index in `args` of the bare `*` keyword-only marker
+    pub parameter_star: Option<u32>,
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -9724,6 +9875,7 @@ pub struct TypeParamTypeVar {
     pub name: crate::Identifier,
     pub bound: Option<Box<Expr>>,
     pub default: Option<Box<Expr>>,
+    pub variance: Option<crate::Variance>,
 }
 
 /// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
@@ -10318,6 +10470,7 @@ impl ExprLambda {
     {
         let ExprLambda {
             parameters,
+            returns,
             body,
             range: _,
             node_index: _,
@@ -10325,6 +10478,10 @@ impl ExprLambda {
 
         if let Some(parameters) = parameters {
             visitor.visit_parameters(parameters);
+        }
+
+        if let Some(returns) = returns {
+            visitor.visit_annotation(returns);
         }
 
         visitor.visit_expr(body);
@@ -10502,6 +10659,7 @@ impl ExprCall {
         let ExprCall {
             func,
             arguments,
+            is_cast: _,
             range: _,
             node_index: _,
         } = self;
@@ -10569,6 +10727,7 @@ impl ExprAttribute {
             value,
             attr,
             ctx: _,
+            optional: _,
             range: _,
             node_index: _,
         } = self;
@@ -10586,6 +10745,7 @@ impl ExprSubscript {
             value,
             slice,
             ctx: _,
+            is_typeof: _,
             range: _,
             node_index: _,
         } = self;
@@ -10650,6 +10810,11 @@ impl ExprTuple {
             elts,
             ctx: _,
             parenthesized: _,
+            is_anon_named_tuple: _,
+            is_anon_named_tuple_value: _,
+            parameter_slash: _,
+            parameter_star: _,
+            is_parameter_shape: _,
             range: _,
             node_index: _,
         } = self;
@@ -10698,6 +10863,27 @@ impl ExprIpyEscapeCommand {
             range: _,
             node_index: _,
         } = self;
+    }
+}
+
+impl ExprCallableType {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprCallableType {
+            args,
+            returns,
+            parameter_slash: _,
+            parameter_star: _,
+            range: _,
+            node_index: _,
+        } = self;
+
+        for elm in args {
+            visitor.visit_expr(elm);
+        }
+        visitor.visit_expr(returns);
     }
 }
 
@@ -10827,6 +11013,7 @@ impl TypeParamTypeVar {
             name,
             bound,
             default,
+            variance: _,
             range: _,
             node_index: _,
         } = self;

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/f_string.py
 ---
 ## AST
 
@@ -297,6 +298,11 @@ Module(
                                                                 ],
                                                                 ctx: Load,
                                                                 parenthesized: false,
+                                                                is_anon_named_tuple: false,
+                                                                is_anon_named_tuple_value: false,
+                                                                parameter_slash: None,
+                                                                parameter_star: None,
+                                                                is_parameter_shape: false,
                                                             },
                                                         ),
                                                         debug_text: None,
@@ -795,6 +801,11 @@ Module(
                                                                 ],
                                                                 ctx: Load,
                                                                 parenthesized: false,
+                                                                is_anon_named_tuple: false,
+                                                                is_anon_named_tuple_value: false,
+                                                                parameter_slash: None,
+                                                                parameter_star: None,
+                                                                is_parameter_shape: false,
                                                             },
                                                         ),
                                                         debug_text: Some(
@@ -1790,6 +1801,7 @@ Module(
                                                                                                 node_index: NodeIndex(None),
                                                                                             },
                                                                                             ctx: Load,
+                                                                                            optional: false,
                                                                                         },
                                                                                     ),
                                                                                     arguments: Arguments {
@@ -1798,6 +1810,7 @@ Module(
                                                                                         args: [],
                                                                                         keywords: [],
                                                                                     },
+                                                                                    is_cast: false,
                                                                                 },
                                                                             ),
                                                                             debug_text: None,
@@ -1875,6 +1888,7 @@ Module(
                                                                         kwarg: None,
                                                                     },
                                                                 ),
+                                                                returns: None,
                                                                 body: Set(
                                                                     ExprSet {
                                                                         node_index: NodeIndex(None),
@@ -2522,6 +2536,11 @@ Module(
                                                                 ],
                                                                 ctx: Load,
                                                                 parenthesized: false,
+                                                                is_anon_named_tuple: false,
+                                                                is_anon_named_tuple_value: false,
+                                                                parameter_slash: None,
+                                                                parameter_star: None,
+                                                                is_parameter_shape: false,
                                                             },
                                                         ),
                                                         debug_text: None,

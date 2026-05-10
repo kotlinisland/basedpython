@@ -983,7 +983,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
     ");
 
@@ -994,7 +994,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
       Cause: No such file or directory (os error 2)
     ");
@@ -1073,7 +1073,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Invalid `environment.python` setting
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
@@ -1109,7 +1109,7 @@ fn config_file_unsupported_python_version() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`: TOML parse error at line 3, column 18
       |
     3 | python-version = "2.7"
@@ -1167,7 +1167,7 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Failed to discover the site-packages directory
       Cause: Invalid `environment.python` setting
 
@@ -1257,7 +1257,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Failed to discover the site-packages directory
       Cause: Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation
 
@@ -2841,7 +2841,7 @@ home = ./
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
+    by failed
       Cause: Failed to discover local Python environment
       Cause: Invalid `VIRTUAL_ENV` environment variable `<temp_dir>/nonexistent-venv`: does not point to a directory on disk
       Cause: No such file or directory (os error 2)

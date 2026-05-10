@@ -81,7 +81,7 @@ fn change_detected(event: &notify::Event) -> Option<ChangeKind> {
                 Some("toml") => {
                     return Some(ChangeKind::Configuration);
                 }
-                Some("py" | "pyi" | "pyw" | "ipynb") => source_file = true,
+                Some("py" | "pyi" | "by" | "byi" | "pyw" | "ipynb") => source_file = true,
                 _ => {}
             }
         }

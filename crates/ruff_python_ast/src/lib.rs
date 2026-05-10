@@ -103,6 +103,12 @@ pub enum PySourceType {
     Stub,
     /// The source is a Jupyter notebook (`.ipynb`).
     Ipynb,
+    /// The source is a basedpython file (`.by`). Parses as a Python module
+    /// but with basedpython grammar extensions enabled.
+    BasedPython,
+    /// The source is a basedpython stub file (`.byi`). Parses as a Python
+    /// stub with basedpython grammar extensions enabled.
+    BasedPythonStub,
 }
 
 impl PySourceType {
@@ -116,9 +122,10 @@ impl PySourceType {
     /// Infers the source type from the file extension.
     pub fn try_from_extension(extension: &str) -> Option<Self> {
         let ty = match extension {
-            "py" => Self::Python,
+            "py" | "pyw" => Self::Python,
             "pyi" => Self::Stub,
-            "pyw" => Self::Python,
+            "by" => Self::BasedPython,
+            "byi" => Self::BasedPythonStub,
             "ipynb" => Self::Ipynb,
             _ => return None,
         };
@@ -134,19 +141,29 @@ impl PySourceType {
     }
 
     pub const fn is_py_file(self) -> bool {
-        matches!(self, Self::Python)
+        matches!(self, Self::Python | Self::BasedPython)
     }
 
     pub const fn is_stub(self) -> bool {
-        matches!(self, Self::Stub)
+        matches!(self, Self::Stub | Self::BasedPythonStub)
     }
 
     pub const fn is_py_file_or_stub(self) -> bool {
-        matches!(self, Self::Python | Self::Stub)
+        matches!(
+            self,
+            Self::Python | Self::Stub | Self::BasedPython | Self::BasedPythonStub
+        )
     }
 
     pub const fn is_ipynb(self) -> bool {
         matches!(self, Self::Ipynb)
+    }
+
+    /// Whether this source type accepts basedpython grammar extensions
+    /// (typed lambdas, anonymous named tuples, modifier keywords, `??` /
+    /// `?.` operators, bodyless `def` overload sugar, etc).
+    pub const fn is_basedpython(self) -> bool {
+        matches!(self, Self::BasedPython | Self::BasedPythonStub)
     }
 }
 

@@ -1,6 +1,6 @@
 use ruff_formatter::{FormatRuleWithOptions, format_args};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprTuple;
+use ruff_python_ast::{Expr, ExprTuple};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
@@ -118,7 +118,28 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             range: _,
             node_index: _,
             parenthesized: is_parenthesized,
+            is_anon_named_tuple: _,
+            is_anon_named_tuple_value: _,
+            parameter_slash: _,
+            parameter_star: _,
+            is_parameter_shape: _,
         } = item;
+
+        // basedpython: anonymous named tuple type — `(name: T, name: T, ...)`.
+        // Always parenthesized; format each `ExprNamed` element as `name: type`.
+        if item.is_anon_named_tuple {
+            return parenthesized("(", &AnonNamedTupleFields::new(item, ":"), ")").fmt(f);
+        }
+        // basedpython: anonymous named tuple value — `(name=expr, ...)`.
+        if item.is_anon_named_tuple_value {
+            return parenthesized("(", &AnonNamedTupleFields::new(item, "="), ")").fmt(f);
+        }
+        // basedpython: Parameters spec — `(int, str, /, name: T)`,
+        // `(*: T)`, `(**: T)`, etc. dedicated formatter handles slash/star
+        // markers + variadic / kwargs encodings
+        if item.has_parameter_shape() {
+            return parenthesized("(", &ParameterShapeFields::new(item), ")").fmt(f);
+        }
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -219,6 +240,182 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
         f.join_comma_separated(self.tuple.end())
             .nodes(&self.tuple.elts)
             .finish()
+    }
+}
+
+#[derive(Debug)]
+struct AnonNamedTupleFields<'a> {
+    tuple: &'a ExprTuple,
+    /// Operator between field name and field expression: `":"` for the
+    /// type form (`name: T`), `"="` for the value form (`name=v`).
+    sep: &'static str,
+}
+
+impl<'a> AnonNamedTupleFields<'a> {
+    const fn new(tuple: &'a ExprTuple, sep: &'static str) -> Self {
+        Self { tuple, sep }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for AnonNamedTupleFields<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let mut joiner = f.join_comma_separated(self.tuple.end());
+        let sep_token = self.sep;
+        // Type form gets a trailing space after `:` (PEP 8); value form does
+        // not insert space around `=` (Python keyword-argument convention).
+        let needs_space_after = sep_token == ":";
+        for elt in &self.tuple.elts {
+            // Mixed positional + named: a bare expression is a positional
+            // field and renders verbatim. An `Expr::Named` node carries the
+            // field name and value with the form-appropriate separator.
+            if let Expr::Named(named) = elt {
+                joiner.entry(
+                    elt,
+                    &format_with(|f| {
+                        if needs_space_after {
+                            ruff_formatter::write!(
+                                f,
+                                [
+                                    named.target.format(),
+                                    token(sep_token),
+                                    space(),
+                                    named.value.format()
+                                ]
+                            )
+                        } else {
+                            ruff_formatter::write!(
+                                f,
+                                [
+                                    named.target.format(),
+                                    token(sep_token),
+                                    named.value.format()
+                                ]
+                            )
+                        }
+                    }),
+                );
+            } else {
+                joiner.entry(elt, &elt.format());
+            }
+        }
+        joiner.finish()
+    }
+}
+
+/// Formatter for parameter-shape tuples. Handles markers (`/`, `*`),
+/// variadic (`*: T` / `*name: T`) encoded as `Expr::Starred` /
+/// `Expr::Named(target=Starred(...), value=T)`, and kwargs catch-all
+/// (`**: T` / `**name: T`) encoded as `Expr::Starred(Starred(...))` /
+/// `Expr::Named(target=Starred(Starred(...)), value=T)`. Markers are
+/// re-inserted at their `parameter_slash` / `parameter_star` indices
+struct ParameterShapeFields<'a> {
+    tuple: &'a ExprTuple,
+}
+
+impl<'a> ParameterShapeFields<'a> {
+    const fn new(tuple: &'a ExprTuple) -> Self {
+        Self { tuple }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for ParameterShapeFields<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let slash = self.tuple.parameter_slash.map(|i| i as usize);
+        let star = self.tuple.parameter_star.map(|i| i as usize);
+        let mut joiner = f.join_comma_separated(self.tuple.end());
+        for (i, elt) in self.tuple.elts.iter().enumerate() {
+            if Some(i) == slash {
+                joiner.entry(elt, &format_with(|f| token("/").fmt(f)));
+            }
+            if Some(i) == star
+                && !matches!(elt, Expr::Starred(_))
+                && !matches!(elt, Expr::Named(n) if matches!(n.target.as_ref(), Expr::Starred(_)))
+            {
+                joiner.entry(elt, &format_with(|f| token("*").fmt(f)));
+            }
+            match elt {
+                Expr::Named(named) => match named.target.as_ref() {
+                    Expr::Starred(starred) => match starred.value.as_ref() {
+                        // `**name: T`
+                        Expr::Starred(inner_inner) => {
+                            joiner.entry(
+                                elt,
+                                &format_with(|f| {
+                                    token("**").fmt(f)?;
+                                    inner_inner.value.format().fmt(f)?;
+                                    token(":").fmt(f)?;
+                                    space().fmt(f)?;
+                                    named.value.format().fmt(f)
+                                }),
+                            );
+                        }
+                        // `*name: T`
+                        _ => {
+                            joiner.entry(
+                                elt,
+                                &format_with(|f| {
+                                    token("*").fmt(f)?;
+                                    starred.value.format().fmt(f)?;
+                                    token(":").fmt(f)?;
+                                    space().fmt(f)?;
+                                    named.value.format().fmt(f)
+                                }),
+                            );
+                        }
+                    },
+                    // `name: T`
+                    _ => {
+                        joiner.entry(
+                            elt,
+                            &format_with(|f| {
+                                named.target.format().fmt(f)?;
+                                token(":").fmt(f)?;
+                                space().fmt(f)?;
+                                named.value.format().fmt(f)
+                            }),
+                        );
+                    }
+                },
+                Expr::Starred(s) => match s.value.as_ref() {
+                    // `**: T`
+                    Expr::Starred(inner) => {
+                        joiner.entry(
+                            elt,
+                            &format_with(|f| {
+                                token("**").fmt(f)?;
+                                token(":").fmt(f)?;
+                                space().fmt(f)?;
+                                inner.value.format().fmt(f)
+                            }),
+                        );
+                    }
+                    // `*: T`
+                    _ => {
+                        joiner.entry(
+                            elt,
+                            &format_with(|f| {
+                                token("*").fmt(f)?;
+                                token(":").fmt(f)?;
+                                space().fmt(f)?;
+                                s.value.format().fmt(f)
+                            }),
+                        );
+                    }
+                },
+                _ => {
+                    joiner.entry(elt, &elt.format());
+                }
+            }
+        }
+        // markers can also appear at the very end (after last elt)
+        let after_last = self.tuple.elts.len();
+        if Some(after_last) == slash {
+            joiner.entry(self.tuple, &format_with(|f| token("/").fmt(f)));
+        }
+        if Some(after_last) == star {
+            joiner.entry(self.tuple, &format_with(|f| token("*").fmt(f)));
+        }
+        joiner.finish()
     }
 }
 

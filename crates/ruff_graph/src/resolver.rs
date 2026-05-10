@@ -31,7 +31,7 @@ impl<'a> Resolver<'a> {
 
                 // If the file is a stub, look for the corresponding source file.
                 let source_file = file
-                    .is_some_and(|file| file.extension() == Some("pyi"))
+                    .is_some_and(|file| matches!(file.extension(), Some("pyi" | "byi")))
                     .then(|| self.resolve_real_module(&import))
                     .flatten();
 
@@ -43,7 +43,7 @@ impl<'a> Resolver<'a> {
                 // Attempt to resolve the member (e.g., given `from foo import bar`, look for `foo.bar`).
                 if let Some(file) = self.resolve_module(&import) {
                     // If the file is a stub, look for the corresponding source file.
-                    let source_file = (file.extension() == Some("pyi"))
+                    let source_file = (matches!(file.extension(), Some("pyi" | "byi")))
                         .then(|| self.resolve_real_module(&import))
                         .flatten();
 
@@ -60,7 +60,7 @@ impl<'a> Resolver<'a> {
 
                 // If the file is a stub, look for the corresponding source file.
                 let source_file = file
-                    .is_some_and(|file| file.extension() == Some("pyi"))
+                    .is_some_and(|file| matches!(file.extension(), Some("pyi" | "byi")))
                     .then(|| {
                         parent
                             .as_ref()
@@ -83,7 +83,7 @@ impl<'a> Resolver<'a> {
                     .find_map(|name| {
                         let file = self.resolve_module(&name)?;
                         // If the file is a stub, look for the corresponding source file.
-                        if file.extension() == Some("pyi") {
+                        if matches!(file.extension(), Some("pyi" | "byi")) {
                             Some((Some(file), self.resolve_real_module(&name)))
                         } else {
                             Some((Some(file), None))

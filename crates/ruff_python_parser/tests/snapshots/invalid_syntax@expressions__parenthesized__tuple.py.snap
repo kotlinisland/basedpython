@@ -30,6 +30,11 @@ Module(
                             ],
                             ctx: Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                 },
@@ -52,6 +57,14 @@ Module(
                                         ),
                                     },
                                 ),
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 91..91,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
                                         node_index: NodeIndex(None),
@@ -64,6 +77,11 @@ Module(
                             ],
                             ctx: Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                 },
@@ -86,9 +104,22 @@ Module(
                                         ),
                                     },
                                 ),
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 99..99,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
                             ],
                             ctx: Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                 },
@@ -193,6 +224,11 @@ Module(
                             ],
                             ctx: Load,
                             parenthesized: true,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                 },
@@ -272,6 +308,11 @@ Module(
                             ],
                             ctx: Load,
                             parenthesized: false,
+                            is_anon_named_tuple: false,
+                            is_anon_named_tuple_value: false,
+                            parameter_slash: None,
+                            parameter_star: None,
+                            is_parameter_shape: false,
                         },
                     ),
                 },
@@ -296,7 +337,7 @@ Module(
 3 | (,)
 4 |
 5 | (1,,2)
-  |    ^ Syntax Error: Expected an expression or a ')'
+  |    ^ Syntax Error: Expected an expression
 6 |
 7 | (1,,)
   |
@@ -306,7 +347,7 @@ Module(
 5 | (1,,2)
 6 |
 7 | (1,,)
-  |    ^ Syntax Error: Expected an expression or a ')'
+  |    ^ Syntax Error: Expected an expression
 8 |
 9 | # Missing comma
   |

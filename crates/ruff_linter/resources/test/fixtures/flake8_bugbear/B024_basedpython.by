@@ -1,0 +1,14 @@
+from abc import ABC
+
+
+# OK: `abstract def` lowers to `@abstractmethod` after transpile, so the
+# class does have an abstract method.
+abstract class HasAbstract(ABC):
+    abstract def required(self) -> int: ...
+
+
+# Not OK: a basedpython ABC with no abstract methods or properties still
+# triggers B024, matching pure-Python behaviour.
+class NoAbstract(ABC):
+    def regular(self) -> int:
+        return 0

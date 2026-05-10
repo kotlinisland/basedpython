@@ -1560,6 +1560,12 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting the argument to `Unpack[...]`.
         const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
+
+        /// basedpython: set while inferring a subscript slice element. enables
+        /// `ty_extensions.Top` and `Bottom` to appear nested in type positions
+        /// (e.g. `list[int | Top]`); on encounter the enclosing subscript is
+        /// top/bottom-materialized
+        const IN_SUBSCRIPT_SLICE = 1 << 15;
     }
 }
 

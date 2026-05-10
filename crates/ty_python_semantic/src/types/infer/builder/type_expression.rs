@@ -1,5 +1,8 @@
 use itertools::Either;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{
+    UseSiteVariance, is_dotted_name, is_top_star_marker, top_star_marker_ranges_in_slice,
+    top_star_slice_elements, use_site_variance_marker,
+};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
@@ -18,10 +21,11 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeFormType, TypeGuardType,
-    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
+    any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -126,6 +130,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.check_for_unbound_type_variable(annotation, result_ty)
     }
 
+    /// basedpython: if `ty` is `ty_extensions.Top` / `Bottom` and we are inside
+    /// a subscript slice, record the materialization on the enclosing subscript
+    /// and contribute `Any` / `Never` to the inner type. caller should return
+    /// the result instead of going through the standard error path
+    fn intercept_nested_top_bottom(&mut self, ty: Type<'db>) -> Option<Type<'db>> {
+        if !self.is_basedpython_file()
+            || !self
+                .inference_flags()
+                .contains(InferenceFlags::IN_SUBSCRIPT_SLICE)
+        {
+            return None;
+        }
+        let Type::SpecialForm(sf) = ty else {
+            return None;
+        };
+        match sf {
+            crate::types::SpecialFormType::Top => {
+                self.slice_materialization = Some(crate::types::MaterializationKind::Top);
+                Some(Type::any())
+            }
+            crate::types::SpecialFormType::Bottom => {
+                self.slice_materialization = Some(crate::types::MaterializationKind::Bottom);
+                Some(Type::Never)
+            }
+            _ => None,
+        }
+    }
+
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
@@ -133,6 +165,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
                     let ty = self.infer_name_expression(name);
+                    if let Some(materialized) = self.intercept_nested_top_bottom(ty) {
+                        return materialized;
+                    }
                     self.infer_name_or_attribute_type_expression(ty, expression)
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
@@ -146,6 +181,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     match attribute_expression.ctx {
                         ast::ExprContext::Load => {
                             let ty = self.infer_attribute_expression(attribute_expression);
+                            if let Some(materialized) = self.intercept_nested_top_bottom(ty) {
+                                return materialized;
+                            }
                             self.infer_name_or_attribute_type_expression(ty, expression)
                         }
                         ast::ExprContext::Invalid => Type::unknown(),
@@ -181,11 +219,102 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ctx: _,
                     range: _,
                     node_index: _,
+                    is_typeof,
                 } = subscript;
 
-                let value_ty = self.infer_expression(value, TypeContext::default());
+                // basedpython use-site variance — `Container[out T]` /
+                // `Container[in T]` / `Container[in out T]`. The parser
+                // encoded each marked element as a `Subscript(Name(<marker>,
+                // Invalid), inner)`. The result is the same instance type
+                // that `Container[T]` would normally produce, but with a
+                // per-typevar projection recorded on the specialization;
+                // downstream member access consults the projection to
+                // implement kotlin-style read/write restrictions.
+                if self.is_basedpython_file()
+                    && let Some(slice_elements) = use_site_variance_slice_elements(slice)
+                {
+                    let value_ty = self.infer_expression(value, TypeContext::default());
+                    return resolve_use_site_variance(
+                        self.db(),
+                        value_ty,
+                        &slice_elements,
+                        |elt| self.infer_type_expression(elt),
+                    );
+                }
 
-                if is_dotted_name(value) {
+                // basedpython `X[*]` desugars to `Top[X[Any]]`. The slice is
+                // the parser-synthesized `Starred(Name(id="", ctx=Invalid))`
+                // marker, which can't resolve, so dispatch on the shape
+                // before falling through to the regular subscript path
+                if self.is_basedpython_file()
+                    && let Some(elts) = top_star_slice_elements(slice)
+                {
+                    let value_ty = self.infer_expression(value, TypeContext::default());
+                    let inner_ty = match value_ty {
+                        Type::ClassLiteral(class_literal) => {
+                            if class_literal.is_known(self.db(), KnownClass::Tuple) {
+                                // tuple has variadic typevars — treat any marker
+                                // as a homogeneous-Any tuple regardless of mix
+                                Type::homogeneous_tuple(self.db(), Type::any())
+                            } else {
+                                let db = self.db();
+                                let arg_types: Vec<Type<'db>> = elts
+                                    .iter()
+                                    .map(|elt| {
+                                        if is_top_star_marker(elt) {
+                                            Type::any()
+                                        } else {
+                                            self.infer_type_expression(elt)
+                                        }
+                                    })
+                                    .collect();
+                                let class_type =
+                                    class_literal.apply_specialization(db, |generic_context| {
+                                        let n = generic_context.len(db);
+                                        if arg_types.len() == n {
+                                            generic_context.specialize(db, arg_types.as_slice())
+                                        } else {
+                                            // arity mismatch — fall back to
+                                            // all-Any so we don't crash; the
+                                            // user gets a downstream error from
+                                            // normal subscription checking
+                                            generic_context
+                                                .specialize(db, vec![Type::any(); n].as_slice())
+                                        }
+                                    });
+                                Type::instance(db, class_type)
+                            }
+                        }
+                        _ => value_ty,
+                    };
+                    return inner_ty.top_materialization(self.db());
+                }
+
+                // basedpython `typeof X` desugars to `ty_extensions.TypeOf[X]`
+                // for type inference. The synthetic value `Name("typeof")`
+                // doesn't resolve, so dispatch on the flag directly
+                let value_ty = if *is_typeof {
+                    Type::SpecialForm(crate::types::SpecialFormType::TypeOf)
+                } else {
+                    self.infer_expression(value, TypeContext::default())
+                };
+
+                // basedpython: top-star marker nested inside the slice (e.g.
+                // `list[int | *]`). the marker arm returns `Any`, but the
+                // outer subscript still needs the top-materialization wrap
+                // that the direct/tuple form gets above
+                if self.is_basedpython_file()
+                    && !is_top_star_marker(slice)
+                    && top_star_slice_elements(slice).is_none()
+                    && !top_star_marker_ranges_in_slice(slice).is_empty()
+                    && (*is_typeof || is_dotted_name(value))
+                {
+                    let inner =
+                        self.infer_subscript_type_expression_no_store(subscript, slice, value_ty);
+                    return inner.top_materialization(self.db());
+                }
+
+                if *is_typeof || is_dotted_name(value) {
                     self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
                 } else {
                     if !self.in_string_annotation() {
@@ -339,6 +468,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
                     }
+                    // basedpython: `A & B` in a type annotation is an
+                    // intersection type. allowed only in `.by` / `.byi`
+                    ast::Operator::BitAnd if self.is_basedpython_file() => {
+                        let left_ty = self.infer_type_expression(&binary.left);
+                        let right_ty = self.infer_type_expression(&binary.right);
+                        IntersectionType::from_two_elements(self.db(), left_ty, right_ty)
+                    }
                     // anything else is an invalid annotation:
                     op => {
                         // Avoid inferring the types of invalid binary expressions that have been
@@ -365,6 +501,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // always `Type::unknown` in these cases.
             // =====================================================================================
             ast::Expr::BytesLiteral(bytes) => {
+                // basedpython: bytes literal in type position is the literal type
+                if self.is_basedpython_file()
+                    && let Some(single_element) = bytes.as_single_part_bytestring()
+                {
+                    return Type::bytes_literal(self.db(), &single_element.value);
+                }
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -387,6 +529,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value: ast::Number::Int(int),
                 ..
             }) => {
+                // basedpython: int literal in type position is the literal type
+                if self.is_basedpython_file() {
+                    if let Some(int) = int.as_i64() {
+                        return Type::int_literal(int);
+                    }
+                    return KnownClass::Int.to_instance(self.db());
+                }
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -405,9 +554,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Float(_),
+                value: ast::Number::Float(v),
                 ..
             }) => {
+                // basedpython: float literal in type position is the literal type
+                if self.is_basedpython_file() {
+                    return Type::float_literal(*v);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -419,9 +572,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Complex { .. },
+                value: ast::Number::Complex { real, imag },
                 ..
             }) => {
+                // basedpython: complex literal in type position is the literal type
+                if self.is_basedpython_file() {
+                    return Type::complex_literal(self.db(), *real, *imag);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -433,6 +590,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::BooleanLiteral(bool_value) => {
+                // basedpython: bool literal in type position is the literal type
+                if self.is_basedpython_file() {
+                    return Type::bool_literal(bool_value.value);
+                }
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -480,6 +641,64 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Tuple(tuple) => {
+                // basedpython anonymous named tuple type: `(name: T, name: T, ...)`.
+                // Returns an *instance* of the synthesized `NamedTuple` class
+                // so attribute access (`a.name`) resolves to the field's
+                // declared type. Identity is shape-based — two structurally
+                // identical anonymous named tuples in the same file resolve
+                // to the same class.
+                if tuple.is_anon_named_tuple {
+                    let class_lit = self
+                        .synthesize_anon_named_tuple_class(tuple, /* is_type_form = */ true);
+                    return class_lit.to_instance(self.db()).unwrap_or(class_lit);
+                }
+
+                // basedpython parameter-shape tuple in type position. three
+                // sub-cases:
+                //   * variadic (`(*args: T)`, `(int, *args: T, str)`,
+                //     `(*: T)`): emit a real variable-length tuple type so
+                //     assignability matches `tuple[T, ...]` semantics
+                //   * fixed with markers (`(int, /, name: T)`): the markers
+                //     signal parameter-spec semantics — drop names and emit
+                //     a heterogeneous `tuple[...]`. matches the forward
+                //     transpile lowering
+                //   * fixed without markers but with named fields
+                //     (`(int, name: T)`): handled upstream by
+                //     `is_anon_named_tuple` dispatch
+                if tuple.has_parameter_shape() {
+                    if let Some(ty) = self.lower_parameter_shape_to_tuple_type(tuple) {
+                        return ty;
+                    }
+                    let has_markers =
+                        tuple.parameter_slash.is_some() || tuple.parameter_star.is_some();
+                    if has_markers {
+                        let elt_tys: Vec<Type<'db>> = tuple
+                            .elts
+                            .iter()
+                            .map(|e| match e {
+                                ast::Expr::Named(n) => self.infer_type_expression(&n.value),
+                                _ => self.infer_type_expression(e),
+                            })
+                            .collect();
+                        return Type::heterogeneous_tuple(self.db(), elt_tys);
+                    }
+                    let class_lit = self
+                        .synthesize_anon_named_tuple_class(tuple, /* is_type_form = */ true);
+                    return class_lit.to_instance(self.db()).unwrap_or(class_lit);
+                }
+
+                // basedpython: parenthesized tuples are valid type
+                // expressions equivalent to `tuple[...]`. lower each
+                // element and return a heterogeneous tuple type
+                if tuple.parenthesized && self.is_basedpython_file() {
+                    let elt_tys: Vec<Type<'db>> = tuple
+                        .elts
+                        .iter()
+                        .map(|e| self.infer_type_expression(e))
+                        .collect();
+                    return Type::heterogeneous_tuple(self.db(), elt_tys);
+                }
+
                 if tuple.parenthesized {
                     if !self.in_string_annotation() {
                         for element in tuple {
@@ -533,6 +752,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Named(named) => {
+                // basedpython: a Named with `Invalid` ctx target is a keyword
+                // type-arg binding (`A[T=int]`) or anon-NT field — not a walrus.
+                // infer the value as a type expression. Position-by-name is
+                // not modelled here; for single-typevar generics the position
+                // matches naturally.
+                if let ast::Expr::Name(n) = named.target.as_ref()
+                    && matches!(n.ctx, ast::ExprContext::Invalid)
+                    && self.is_basedpython_file()
+                {
+                    return self.infer_type_expression(&named.value);
+                }
                 if !self.in_string_annotation() {
                     self.infer_named_expression(named);
                 }
@@ -547,6 +777,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::UnaryOp(unary) => {
+                // basedpython: `not T` in type position is sugar for
+                // `ty_extensions.Not[T]` — the negation type. Compute the
+                // inner type and apply the Not special form via inference
+                if matches!(unary.op, ast::UnaryOp::Not) && self.is_basedpython_file() {
+                    let inner = self.infer_type_expression(&unary.operand);
+                    return inner.negate(self.db());
+                }
                 if !self.in_string_annotation() {
                     self.infer_unary_expression(unary);
                 }
@@ -589,6 +826,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Dict(dict) => {
+                // basedpython: `{"key": T, ...}` in a type position is sugar
+                // for a synthesized `TypedDict` subclass. Identity is shape-
+                // based so the same shape resolves to the same class.
+                if self.is_basedpython_file()
+                    && let Some(ty) = self.synthesize_typed_dict_literal(dict)
+                {
+                    return ty;
+                }
                 if !self.in_string_annotation() {
                     self.infer_dict_expression(dict, TypeContext::default());
                 }
@@ -747,6 +992,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Compare(compare) => {
+                // basedpython: `a is T` in return-type position is sugar
+                // for `typing.TypeIs[T]`. Single `is` op with a Name lhs
+                // and a single comparator. Compute the inner type and
+                // wrap it via `KnownInstanceType::TypeIs`-equivalent
+                // semantics
+                if self.is_basedpython_file()
+                    && compare.ops.len() == 1
+                    && matches!(compare.ops[0], ast::CmpOp::Is)
+                    && matches!(compare.left.as_ref(), ast::Expr::Name(_))
+                    && let [target] = compare.comparators.as_ref()
+                {
+                    // skip resolving the lhs name — `a is T` in return-type
+                    // position is a labeled annotation, not a reference; the
+                    // forward transpile drops the name when lowering to
+                    // `TypeIs[T]`. we don't infer the name here, but we
+                    // still need to seed the expression cache with a sentinel
+                    // type so other passes don't choke
+                    let _ = compare.left.as_ref();
+                    let narrowed = self.infer_type_expression(target);
+                    let expanded = narrowed.expand_eagerly(self.db());
+                    if expanded.is_divergent() {
+                        return expanded;
+                    }
+                    return crate::types::TypeIsType::from_type_expression(self.db(), narrowed);
+                }
                 if !self.in_string_annotation() {
                     self.infer_compare_expression(compare);
                 }
@@ -838,6 +1108,104 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Starred(starred) => self.infer_starred_type_expression(starred),
+
+            // basedpython: `(int, str) -> bool` sugar for `Callable[[int, str], bool]`
+            ast::Expr::CallableType(callable) => {
+                let db = self.db();
+                let slash = callable.parameter_slash.map(|i| i as usize);
+                let star = callable.parameter_star.map(|i| i as usize);
+                let mut params: Vec<Parameter<'db>> = Vec::with_capacity(callable.args.len());
+                for (i, arg) in callable.args.iter().enumerate() {
+                    let after_star = star.is_some_and(|s| i >= s);
+                    match arg {
+                        ast::Expr::Named(named) => match named.target.as_ref() {
+                            ast::Expr::Starred(starred) => {
+                                let ty = self.infer_type_expression(&named.value);
+                                let name_str = match starred.value.as_ref() {
+                                    ast::Expr::Starred(inner) => {
+                                        let n = inner
+                                            .value
+                                            .as_name_expr()
+                                            .map(|n| n.id.as_str())
+                                            .unwrap_or("kwargs");
+                                        let p = Parameter::keyword_variadic(
+                                            ruff_python_ast::name::Name::new(n),
+                                        );
+                                        params.push(p.with_annotated_type(ty));
+                                        continue;
+                                    }
+                                    _ => starred
+                                        .value
+                                        .as_name_expr()
+                                        .map(|n| n.id.as_str())
+                                        .unwrap_or("args")
+                                        .to_owned(),
+                                };
+                                params.push(
+                                    Parameter::variadic(ruff_python_ast::name::Name::new(
+                                        &name_str,
+                                    ))
+                                    .with_annotated_type(ty),
+                                );
+                            }
+                            _ => {
+                                let name_str = named
+                                    .target
+                                    .as_name_expr()
+                                    .map(|n| n.id.as_str().to_owned())
+                                    .unwrap_or_default();
+                                let ty = self.infer_type_expression(&named.value);
+                                let p = if after_star
+                                    || slash.is_none_or(|s| i >= s) && slash.is_none()
+                                {
+                                    // before slash or no slash: positional_or_keyword
+                                    Parameter::positional_or_keyword(
+                                        ruff_python_ast::name::Name::new(&name_str),
+                                    )
+                                } else if after_star {
+                                    Parameter::keyword_only(ruff_python_ast::name::Name::new(
+                                        &name_str,
+                                    ))
+                                } else {
+                                    Parameter::positional_or_keyword(
+                                        ruff_python_ast::name::Name::new(&name_str),
+                                    )
+                                };
+                                params.push(p.with_annotated_type(ty));
+                            }
+                        },
+                        ast::Expr::Starred(s) => {
+                            let (ty, is_kw) = match s.value.as_ref() {
+                                ast::Expr::Starred(inner) => {
+                                    (self.infer_type_expression(&inner.value), true)
+                                }
+                                _ => (self.infer_type_expression(&s.value), false),
+                            };
+                            let p = if is_kw {
+                                Parameter::keyword_variadic(
+                                    ruff_python_ast::name::Name::new_static("kwargs"),
+                                )
+                            } else {
+                                Parameter::variadic(ruff_python_ast::name::Name::new_static("args"))
+                            };
+                            params.push(p.with_annotated_type(ty));
+                        }
+                        _ => {
+                            let ty = self.infer_type_expression(arg);
+                            params.push(Parameter::positional_only(None).with_annotated_type(ty));
+                        }
+                    }
+                }
+                let parameters = Parameters::new(db, params);
+                let return_type = self.infer_type_expression(&callable.returns);
+                let previous = self
+                    .inference_flags()
+                    .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, false);
+                let result = Type::single_callable(db, Signature::new(parameters, return_type));
+                self.inference_flags()
+                    .set(InferenceFlags::CHECK_UNBOUND_TYPEVARS, previous);
+                result
+            }
         }
     }
 
@@ -848,6 +1216,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             value,
             ctx: _,
         } = starred;
+
+        // basedpython top-star marker `Starred(Name(""))` in nested position
+        // (e.g. inside `int | *`) resolves to `Any`. the surrounding subscript
+        // detects the marker and top-materializes the result, so contributing
+        // `Any` here yields the desired top projection
+        if self.is_basedpython_file()
+            && let ast::Expr::Name(name) = value.as_ref()
+            && name.id.is_empty()
+            && matches!(name.ctx, ast::ExprContext::Invalid)
+        {
+            return Type::any();
+        }
 
         let starred_type = self.infer_type_expression(value);
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
@@ -863,6 +1243,61 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         slice: &ast::Expr,
         value_ty: Type<'db>,
     ) -> Type<'db> {
+        // basedpython: track `ty_extensions.Top` / `Bottom` appearing in nested
+        // type-position inside this subscript's slice. the Name/Attribute arms
+        // set `slice_materialization` when they encounter one; on exit the
+        // materialization is applied to the result of this subscript
+        let (prev_slice_flag, prev_slice_materialization) = if self.is_basedpython_file() {
+            let prev_flag = self
+                .context
+                .inference_flags
+                .replace(InferenceFlags::IN_SUBSCRIPT_SLICE, true);
+            let prev_mat = self.slice_materialization.take();
+            (Some(prev_flag), prev_mat)
+        } else {
+            (None, None)
+        };
+
+        let result =
+            self.infer_subscript_type_expression_no_store_inner(subscript, slice, value_ty);
+
+        if let Some(prev_flag) = prev_slice_flag {
+            let kind = self.slice_materialization.take();
+            self.slice_materialization = prev_slice_materialization;
+            self.context
+                .inference_flags
+                .set(InferenceFlags::IN_SUBSCRIPT_SLICE, prev_flag);
+            match kind {
+                Some(crate::types::MaterializationKind::Top) => {
+                    return result.top_materialization(self.db());
+                }
+                Some(crate::types::MaterializationKind::Bottom) => {
+                    return result.bottom_materialization(self.db());
+                }
+                None => {}
+            }
+        }
+        result
+    }
+
+    fn infer_subscript_type_expression_no_store_inner(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        slice: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        // basedpython use-site variance also fires here — the annotation
+        // expression path enters `infer_subscript_type_expression_no_store`
+        // directly for `list[in T]` / `Container[out T]` annotations on
+        // assignments, dropping into the regular subscript path without ever
+        // visiting `infer_type_expression`.
+        if self.is_basedpython_file()
+            && let Some(slice_elements) = use_site_variance_slice_elements(slice)
+        {
+            return resolve_use_site_variance(self.db(), value_ty, &slice_elements, |elt| {
+                self.infer_type_expression(elt)
+            });
+        }
         match value_ty {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
@@ -878,6 +1313,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         string: &ast::ExprStringLiteral,
     ) -> Type<'db> {
+        // basedpython: string in type position is `Literal[<str>]`, not a forward ref
+        if self.is_basedpython_file() {
+            let value = string.value.to_str();
+            return Type::string_literal(self.db(), value);
+        }
         match parse_string_annotation(&self.context, self.inference_flags(), string) {
             Some(parsed) => {
                 self.string_annotations
@@ -1361,7 +1801,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             value: _,
             slice,
             ctx: _,
+            is_typeof: _,
         } = subscript;
+
+        // basedpython use-site variance: catch here too — this is the
+        // central subscript type-expression resolver, reached from both the
+        // annotation-expression and type-expression entry points. Without
+        // this check, variable-annotation forms like `x: list[out int]`
+        // would fall through to ordinary subscript inference and lose the
+        // projection.
+        if self.is_basedpython_file()
+            && let Some(slice_elements) = use_site_variance_slice_elements(slice)
+        {
+            return resolve_use_site_variance(self.db(), value_ty, &slice_elements, |elt| {
+                self.infer_type_expression(elt)
+            });
+        }
 
         match value_ty {
             Type::Never => {
@@ -1717,7 +2172,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         alias: LegacyStdlibAlias,
     ) -> Type<'db> {
         let arguments = &*subscript_node.slice;
-        let args = if let ast::Expr::Tuple(t) = arguments {
+        let args = if let ast::Expr::Tuple(t) = arguments
+            && !t.is_anon_named_tuple
+        {
             &*t.elts
         } else {
             std::slice::from_ref(arguments)
@@ -1917,7 +2374,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // `ty_extensions` special forms
             SpecialFormType::Not => {
-                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+                    && !tuple.is_anon_named_tuple
+                {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
@@ -1963,7 +2422,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty
             }
             SpecialFormType::Top => {
-                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+                    && !tuple.is_anon_named_tuple
+                {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
@@ -1989,7 +2450,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 arg.top_materialization(db)
             }
             SpecialFormType::Bottom => {
-                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+                    && !tuple.is_anon_named_tuple
+                {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
@@ -2015,7 +2478,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 arg.bottom_materialization(db)
             }
             SpecialFormType::TypeOf => {
-                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+                    && !tuple.is_anon_named_tuple
+                {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
@@ -2077,7 +2542,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
-                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+                    && !tuple.is_anon_named_tuple
+                {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
@@ -2228,7 +2695,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     diag.info(" - as a type argument for a `ParamSpec` parameter");
                 }
 
-                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+                    && !tuple.is_anon_named_tuple
+                {
                     &*tuple.elts
                 } else {
                     std::slice::from_ref(arguments_slice)
@@ -2582,6 +3051,99 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { .. }) => {
                 return Some(Parameters::gradual_form());
             }
+            // basedpython: `Callable[(int, str), R]` — tuples and parameter
+            // lists are interchangeable. lower the parenthesized tuple to
+            // a parameter list with the same shape semantics. positional
+            // fields, named fields, variadic (`*name: T`), and kwargs
+            // catch-all (`**name: T`) all map onto Parameter slots
+            ast::Expr::Tuple(tuple) if tuple.parenthesized => {
+                let mut params: Vec<Parameter<'db>> = Vec::with_capacity(tuple.elts.len());
+                let parameter_star = tuple.parameter_star.map(|i| i as usize);
+                for (i, elt) in tuple.elts.iter().enumerate() {
+                    let after_star = parameter_star.is_some_and(|s| i >= s);
+                    match elt {
+                        // `*: T` or `**: T`
+                        ast::Expr::Starred(s) => match s.value.as_ref() {
+                            // `**: T` — anonymous kwargs catch-all
+                            ast::Expr::Starred(inner) => {
+                                let ty = self.infer_type_expression(&inner.value);
+                                params.push(
+                                    Parameter::keyword_variadic(
+                                        ruff_python_ast::name::Name::new_static("kwargs"),
+                                    )
+                                    .with_annotated_type(ty),
+                                );
+                            }
+                            // `*: T` — anonymous variadic
+                            _ => {
+                                let ty = self.infer_type_expression(&s.value);
+                                params.push(
+                                    Parameter::variadic(ruff_python_ast::name::Name::new_static(
+                                        "args",
+                                    ))
+                                    .with_annotated_type(ty),
+                                );
+                            }
+                        },
+                        ast::Expr::Named(named) => match named.target.as_ref() {
+                            ast::Expr::Starred(starred) => {
+                                let name_str = match starred.value.as_ref() {
+                                    ast::Expr::Starred(inner_inner) => {
+                                        // `**name: T`
+                                        inner_inner
+                                            .value
+                                            .as_name_expr()
+                                            .map(|n| n.id.as_str())
+                                            .unwrap_or("kwargs")
+                                            .to_owned()
+                                    }
+                                    _ => starred
+                                        .value
+                                        .as_name_expr()
+                                        .map(|n| n.id.as_str())
+                                        .unwrap_or("args")
+                                        .to_owned(),
+                                };
+                                let ty = self.infer_type_expression(&named.value);
+                                let is_kwvariadic =
+                                    matches!(starred.value.as_ref(), ast::Expr::Starred(_));
+                                let p = if is_kwvariadic {
+                                    Parameter::keyword_variadic(ruff_python_ast::name::Name::new(
+                                        &name_str,
+                                    ))
+                                } else {
+                                    Parameter::variadic(ruff_python_ast::name::Name::new(&name_str))
+                                };
+                                params.push(p.with_annotated_type(ty));
+                            }
+                            _ => {
+                                // `name: T`
+                                let name_str = named
+                                    .target
+                                    .as_name_expr()
+                                    .map(|n| n.id.as_str().to_owned())
+                                    .unwrap_or_default();
+                                let ty = self.infer_type_expression(&named.value);
+                                let p = if after_star {
+                                    Parameter::keyword_only(ruff_python_ast::name::Name::new(
+                                        &name_str,
+                                    ))
+                                } else {
+                                    Parameter::positional_or_keyword(
+                                        ruff_python_ast::name::Name::new(&name_str),
+                                    )
+                                };
+                                params.push(p.with_annotated_type(ty));
+                            }
+                        },
+                        _ => {
+                            let ty = self.infer_type_expression(elt);
+                            params.push(Parameter::positional_only(None).with_annotated_type(ty));
+                        }
+                    }
+                }
+                return Some(Parameters::new(self.db(), params));
+            }
             ast::Expr::List(ast::ExprList { elts: params, .. }) => {
                 if let [ast::Expr::EllipsisLiteral(_)] = &params[..] {
                     // Return `None` here so that we emit a specific diagnostic at the callsite.
@@ -2715,7 +3277,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, false);
 
         let arguments_slice = &*subscript.slice;
-        let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+        let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice
+            && !tuple.is_anon_named_tuple
+        {
             &*tuple.elts
         } else {
             std::slice::from_ref(arguments_slice)
@@ -2747,11 +3311,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .context
             .inference_flags
             .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
-        let prefix_params = prefix_args
+        let prefix_params: Vec<Parameter<'db>> = prefix_args
             .iter()
-            .map(|arg| {
-                Parameter::positional_only(None)
-                    .with_annotated_type(self.infer_type_expression(arg))
+            .flat_map(|arg| -> Vec<Parameter<'db>> {
+                // basedpython: tuples and parameter lists are equivalent —
+                // a parenthesized tuple in `Concatenate`'s prefix expands
+                // into individual positional parameters
+                if let ast::Expr::Tuple(tuple) = arg
+                    && tuple.parenthesized
+                {
+                    return tuple
+                        .elts
+                        .iter()
+                        .map(|elt| {
+                            let ty = match elt {
+                                ast::Expr::Named(named) => self.infer_type_expression(&named.value),
+                                _ => self.infer_type_expression(elt),
+                            };
+                            Parameter::positional_only(None).with_annotated_type(ty)
+                        })
+                        .collect();
+                }
+                vec![
+                    Parameter::positional_only(None)
+                        .with_annotated_type(self.infer_type_expression(arg)),
+                ]
             })
             .collect();
         self.context.inference_flags.set(
@@ -2879,4 +3463,81 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ty
         }
     }
+}
+
+/// One element of a subscript slice that may or may not carry a variance
+/// marker.
+struct VarianceSliceElement<'ast> {
+    variance: Option<UseSiteVariance>,
+    /// inner expression — for marker elements this is the unwrapped
+    /// expression inside the marker; for non-marker elements the element
+    /// itself.
+    inner: &'ast ast::Expr,
+}
+
+/// If `slice` contains at least one use-site variance marker, return the
+/// flat list of slice elements with their variance and inner expression.
+/// Returns `None` if no element is variance-marked.
+fn use_site_variance_slice_elements(slice: &ast::Expr) -> Option<Vec<VarianceSliceElement<'_>>> {
+    let elements: Vec<&ast::Expr> = match slice {
+        ast::Expr::Tuple(t)
+            if !t.parenthesized && !t.is_anon_named_tuple && !t.is_anon_named_tuple_value =>
+        {
+            t.elts.iter().collect()
+        }
+        other => vec![other],
+    };
+    let mut any_marker = false;
+    let mapped: Vec<VarianceSliceElement<'_>> = elements
+        .into_iter()
+        .map(|elt| {
+            if let Some((variance, inner)) = use_site_variance_marker(elt) {
+                any_marker = true;
+                VarianceSliceElement {
+                    variance: Some(variance),
+                    inner,
+                }
+            } else {
+                VarianceSliceElement {
+                    variance: None,
+                    inner: elt,
+                }
+            }
+        })
+        .collect();
+    if any_marker { Some(mapped) } else { None }
+}
+
+/// Build an instance type for `value_ty[slice...]` where at least one slice
+/// element carries a use-site variance marker. Returns an instance of the
+/// outer class specialized with the slice's types and tagged with per-typevar
+/// projections so downstream member access can apply kotlin-style variance
+/// restrictions. Falls back to `Unknown` if the outer is not a class.
+fn resolve_use_site_variance<'db, 'ast>(
+    db: &'db dyn crate::Db,
+    value_ty: Type<'db>,
+    elements: &[VarianceSliceElement<'ast>],
+    mut infer_inner: impl FnMut(&'ast ast::Expr) -> Type<'db>,
+) -> Type<'db> {
+    let Type::ClassLiteral(class_literal) = value_ty else {
+        // variance keywords on a non-class outer — infer inners for
+        // diagnostics and bail.
+        for element in elements {
+            let _ = infer_inner(element.inner);
+        }
+        return Type::unknown();
+    };
+    let arg_types: Vec<Type<'db>> = elements.iter().map(|elt| infer_inner(elt.inner)).collect();
+    let projections: Vec<Option<UseSiteVariance>> =
+        elements.iter().map(|elt| elt.variance).collect();
+    let class_type = class_literal.apply_specialization(db, |generic_context| {
+        let n = generic_context.len(db);
+        if arg_types.len() == n {
+            let spec = generic_context.specialize(db, arg_types.as_slice());
+            spec.with_projections(db, projections.clone().into_boxed_slice())
+        } else {
+            generic_context.specialize(db, vec![Type::unknown(); n].as_slice())
+        }
+    });
+    Type::instance(db, class_type)
 }

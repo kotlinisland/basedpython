@@ -34,7 +34,9 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             node_index: _,
             attr,
             ctx: _,
+            optional,
         } = item;
+        let dot = if *optional { "?." } else { "." };
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
@@ -170,7 +172,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 f,
                 [
                     dangling_comments(before_dot),
-                    token("."),
+                    token(dot),
                     dangling_comments(after_dot),
                     attr.format()
                 ]

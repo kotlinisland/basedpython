@@ -346,6 +346,7 @@ impl<'a> ReFunc<'a> {
             attr: Identifier::new(method, TextRange::default()),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            optional: false,
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Expr::Call(ExprCall {
@@ -358,6 +359,7 @@ impl<'a> ReFunc<'a> {
             },
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            is_cast: false,
         })
     }
 }

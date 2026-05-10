@@ -114,6 +114,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     })
                     .collect(),
             },
+            is_cast: false,
         }),
         Pattern::MatchStar(ast::PatternMatchStar {
             range,

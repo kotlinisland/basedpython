@@ -102,6 +102,11 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
         return;
     }
 
+    // basedpython compiles defaults into placeholders, so mutable defaults are safe
+    if checker.source_type.is_basedpython() {
+        return;
+    }
+
     for parameter in function_def.parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;

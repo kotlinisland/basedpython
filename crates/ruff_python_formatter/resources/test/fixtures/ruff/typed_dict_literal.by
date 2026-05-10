@@ -1,0 +1,9 @@
+a: {"name": str, "age": int}
+
+b: {"key": int, **: str}
+
+c: {**: int}
+
+d: dict[str, {"name": str, **: int}]
+
+def f(x: {"name": str, **: object}) -> {"id": int}: ...

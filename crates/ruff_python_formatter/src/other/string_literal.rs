@@ -1,7 +1,8 @@
-use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::StringLiteral;
+use ruff_formatter::{FormatContext, FormatRuleWithOptions};
+use ruff_python_ast::{StringFlags, StringLiteral};
 
 use crate::QuoteStyle;
+use crate::context::InterpolatedStringState;
 use crate::prelude::*;
 use crate::string::{StringNormalizer, docstring};
 
@@ -53,6 +54,14 @@ impl FormatNodeRule<StringLiteral> for FormatStringLiteral {
 
         if self.layout.is_docstring() {
             docstring::format(&normalized, f)
+        } else if f.context().options().is_basedpython()
+            && normalized.flags().is_triple_quoted()
+            && matches!(
+                f.context().interpolated_string_state(),
+                InterpolatedStringState::Outside
+            )
+        {
+            docstring::format_multiline_string(&normalized, f)
         } else {
             normalized.fmt(f)
         }

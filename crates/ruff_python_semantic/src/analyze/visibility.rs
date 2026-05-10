@@ -41,8 +41,18 @@ pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
+///
+/// Also returns `true` for the synthetic `abstract` decorator emitted by the basedpython
+/// parser when it sees the `abstract def` modifier — that decorator has an `Invalid`
+/// expression context and lowers to `@abstractmethod` after transpilation.
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
+        if let Expr::Name(name) = &decorator.expression
+            && matches!(name.ctx, ast::ExprContext::Invalid)
+            && name.id.as_str() == "abstract"
+        {
+            return true;
+        }
         semantic
             .resolve_qualified_name(&decorator.expression)
             .is_some_and(|qualified_name| {

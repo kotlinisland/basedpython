@@ -210,6 +210,7 @@ fn create_fix(
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         ctx: ExprContext::Load,
+        is_typeof: false,
         slice: Box::new(if literal_elements.len() > 1 {
             Expr::Tuple(ast::ExprTuple {
                 elts: literal_elements.into_iter().cloned().collect(),
@@ -217,6 +218,11 @@ fn create_fix(
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
                 parenthesized: true,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
+                is_parameter_shape: false,
             })
         } else {
             literal_elements[0].clone()

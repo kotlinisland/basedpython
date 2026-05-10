@@ -225,6 +225,7 @@ mod tests {
 value: Literal[f\"\"\"{(\r\n1\r\n)=}\"\"\"] | Literal[f\"\"\"{(\n1\n)=}\"\"\"]\n"
                     .to_string(),
                 is_stub: true,
+                is_basedpython: false,
             },
             path,
             &settings::LinterSettings::for_rule(Rule::DuplicateUnionMember),

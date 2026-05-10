@@ -2102,6 +2102,42 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
     }
 }
 
+impl FormatRule<ast::ExprCallableType, PyFormatContext<'_>>
+    for crate::expression::expr_callable_type::FormatExprCallableType
+{
+    #[inline]
+    fn fmt(&self, node: &ast::ExprCallableType, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::ExprCallableType>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprCallableType {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::ExprCallableType,
+        crate::expression::expr_callable_type::FormatExprCallableType,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::expression::expr_callable_type::FormatExprCallableType::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCallableType {
+    type Format = FormatOwnedWithRule<
+        ast::ExprCallableType,
+        crate::expression::expr_callable_type::FormatExprCallableType,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::expression::expr_callable_type::FormatExprCallableType::default(),
+        )
+    }
+}
+
 impl FormatRule<ast::ExceptHandlerExceptHandler, PyFormatContext<'_>>
     for crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler
 {

@@ -64,13 +64,22 @@ mod precedence {
     pub(crate) const MAX: u8 = 63;
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
     /// Ruff's default unparsing behaviour.
     #[default]
     Default,
     /// Emits same output as [`ast.unparse`](https://docs.python.org/3/library/ast.html#ast.unparse).
     AstUnparse,
+    /// Emit basedpython surface syntax: `?.` for optional attribute access,
+    /// `(args) -> returns` for `ExprCallableType`, `(field: type, ...)`
+    /// anon NT literal for `ExprTuple` with `is_anon_named_tuple`,
+    /// `typeof X` for `ExprSubscript` with `is_typeof`, `<value> cast
+    /// <type>` for `ExprCall` with `is_cast`. Modifier-keyword
+    /// decorators (whose source range does not start with `@`) are
+    /// preserved as-is when this mode is active. Use when re-rendering an
+    /// AST that may carry basedpython-only nodes / flags
+    BasedPython,
 }
 
 impl Mode {
@@ -78,10 +87,11 @@ impl Mode {
     ///
     /// - [`Default`](`Mode::Default`): Output of `[AnyStringFlags.quote_style`].
     /// - [`AstUnparse`](`Mode::AstUnparse`): Always return [`Quote::Single`].
+    /// - [`BasedPython`](`Mode::BasedPython`): same as `Default`.
     #[must_use]
-    fn quote_style(&self, flags: impl StringFlags) -> Quote {
+    fn quote_style(self, flags: impl StringFlags) -> Quote {
         match self {
-            Self::Default => flags.quote_style(),
+            Self::Default | Self::BasedPython => flags.quote_style(),
             Self::AstUnparse => Quote::Single,
         }
     }
@@ -409,6 +419,7 @@ impl<'a> Generator<'a> {
                         Operator::BitXor => "^",
                         Operator::BitAnd => "&",
                         Operator::FloorDiv => "//",
+                        Operator::Coalesce => unreachable!("??= is not valid Python"),
                     });
                     self.p("= ");
                     self.unparse_expr(value, precedence::AUG_ASSIGN);
@@ -994,6 +1005,7 @@ impl<'a> Generator<'a> {
                     BitXor("^", BIT_XOR),
                     BitAnd("&", BIT_AND),
                     FloorDiv("//", FLOORDIV),
+                    Coalesce("??", OR),
                 );
                 group_if!(prec, {
                     self.unparse_expr(left, prec + u8::from(rassoc));
@@ -1023,6 +1035,7 @@ impl<'a> Generator<'a> {
             }
             Expr::Lambda(ast::ExprLambda {
                 parameters,
+                returns: _,
                 body,
                 range: _,
                 node_index: _,
@@ -1061,6 +1074,12 @@ impl<'a> Generator<'a> {
                         self.unparse_expr(key, precedence::COMMA);
                         self.p(": ");
                         self.unparse_expr(value, precedence::COMMA);
+                    } else if let Expr::Starred(outer) = value
+                        && let Expr::Starred(inner) = outer.value.as_ref()
+                    {
+                        // basedpython `**: T` extra-items marker
+                        self.p("**: ");
+                        self.unparse_expr(&inner.value, precedence::COMMA);
                     } else {
                         self.p("**");
                         self.unparse_expr(value, precedence::MAX);
@@ -1199,6 +1218,7 @@ impl<'a> Generator<'a> {
                 arguments,
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
@@ -1298,7 +1318,17 @@ impl<'a> Generator<'a> {
             Expr::EllipsisLiteral(_) => {
                 self.p("...");
             }
-            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            Expr::Attribute(ast::ExprAttribute {
+                value,
+                attr,
+                optional,
+                ..
+            }) => {
+                let dot = if self.mode == Mode::BasedPython && *optional {
+                    "?."
+                } else {
+                    "."
+                };
                 if let Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(_),
                     ..
@@ -1306,10 +1336,11 @@ impl<'a> Generator<'a> {
                 {
                     self.p("(");
                     self.unparse_expr(value, precedence::MAX);
-                    self.p(").");
+                    self.p(")");
+                    self.p(dot);
                 } else {
                     self.unparse_expr(value, precedence::MAX);
-                    self.p(".");
+                    self.p(dot);
                 }
                 self.p_id(attr);
             }
@@ -1338,7 +1369,7 @@ impl<'a> Generator<'a> {
                     self.p("()");
                 } else {
                     let lvl = match self.mode {
-                        Mode::Default => precedence::TUPLE,
+                        Mode::Default | Mode::BasedPython => precedence::TUPLE,
                         Mode::AstUnparse => precedence::MIN,
                     };
                     group_if!(lvl, {
@@ -1372,6 +1403,30 @@ impl<'a> Generator<'a> {
             }
             Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { kind, value, .. }) => {
                 self.p(&format!("{kind}{value}"));
+            }
+            Expr::CallableType(callable) => {
+                assert_eq!(
+                    self.mode,
+                    Mode::BasedPython,
+                    "callable type syntax should be transpiled before codegen"
+                );
+                self.p("(");
+                let slash = callable.parameter_slash.map(|i| i as usize);
+                let star = callable.parameter_star.map(|i| i as usize);
+                for (i, arg) in callable.args.iter().enumerate() {
+                    if i > 0 {
+                        self.p(", ");
+                    }
+                    if Some(i) == slash {
+                        self.p("/, ");
+                    }
+                    if Some(i) == star {
+                        self.p("*, ");
+                    }
+                    self.unparse_expr(arg, precedence::EXPR);
+                }
+                self.p(") -> ");
+                self.unparse_expr(&callable.returns, precedence::EXPR);
             }
         }
     }

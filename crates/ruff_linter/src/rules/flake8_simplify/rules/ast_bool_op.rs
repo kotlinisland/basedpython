@@ -316,6 +316,7 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
             },
         range: _,
         node_index: _,
+        is_cast: _,
     } = call.as_call_expr()?;
     if args.len() != 2 {
         return None;
@@ -536,6 +537,11 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             parenthesized: true,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
+            is_parameter_shape: false,
         };
         let node1 = ast::ExprName {
             id: id.clone(),

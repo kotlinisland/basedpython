@@ -266,6 +266,7 @@ Module(
                                 ],
                                 keywords: [],
                             },
+                            is_cast: false,
                         },
                     ),
                     body: [

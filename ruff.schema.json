@@ -2072,6 +2072,8 @@
       "enum": [
         "python",
         "pyi",
+        "bython",
+        "byi",
         "ipynb",
         "markdown"
       ]

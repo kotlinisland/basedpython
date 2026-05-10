@@ -125,6 +125,7 @@ impl SideEffect {
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
             | Expr::IpyEscapeCommand(_) => Self::Present,
+            Expr::CallableType(_) => Self::Absent,
 
             // Side-effect-free expressions — continue walking child nodes.
             Expr::BoolOp(_)
@@ -185,6 +186,7 @@ const fn is_known_safe_binop_operand(expr: &Expr) -> bool {
         | Expr::Name(_)
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_)
+        | Expr::CallableType(_)
         | Expr::TString(_) => false,
     }
 }
@@ -412,6 +414,7 @@ where
                 arguments,
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) => {
                 any_over_expr(call_func, &mut *func)
                     // Note that this is the evaluation order but not necessarily the declaration order
@@ -440,6 +443,10 @@ where
                     || step
                         .as_ref()
                         .is_some_and(|value| any_over_expr(value, &mut *func))
+            }
+            Expr::CallableType(ast::ExprCallableType { args, returns, .. }) => {
+                args.iter().any(|e| any_over_expr(e, &mut *func))
+                    || any_over_expr(returns, &mut *func)
             }
             Expr::Name(_)
             | Expr::StringLiteral(_)
@@ -917,6 +924,138 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
     } else {
         // Ex) `Iterable`  => return `Iterable`
         expr
+    }
+}
+
+/// basedpython: returns `true` if `expr` is a single parser-synthesized
+/// `[*]` marker — `Starred(Name(id="", ctx=Invalid))`. An empty-id `Name`
+/// with `Invalid` context is unique to this synthesis and cannot appear from
+/// any normal parse, so detecting it is unambiguous.
+pub fn is_top_star_marker(expr: &Expr) -> bool {
+    let Expr::Starred(starred) = expr else {
+        return false;
+    };
+    let Expr::Name(name) = starred.value.as_ref() else {
+        return false;
+    };
+    name.id.is_empty() && matches!(name.ctx, ExprContext::Invalid)
+}
+
+/// basedpython: use-site variance marker, one of `out X`, `in X`, `in out X`
+/// in a subscript element. Encoded by the parser as
+/// `Subscript(Name(id, ctx=Invalid), inner)` where `id` is one of
+/// `__variance_out__`, `__variance_in__`, `__variance_inout__`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum UseSiteVariance {
+    /// `out X` — covariant: read-only view of `X`
+    Out,
+    /// `in X` — contravariant: write-only view of `X`
+    In,
+    /// `in out X` — invariant: read-write view of `X` (same as no variance)
+    InOut,
+}
+
+impl UseSiteVariance {
+    /// the synthetic name id the parser uses for this variance marker
+    pub fn marker_id(self) -> &'static str {
+        match self {
+            Self::Out => "__variance_out__",
+            Self::In => "__variance_in__",
+            Self::InOut => "__variance_inout__",
+        }
+    }
+
+    /// parse from a marker name id; returns None if not a variance marker
+    pub fn from_marker_id(id: &str) -> Option<Self> {
+        match id {
+            "__variance_out__" => Some(Self::Out),
+            "__variance_in__" => Some(Self::In),
+            "__variance_inout__" => Some(Self::InOut),
+            _ => None,
+        }
+    }
+}
+
+/// basedpython: if `expr` is a parser-synthesized use-site variance marker —
+/// `Subscript(Name(id=<marker>, ctx=Invalid), inner)` — return its variance
+/// and inner expression. An invalid-context Name with one of the marker ids
+/// is unique to parser synthesis and cannot appear from any normal parse.
+pub fn use_site_variance_marker(expr: &Expr) -> Option<(UseSiteVariance, &Expr)> {
+    let Expr::Subscript(sub) = expr else {
+        return None;
+    };
+    let Expr::Name(name) = sub.value.as_ref() else {
+        return None;
+    };
+    if !matches!(name.ctx, ExprContext::Invalid) {
+        return None;
+    }
+    let variance = UseSiteVariance::from_marker_id(name.id.as_str())?;
+    Some((variance, sub.slice.as_ref()))
+}
+
+/// basedpython: when `slice` contains at least one parser-synthesized
+/// top-star marker (`Starred(Name(id="", ctx=Invalid))`), returns the slice
+/// elements as a flat slice. The single-marker form is encoded as one
+/// `Starred(Name(""))`; multi-element forms (pure or mixed) are an
+/// unparenthesized tuple. Mixed slices like `dict[str, *]` are supported —
+/// non-marker elements are returned as-is and consumers replace markers
+/// with `Any` while keeping concrete elements
+pub fn top_star_slice_elements(slice: &Expr) -> Option<&[Expr]> {
+    if is_top_star_marker(slice) {
+        return Some(std::slice::from_ref(slice));
+    }
+    let Expr::Tuple(tuple) = slice else {
+        return None;
+    };
+    if tuple.parenthesized || tuple.elts.is_empty() {
+        return None;
+    }
+    if tuple.elts.iter().any(is_top_star_marker) {
+        Some(&tuple.elts)
+    } else {
+        None
+    }
+}
+
+/// basedpython: collects ranges of every top-star marker reachable from
+/// `slice` without descending into nested `Subscript` expressions. The
+/// nested-subscript boundary preserves locality — a marker inside
+/// `dict[int, *]` belongs to that inner subscript, not the outer one in
+/// `list[dict[int, *]]`. Markers nested inside union/intersection binops or
+/// tuples (`list[int | *]`, `list[int, *]`) are picked up
+pub fn top_star_marker_ranges_in_slice(slice: &Expr) -> Vec<TextRange> {
+    let mut out = Vec::new();
+    collect_top_star_markers(slice, &mut out);
+    out
+}
+
+fn collect_top_star_markers(expr: &Expr, out: &mut Vec<TextRange>) {
+    if is_top_star_marker(expr) {
+        out.push(expr.range());
+        return;
+    }
+    match expr {
+        Expr::Subscript(_) => {}
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            collect_top_star_markers(left, out);
+            collect_top_star_markers(right, out);
+        }
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            for elt in elts {
+                collect_top_star_markers(elt, out);
+            }
+        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            collect_top_star_markers(operand, out);
+        }
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+            for v in values {
+                collect_top_star_markers(v, out);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1597,6 +1736,7 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Name(_) => false,
             Expr::Slice(_) => false,
             Expr::IpyEscapeCommand(_) => false,
+            Expr::CallableType(_) => false,
 
             // These literals may or may not be empty.
             Expr::FString(f_string) => is_non_empty_f_string(f_string),
@@ -1726,6 +1866,11 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
             parenthesized: true,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
+            is_parameter_shape: false,
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
         [elt] => elt.clone(),
@@ -1752,6 +1897,7 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
+        is_typeof: false,
     })
 }
 
@@ -1773,10 +1919,16 @@ pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
             elts: elts.to_vec(),
             ctx: ExprContext::Load,
             parenthesized: false,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
+            is_parameter_shape: false,
         })),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
+        is_typeof: false,
     })
 }
 
@@ -1941,6 +2093,7 @@ mod tests {
             bound: Some(Box::new(constant_one.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
+            variance: None,
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
@@ -1948,6 +2101,7 @@ mod tests {
             bound: None,
             default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
+            variance: None,
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
@@ -1978,6 +2132,7 @@ mod tests {
             bound: None,
             default: None,
             name: Identifier::new("x", TextRange::default()),
+            variance: None,
         });
         assert!(!any_over_type_param(&type_var_no_bound, &mut |_expr| true));
 
@@ -1993,6 +2148,7 @@ mod tests {
             bound: Some(Box::new(constant.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
+            variance: None,
         });
         assert!(
             any_over_type_param(&type_var_with_bound, &mut |expr| {
@@ -2011,6 +2167,7 @@ mod tests {
             default: Some(Box::new(constant.clone())),
             bound: None,
             name: Identifier::new("x", TextRange::default()),
+            variance: None,
         });
         assert!(
             any_over_type_param(&type_var_with_default, &mut |expr| {

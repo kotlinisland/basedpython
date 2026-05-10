@@ -512,15 +512,19 @@ impl File {
         self.source_type(db).is_stub()
     }
 
-    /// Returns `true` if the file is an `__init__.pyi`
+    /// Returns `true` if the file is an `__init__.pyi` or `__init__.byi`
     pub fn is_package_stub(self, db: &dyn Db) -> bool {
-        self.path(db).as_str().ends_with("__init__.pyi")
+        let path = self.path(db).as_str();
+        path.ends_with("__init__.pyi") || path.ends_with("__init__.byi")
     }
 
-    /// Returns `true` if the file is an `__init__.pyi`
+    /// Returns `true` if the file is an `__init__` Python/basedpython source or stub
     pub fn is_package(self, db: &dyn Db) -> bool {
         let path = self.path(db).as_str();
-        path.ends_with("__init__.pyi") || path.ends_with("__init__.py")
+        path.ends_with("__init__.pyi")
+            || path.ends_with("__init__.py")
+            || path.ends_with("__init__.byi")
+            || path.ends_with("__init__.by")
     }
 
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
@@ -528,7 +532,9 @@ impl File {
             FilePath::System(path) => path
                 .extension()
                 .map_or(PySourceType::Python, PySourceType::from_extension),
-            FilePath::Vendored(_) => PySourceType::Stub,
+            FilePath::Vendored(path) => path
+                .extension()
+                .map_or(PySourceType::Stub, PySourceType::from_extension),
             FilePath::SystemVirtual(path) => path
                 .extension()
                 .map_or(PySourceType::Python, PySourceType::from_extension),

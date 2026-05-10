@@ -558,9 +558,84 @@ pub(crate) fn known_module_symbol<'db>(
 ///
 /// Returns `Place::Undefined` if the `typing` module isn't available for some reason.
 #[inline]
-#[cfg(test)]
 pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, KnownModule::Typing, symbol)
+}
+
+/// `typing` members that are implicitly available in basedpython source — keep
+/// this in sync with `by_transforms::transforms::implicit_typing::IMPLICIT_TYPING_NAMES`,
+/// which inserts the matching imports during transpilation
+pub(crate) const BASEDPYTHON_IMPLICIT_TYPING_NAMES: &[&str] = &[
+    "AbstractSet",
+    "Annotated",
+    "Any",
+    "AnyStr",
+    "AsyncContextManager",
+    "AsyncGenerator",
+    "AsyncIterable",
+    "AsyncIterator",
+    "Awaitable",
+    "BinaryIO",
+    "ByteString",
+    "ChainMap",
+    "Collection",
+    "Concatenate",
+    "Container",
+    "ContextManager",
+    "Coroutine",
+    "Counter",
+    "DefaultDict",
+    "Deque",
+    "Dict",
+    "FrozenSet",
+    "Generator",
+    "Hashable",
+    "IO",
+    "ItemsView",
+    "Iterable",
+    "Iterator",
+    "KeysView",
+    "List",
+    "LiteralString",
+    "Mapping",
+    "MappingView",
+    "Match",
+    "MutableMapping",
+    "MutableSequence",
+    "MutableSet",
+    "Never",
+    "NoReturn",
+    "NotRequired",
+    "Optional",
+    "OrderedDict",
+    "Pattern",
+    "ReadOnly",
+    "Required",
+    "Reversible",
+    "Self",
+    "Sequence",
+    "Set",
+    "Sized",
+    "SupportsAbs",
+    "SupportsBytes",
+    "SupportsComplex",
+    "SupportsFloat",
+    "SupportsIndex",
+    "SupportsInt",
+    "SupportsRound",
+    "Text",
+    "TextIO",
+    "Tuple",
+    "Type",
+    "TypeGuard",
+    "Union",
+    "ValuesView",
+];
+
+pub(crate) fn is_basedpython_implicit_typing_name(name: &str) -> bool {
+    BASEDPYTHON_IMPLICIT_TYPING_NAMES
+        .binary_search(&name)
+        .is_ok()
 }
 
 /// Lookup the type of `symbol` in the `typing_extensions` module namespace.

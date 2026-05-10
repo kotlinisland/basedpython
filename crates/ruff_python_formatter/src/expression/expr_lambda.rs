@@ -22,11 +22,24 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             range: _,
             node_index: _,
             parameters,
+            returns,
             body,
         } = item;
 
         let body = &**body;
         let parameters = parameters.as_deref();
+
+        // basedpython typed lambda: any annotated parameter, or an explicit
+        // return type, requires the parenthesized form `lambda (...) -> ...:`.
+        // dropping the parens (the standard-lambda formatting) would un-parse
+        // the source.
+        let typed_lambda = returns.is_some()
+            || parameters.is_some_and(|p| p.iter().any(|param| param.annotation().is_some()));
+        let params_parens = if typed_lambda {
+            ParametersParentheses::Preserve
+        } else {
+            ParametersParentheses::Never
+        };
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -108,25 +121,20 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             // Try to keep the parameters on a single line, unless there are intervening comments.
             if !comments.contains_comments(parameters.into()) {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
-                write!(
-                    buffer,
-                    [parameters
-                        .format()
-                        .with_options(ParametersParentheses::Never)]
-                )?;
+                write!(buffer, [parameters.format().with_options(params_parens)])?;
             } else {
-                write!(
-                    f,
-                    [parameters
-                        .format()
-                        .with_options(ParametersParentheses::Never)]
-                )?;
+                write!(f, [parameters.format().with_options(params_parens)])?;
             }
 
             dangling_after_parameters
         } else {
             dangling
         };
+
+        // basedpython typed lambda return-type annotation
+        if let Some(returns) = returns {
+            write!(f, [space(), token("->"), space(), returns.format()])?;
+        }
 
         write!(f, [token(":")])?;
 

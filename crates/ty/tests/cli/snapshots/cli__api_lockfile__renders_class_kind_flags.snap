@@ -1,0 +1,37 @@
+---
+source: crates/ty/tests/cli/api_lockfile.rs
+info:
+  program: by
+  args:
+    - generate-api-file
+    - "--stdout"
+---
+success: true
+exit_code: 0
+----- stdout -----
+#api-lock:v=1
+#tool:by=0.0.0
+#python:default
+#modules:1
+kind.Colors.BLUE:v=Literal[2]
+kind.Colors.RED:v=Literal[1]
+kind.Colors:c[enum.Enum]{enum,final}
+kind.D.x:v=builtins.int
+kind.D:c[]{dataclass}
+kind.Enum:r=enum.Enum
+kind.F:c[]{final}
+kind.NT.x:v=builtins.int
+kind.NT.y:v=builtins.int
+kind.NT:c[typing.NamedTuple]{named_tuple}
+kind.NamedTuple:v=typing.NamedTuple
+kind.P.m:d(self:P)->builtins.int
+kind.P:c[typing.Protocol]{protocol}
+kind.Protocol:v=typing.Protocol
+kind.TD.age:v=builtins.int
+kind.TD.name:v=builtins.str
+kind.TD:c[typing.TypedDict]{typed_dict}
+kind.TypedDict:v=typing.TypedDict
+kind.dataclass:r=dataclasses.dataclass
+kind.final:r=typing.final
+
+----- stderr -----

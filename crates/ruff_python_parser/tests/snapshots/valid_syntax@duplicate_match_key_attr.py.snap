@@ -49,6 +49,7 @@ Module(
                                                     node_index: NodeIndex(None),
                                                 },
                                                 ctx: Load,
+                                                optional: false,
                                             },
                                         ),
                                         Attribute(
@@ -69,6 +70,7 @@ Module(
                                                     node_index: NodeIndex(None),
                                                 },
                                                 ctx: Load,
+                                                optional: false,
                                             },
                                         ),
                                     ],

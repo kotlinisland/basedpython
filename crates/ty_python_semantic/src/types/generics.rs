@@ -482,7 +482,7 @@ impl<'db> GenericContext<'db> {
         inferable_typevars_inner(db, self)
     }
 
-    pub(crate) fn variables(
+    pub fn variables(
         self,
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
@@ -826,6 +826,7 @@ impl<'db> GenericContext<'db> {
                 partial.types(db),
                 None,
                 Some(TupleType::homogeneous(db, Type::unknown())),
+                Box::from([]),
             )
         } else {
             partial
@@ -901,7 +902,7 @@ impl<'db> GenericContext<'db> {
         let types = types.into();
 
         assert_eq!(self.len(db), types.len());
-        Specialization::new(db, self, types, None, None)
+        Specialization::new(db, self, types, None, None, Box::from([]))
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -958,7 +959,7 @@ impl<'db> GenericContext<'db> {
             }
 
             if !any_changed {
-                return Specialization::new(db, self, types, None, None);
+                return Specialization::new(db, self, types, None, None, Box::from([]));
             }
         }
     }
@@ -970,7 +971,14 @@ impl<'db> GenericContext<'db> {
         element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
+        Specialization::new(
+            db,
+            self,
+            Box::from([element_type]),
+            None,
+            Some(tuple),
+            Box::from([]),
+        )
     }
 
     fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
@@ -1036,7 +1044,14 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
+        Specialization::new(
+            db,
+            self,
+            self.fill_in_defaults(db, types),
+            None,
+            None,
+            Box::from([]),
+        )
     }
 }
 
@@ -1061,6 +1076,20 @@ pub struct Specialization<'db> {
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
     tuple_inner: Option<TupleType<'db>>,
+
+    /// basedpython use-site variance projections. One entry per typevar, in the
+    /// same order as `types`. `None` means the typevar was used invariantly at
+    /// the call site (the default — no projection); `Some(Out)` /
+    /// `Some(In)` / `Some(InOut)` correspond to `Container[out T]`,
+    /// `Container[in T]`, and `Container[in out T]` respectively.
+    ///
+    /// `InOut` is equivalent to no projection but is kept in the encoded form
+    /// so the display can faithfully round-trip the surface syntax. `Out` and
+    /// `In` change member-access behavior: a covariantly-projected typevar
+    /// rejects writes (the value is substituted with `Never` in contravariant
+    /// positions), and a contravariantly-projected typevar rejects reads.
+    #[returns(deref)]
+    pub(crate) projections: Box<[Option<ruff_python_ast::helpers::UseSiteVariance>]>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1081,6 +1110,23 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Returns a copy of `self` with `projections` replaced. The new
+    /// projection slice must have the same length as the existing typevars.
+    pub(crate) fn with_projections(
+        self,
+        db: &'db dyn Db,
+        projections: Box<[Option<ruff_python_ast::helpers::UseSiteVariance>]>,
+    ) -> Self {
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            self.types(db).to_vec().into_boxed_slice(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+            projections,
+        )
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
@@ -1103,6 +1149,7 @@ impl<'db> Specialization<'db> {
             restricted_types?,
             self.materialization_kind(db),
             None,
+            Box::from([]),
         ))
     }
 
@@ -1164,6 +1211,7 @@ impl<'db> Specialization<'db> {
             self.types(db),
             materialization_kind,
             self.tuple_inner(db),
+            self.projections(db),
         )
     }
 
@@ -1211,6 +1259,7 @@ impl<'db> Specialization<'db> {
             types,
             self.materialization_kind(db),
             tuple_inner,
+            self.projections(db).to_vec().into_boxed_slice(),
         )
     }
 
@@ -1251,7 +1300,14 @@ impl<'db> Specialization<'db> {
             .collect();
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
-        Specialization::new(db, self.generic_context(db), types, None, None)
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            types,
+            None,
+            None,
+            Box::from([]),
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -1285,6 +1341,7 @@ impl<'db> Specialization<'db> {
             types,
             self.materialization_kind(db),
             tuple_inner,
+            self.projections(db).to_vec().into_boxed_slice(),
         ))
     }
 
@@ -1352,6 +1409,7 @@ impl<'db> Specialization<'db> {
             types,
             new_materialization_kind,
             tuple_inner,
+            self.projections(db).to_vec().into_boxed_slice(),
         )
     }
 
@@ -1413,23 +1471,50 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_materialization_kind = source.materialization_kind(db);
         let target_materialization_kind = target.materialization_kind(db);
 
+        // basedpython use-site variance projections (`Container[out T]`,
+        // `Container[in T]`, `Container[in out T]`) override the typevar's
+        // declared variance kotlin-style for subtyping purposes.
+        let source_projections = source.projections(db);
+        let target_projections = target.projections(db);
+
         let types = itertools::izip!(
             generic_context.variables(db),
             source.types(db),
             target.types(db)
-        );
+        )
+        .enumerate();
 
         types.when_all(
             db,
             self.constraints,
-            |(bound_typevar, source_type, target_type)| {
+            |(i, (bound_typevar, source_type, target_type))| {
+                let declared = specialization_variance(db, bound_typevar);
+                let source_proj = source_projections.get(i).copied().flatten();
+                let target_proj = target_projections.get(i).copied().flatten();
+                // If the target's type at this position is an open typevar
+                // (e.g. method self-parameter dispatch where the receiver's
+                // generic args are still being inferred), don't apply the
+                // strict projection-narrowing rule — the typevar binds to
+                // the source's effective type, which is what the call site
+                // expects.
+                let target_is_open_typevar = matches!(target_type, Type::TypeVar(_));
+                let Some(effective) = combine_use_site_projections(
+                    declared,
+                    source_proj,
+                    target_proj,
+                    target_is_open_typevar,
+                ) else {
+                    // projections in incompatible directions — e.g. `Container[out int]`
+                    // vs `Container[in int]`. No subtyping relation possible.
+                    return self.never();
+                };
                 // Subtyping/assignability of each type in the specialization depends on the variance
                 // of the corresponding typevar:
                 //   - covariant: verify that source_type <: target_type
                 //   - contravariant: verify that target_type <: source_type
                 //   - invariant: verify that source_type <: target_type AND target_type <: source_type
                 //   - bivariant: skip, can't make subtyping/assignability false
-                match specialization_variance(db, bound_typevar) {
+                match effective {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
                         *source_type,
@@ -1639,6 +1724,92 @@ fn specialization_variance<'db>(
         variance.flip()
     } else {
         variance
+    }
+}
+
+/// basedpython kotlin-style use-site variance combiner.
+///
+/// Combines a typevar's declared variance with the use-site projections from
+/// the source and target of a subtyping check. Returns the *effective*
+/// variance to apply at this position, or `None` if the two projections are
+/// in incompatible directions (e.g. `Container[out X]` vs `Container[in X]`
+/// — there is no subtyping relation between read-only and write-only views).
+///
+/// The rules mirror Kotlin's use-site variance / declaration-site variance
+/// interaction:
+///
+/// - For declared covariant/contravariant/bivariant typevars, the declared
+///   variance already covers everything the use-site projection could give,
+///   so the projection is a no-op.
+/// - For declared *invariant* typevars, the projection promotes the position
+///   to covariant (`out`), contravariant (`in`), or leaves it invariant
+///   (`in out`). A non-`None` projection on the *source* side without a
+///   matching projection on the target side means the source describes a
+///   wider set of types than the target can hold, so the relation fails.
+fn combine_use_site_projections(
+    declared: TypeVarVariance,
+    source: Option<ruff_python_ast::helpers::UseSiteVariance>,
+    target: Option<ruff_python_ast::helpers::UseSiteVariance>,
+    target_is_open_typevar: bool,
+) -> Option<TypeVarVariance> {
+    use ruff_python_ast::helpers::UseSiteVariance;
+
+    if matches!(declared, TypeVarVariance::Bivariant) {
+        return Some(TypeVarVariance::Bivariant);
+    }
+    if matches!(
+        declared,
+        TypeVarVariance::Covariant | TypeVarVariance::Contravariant
+    ) {
+        // Declared variance already covers any projection the user could
+        // write; ignore projections in this case.
+        return Some(declared);
+    }
+
+    // Declared invariant — projections are meaningful.
+    // Map `Some(InOut)` to "no projection" since `in out` on an invariant
+    // typevar is equivalent to the plain form.
+    let normalize = |p: Option<UseSiteVariance>| match p {
+        Some(UseSiteVariance::Out) => Some(UseSiteVariance::Out),
+        Some(UseSiteVariance::In) => Some(UseSiteVariance::In),
+        Some(UseSiteVariance::InOut) | None => None,
+    };
+    let source = normalize(source);
+    let target = normalize(target);
+
+    match (source, target) {
+        // No projections on either side — ordinary invariant check.
+        (None, None) => Some(TypeVarVariance::Invariant),
+
+        // Target carries the projection. Source is concrete (or already
+        // matching projection) — narrowing from concrete to projection is
+        // valid, so the position is effectively covariant / contravariant.
+        (None | Some(UseSiteVariance::Out), Some(UseSiteVariance::Out)) => {
+            Some(TypeVarVariance::Covariant)
+        }
+        (None | Some(UseSiteVariance::In), Some(UseSiteVariance::In)) => {
+            Some(TypeVarVariance::Contravariant)
+        }
+
+        // Source carries a projection but target does not — the source
+        // describes a wider set of types than the target can accept, so the
+        // relation fails. Exception: if the target's type at this position
+        // is an open typevar (e.g. method self-parameter inference), allow
+        // the projection to flow through and treat the position by the
+        // projection's variance.
+        (Some(UseSiteVariance::Out), None) => {
+            target_is_open_typevar.then_some(TypeVarVariance::Covariant)
+        }
+        (Some(UseSiteVariance::In), None) => {
+            target_is_open_typevar.then_some(TypeVarVariance::Contravariant)
+        }
+
+        // Both projected but in opposite directions — no relation.
+        (Some(UseSiteVariance::Out), Some(UseSiteVariance::In))
+        | (Some(UseSiteVariance::In), Some(UseSiteVariance::Out)) => None,
+
+        // Normalized to two-state above; InOut/None already handled.
+        (Some(UseSiteVariance::InOut), _) | (_, Some(UseSiteVariance::InOut)) => unreachable!(),
     }
 }
 

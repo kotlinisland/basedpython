@@ -226,6 +226,7 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         arguments: args,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        is_cast: false,
     })
 }
 

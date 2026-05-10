@@ -1,0 +1,11 @@
+f: (int, str) -> bool
+g: (a: int, b: str) -> bool
+h: (int, /, name: str) -> bool
+i: (int, *, name: str) -> bool
+j: (*: int) -> int
+k: (**: str) -> int
+l: (int, /, name: str, *args: bool, **kwargs: int) -> None
+
+
+def takes(cb: (int) -> str) -> str:
+    return cb(0)

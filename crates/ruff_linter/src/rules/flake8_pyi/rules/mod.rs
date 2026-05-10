@@ -146,8 +146,14 @@ fn generate_union_fix(
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
             parenthesized: false,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
+            is_parameter_shape: false,
         })),
         ctx: ExprContext::Load,
+        is_typeof: false,
     });
 
     Ok(Fix::applicable_edits(

@@ -106,6 +106,7 @@ fn run_test(
                     let source_kind = SourceKind::Python {
                         code: source_text(db, file).as_str().to_string(),
                         is_stub: file.is_stub(db),
+                        is_basedpython: file.source_type(db).is_basedpython(),
                     };
                     let path = file
                         .path(db)

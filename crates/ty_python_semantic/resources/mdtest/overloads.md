@@ -764,6 +764,7 @@ def foo(x: str) -> None:
     print("oh no, a string")  # error: [useless-overload-body]
 
 def foo(x):
+    # error: [invalid-return-type] "Return type does not match returned value: expected `int | None`, found `int | str`"
     return x
 ```
 
@@ -862,7 +863,7 @@ error[invalid-overload]: Implementation does not accept all arguments of this ov
 19 |     def update(self, params=(), /, **kwds) -> None:
    |         ------ Implementation defined here
    |
-info: Implementation signature `(self, params=..., /, **kwds) -> None` is not assignable to overload signature `(self, **kwds: Iterable[str]) -> None`
+info: Implementation signature `(self, params: Iterable[tuple[str, Iterable[str]]] = ..., /, **kwds: Iterable[str]) -> None` is not assignable to overload signature `(self, **kwds: Iterable[str]) -> None`
 info: parameter `self` is positional-only but must also accept keyword arguments
 ```
 

@@ -478,14 +478,16 @@ impl<'a> SemanticModel<'a> {
                     // `name: str` should be treated as used.
                     //
                     // There are two exceptions to this rule:
-                    // 1. Stub files. In a stub file, it _is_ considered valid to resolve to a
-                    //    type annotation.
+                    // 1. Stub files (and basedpython files). It _is_ considered valid to resolve
+                    //    to a type annotation there.
                     // 2. Bare annotations inside functions. Per PEP 526, these create local
                     //    variables, so we stop searching outer scopes and resolve them as unbound
                     //    locals (or not found, if accessed from a nested scope). The binding ID
                     //    is recorded in the unresolved reference so the linter can suppress the
                     //    error if a nested scope initializes the variable via `nonlocal`.
-                    BindingKind::Annotation if !self.in_stub_file() => {
+                    BindingKind::Annotation
+                        if !self.in_stub_file() && !self.in_basedpython_file() =>
+                    {
                         if self.scopes[self.bindings[binding_id].scope]
                             .kind
                             .is_function()
@@ -679,6 +681,13 @@ impl<'a> SemanticModel<'a> {
                 UnresolvedReferenceFlags::WILDCARD_IMPORT,
             );
             ReadResult::WildcardImport
+        } else if self.is_basedpython_class_base_self_ref(name)
+            || self.is_basedpython_pseudo_keyword(name)
+            || self.is_basedpython_type_is_lhs(name)
+        {
+            // basedpython resolves these forms at transpile time, so the name is
+            // not actually undefined at runtime
+            ReadResult::ImplicitGlobal
         } else {
             self.unresolved_references.push(
                 name.range,
@@ -688,6 +697,71 @@ impl<'a> SemanticModel<'a> {
             );
             ReadResult::NotFound
         }
+    }
+
+    /// True if `name` is a basedpython pseudo-keyword that has no Python
+    /// binding but is recognized by the transpiler. Currently this is just
+    /// `constraints`, used in typevar bound syntax (`T: constraints(int, str)`)
+    fn is_basedpython_pseudo_keyword(&self, name: &ast::ExprName) -> bool {
+        self.in_basedpython_file() && name.id.as_str() == "constraints"
+    }
+
+    /// True if `name` is the LHS of a `name is T` `TypeIs`-style annotation
+    /// in basedpython (`def f(a) -> a is str: ...`). The transpiler rewrites
+    /// the comparison to `TypeIs[T]`, so `a` is never evaluated at runtime.
+    fn is_basedpython_type_is_lhs(&self, name: &ast::ExprName) -> bool {
+        if !self.in_basedpython_file() || !self.in_annotation() {
+            return false;
+        }
+        let Some(parent) = self.current_expression_parent() else {
+            return false;
+        };
+        let Expr::Compare(compare) = parent else {
+            return false;
+        };
+        if !matches!(compare.ops.as_ref(), [ast::CmpOp::Is]) {
+            return false;
+        }
+        matches!(compare.left.as_ref(), Expr::Name(left) if left.range == name.range)
+    }
+
+    /// True if `name` is a forward self-reference that the basedpython
+    /// transpiler will auto-quote, so resolution should not flag it as
+    /// undefined. This covers two positions:
+    /// - inside a subscript slice of a class base (`class A(list[A])`)
+    /// - inside an annotation in a class body (attribute, method parameter,
+    ///   or return type) where the name matches an enclosing class
+    fn is_basedpython_class_base_self_ref(&self, name: &ast::ExprName) -> bool {
+        if !self.in_basedpython_file() {
+            return false;
+        }
+
+        if self.in_class_base() {
+            let Stmt::ClassDef(class_def) = self.current_statement() else {
+                return false;
+            };
+            if class_def.name.id.as_str() != name.id.as_str() {
+                return false;
+            }
+            // require a `Subscript` ancestor — direct bases like `class A(A)`
+            // are genuine runtime errors and shouldn't be suppressed
+            return self
+                .current_expressions()
+                .skip(1)
+                .any(|e| matches!(e, Expr::Subscript(_)));
+        }
+
+        if self.in_annotation() {
+            for scope in self.current_scopes() {
+                if let ScopeKind::Class(class_def) = scope.kind {
+                    if class_def.name.id.as_str() == name.id.as_str() {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     /// Lookup a symbol in the current scope.
@@ -2141,6 +2215,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::STUB_FILE)
     }
 
+    /// Return `true` if the model is in a basedpython file (i.e., a `.by` or `.byi` file).
+    pub const fn in_basedpython_file(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::BASEDPYTHON_FILE)
+    }
+
     /// Return `true` if the model is in a named expression assignment (e.g., `x := 1`).
     pub const fn in_named_expression_assignment(&self) -> bool {
         self.flags
@@ -2537,6 +2616,9 @@ bitflags! {
         /// The model is in a Python stub file (i.e., a `.pyi` file).
         const STUB_FILE = 1 << 15;
 
+        /// the model is in a basedpython file (`.by` or `.byi`)
+        const BASEDPYTHON_FILE = 1 << 31;
+
         /// `__future__`-style type annotations are enabled in this model.
         /// That could be because it's a stub file,
         /// or it could be because it's a non-stub file that has `from __future__ import annotations`
@@ -2759,11 +2841,15 @@ bitflags! {
 
 impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
-        if PySourceType::from(path).is_stub() {
-            Self::STUB_FILE
-        } else {
-            Self::default()
+        let source_type = PySourceType::from(path);
+        let mut flags = Self::default();
+        if source_type.is_stub() {
+            flags |= Self::STUB_FILE;
         }
+        if source_type.is_basedpython() {
+            flags |= Self::BASEDPYTHON_FILE;
+        }
+        flags
     }
 }
 

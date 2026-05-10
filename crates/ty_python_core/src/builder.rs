@@ -1886,6 +1886,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         name,
                         bound,
                         default,
+                        variance: _,
                     }) => (name, bound, default),
                     ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
                         name, default, ..
@@ -3776,6 +3777,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
+                // basedpython: anonymous named tuples and Parameters specs use
+                // `Expr::Named` to represent `name: type` field labels. these
+                // aren't walrus assignments — the inner Name has
+                // `ExprContext::Invalid` to suppress place-effects — so we
+                // skip the assignment scope entirely. without this, ty's
+                // scope inference would call `expect_single_definition` on
+                // the named expr and panic
+                if matches!(node.target.as_ref(), ast::Expr::Name(n) if matches!(n.ctx, ast::ExprContext::Invalid))
+                {
+                    self.visit_expr(&node.value);
+                    return;
+                }
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
@@ -3804,6 +3817,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         self.visit_expr(default);
                     }
                     self.visit_parameters(parameters);
+                }
+                // return type annotation evaluated in enclosing scope, matching function defs
+                if let Some(returns) = &lambda.returns {
+                    self.visit_annotation(returns);
                 }
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
@@ -4209,6 +4226,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             .node()
             .as_function()
             .is_some_and(|func| func.node(self.module).parameters.includes(name))
+    }
+
+    fn is_basedpython(&self) -> bool {
+        self.source_type.is_basedpython()
     }
 }
 

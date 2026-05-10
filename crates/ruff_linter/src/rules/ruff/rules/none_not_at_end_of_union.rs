@@ -185,10 +185,16 @@ fn generate_fix(
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: false,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
+                is_parameter_shape: false,
             })),
             ctx: ruff_python_ast::ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            is_typeof: false,
         })
     };
 

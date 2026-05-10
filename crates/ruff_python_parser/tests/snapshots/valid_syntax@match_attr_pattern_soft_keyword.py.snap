@@ -48,6 +48,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                 },
@@ -93,6 +94,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                 },
@@ -138,6 +140,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                 },
@@ -203,6 +206,7 @@ Module(
                                                                                         node_index: NodeIndex(None),
                                                                                     },
                                                                                     ctx: Load,
+                                                                                    optional: false,
                                                                                 },
                                                                             ),
                                                                             attr: Identifier {
@@ -211,6 +215,7 @@ Module(
                                                                                 node_index: NodeIndex(None),
                                                                             },
                                                                             ctx: Load,
+                                                                            optional: false,
                                                                         },
                                                                     ),
                                                                     attr: Identifier {
@@ -219,6 +224,7 @@ Module(
                                                                         node_index: NodeIndex(None),
                                                                     },
                                                                     ctx: Load,
+                                                                    optional: false,
                                                                 },
                                                             ),
                                                             attr: Identifier {
@@ -227,6 +233,7 @@ Module(
                                                                 node_index: NodeIndex(None),
                                                             },
                                                             ctx: Load,
+                                                            optional: false,
                                                         },
                                                     ),
                                                     attr: Identifier {
@@ -235,6 +242,7 @@ Module(
                                                         node_index: NodeIndex(None),
                                                     },
                                                     ctx: Load,
+                                                    optional: false,
                                                 },
                                             ),
                                             attr: Identifier {
@@ -243,6 +251,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                 },

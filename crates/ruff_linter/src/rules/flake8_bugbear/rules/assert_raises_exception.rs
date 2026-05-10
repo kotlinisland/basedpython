@@ -112,6 +112,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
             arguments,
             range: _,
             node_index: _,
+            is_cast: _,
         }) = &item.context_expr
         else {
             continue;
@@ -137,6 +138,7 @@ pub(crate) fn assert_raises_exception_call(
         arguments,
         range,
         node_index: _,
+        is_cast: _,
     }: &ast::ExprCall,
 ) {
     let semantic = checker.semantic();

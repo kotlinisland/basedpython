@@ -1,0 +1,6 @@
+def f(data = []):
+    print(data)
+
+
+def g(items = {}, more = set()):
+    print(items, more)

@@ -165,6 +165,23 @@ impl<'src> TokenSource<'src> {
         (first, second)
     }
 
+    /// Returns the `n`th non-trivia token ahead of the current one without consuming.
+    ///
+    /// `peek_nth(0)` returns the same token as [`peek`]; `peek_nth(1)` is one past that, etc.
+    /// The returned `TextRange` is the range of that token in the source.
+    ///
+    /// [`peek`]: TokenSource::peek
+    pub(crate) fn peek_nth(&mut self, n: usize) -> (TokenKind, TextRange) {
+        let checkpoint = self.lexer.checkpoint();
+        let mut kind = self.next_non_trivia_token();
+        for _ in 0..n {
+            kind = self.next_non_trivia_token();
+        }
+        let range = self.lexer.current_range();
+        self.lexer.rewind(checkpoint);
+        (kind, range)
+    }
+
     /// Bumps the token source to the next non-trivia token.
     ///
     /// It pushes the given kind to the token vector with the current token range.

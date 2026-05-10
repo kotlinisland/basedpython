@@ -1,0 +1,14 @@
+decorator def cached(fn: (...) -> object, ttl: int = 0) -> int:
+    return 0
+
+
+@cached
+def f1() -> None: ...
+
+
+@cached()
+def f2() -> None: ...
+
+
+@cached(ttl=10)
+def f3() -> None: ...

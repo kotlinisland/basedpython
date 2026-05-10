@@ -2338,3 +2338,32 @@ dataclass(MyProtocol)
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
 dataclass()(MyProtocol)
 ```
+
+## basedpython: `data class` and `frozen data class` modifiers
+
+in basedpython, `data class` is shorthand for `@dataclass(slots=True)` and `frozen data class` for
+`@dataclass(frozen=True, slots=True)`. ty treats the synthetic decorator like the user wrote the
+equivalent `@dataclass(...)` call
+
+### `data class` synthesizes `__init__`
+
+```by
+data class Point:
+    x: int
+    y: int
+
+p = Point(1, 2)
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+```
+
+### `frozen data class` rejects assignment
+
+```by
+frozen data class Point:
+    x: int
+    y: int
+
+p = Point(1, 2)
+p.x = 3  # error: [invalid-assignment]
+```

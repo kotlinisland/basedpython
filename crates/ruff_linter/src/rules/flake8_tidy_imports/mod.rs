@@ -247,6 +247,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: source.to_string(),
             is_stub: false,
+            is_basedpython: false,
         };
 
         let (diagnostics, fixed) = test_contents(
@@ -319,6 +320,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: source.to_string(),
             is_stub: false,
+            is_basedpython: false,
         };
 
         let (diagnostics, fixed) = test_contents(
@@ -363,6 +365,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: source.to_string(),
             is_stub: false,
+            is_basedpython: false,
         };
 
         let (diagnostics, fixed) = test_contents(
@@ -405,6 +408,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: source.to_string(),
             is_stub: false,
+            is_basedpython: false,
         };
 
         let (diagnostics, fixed) = test_contents(
@@ -448,6 +452,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: source.to_string(),
             is_stub: false,
+            is_basedpython: false,
         };
 
         let (diagnostics, fixed) = test_contents(

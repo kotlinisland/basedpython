@@ -1,0 +1,14 @@
+class Box[T]:
+    value: T
+
+
+class Pair[K, V]:
+    key: K
+    value: V
+
+
+def identity[T](x: T) -> T:
+    return x
+
+
+class Constrained[T: (int, str)]: ...

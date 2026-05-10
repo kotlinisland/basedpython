@@ -135,6 +135,7 @@ fn match_typed_dict_assign<'a>(
         arguments,
         range: _,
         node_index: _,
+        is_cast: _,
     }) = value
     else {
         return None;
@@ -277,6 +278,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keywo
                     arguments: Arguments { keywords, .. },
                     range: _,
                     node_index: _,
+                    is_cast: _,
                 }) => Some((fields_from_dict_call(func, keywords)?, total)),
                 _ => None,
             }

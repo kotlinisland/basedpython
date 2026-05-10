@@ -1,0 +1,25 @@
+---
+source: crates/ty/tests/cli/api_lockfile.rs
+info:
+  program: by
+  args:
+    - generate-api-file
+    - "--stdout"
+---
+success: true
+exit_code: 0
+----- stdout -----
+#api-lock:v=1
+#tool:by=0.0.0
+#python:default
+#modules:1
+q.C.a:v[classvar]=builtins.int
+q.C.b:v[final]=builtins.str
+q.C.c:v=builtins.int
+q.C:c[]
+q.ClassVar:v=typing.ClassVar
+q.Final:v=typing.Final
+q.X:v[final]=builtins.int
+q.Y:v[final]=<unresolved>
+
+----- stderr -----

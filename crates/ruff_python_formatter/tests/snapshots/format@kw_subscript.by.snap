@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/kw_subscript.by
+---
+## Input
+```bython
+class M[K, V]: ...
+class B[T]: ...
+
+
+x: M[K=int, V=str]
+y: B[T=int]
+z: M[int, V=str]
+```
+
+## Output
+```bython
+class M[K, V]: ...
+
+
+class B[T]: ...
+
+
+x: M[(K: int, V: str)]
+y: B[T := int]
+z: M[(int, V: str)]
+```

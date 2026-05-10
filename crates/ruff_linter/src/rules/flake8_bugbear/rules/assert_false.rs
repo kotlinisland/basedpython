@@ -73,6 +73,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
             },
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            is_cast: false,
         }))),
         cause: None,
     })

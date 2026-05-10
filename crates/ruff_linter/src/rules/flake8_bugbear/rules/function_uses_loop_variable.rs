@@ -130,6 +130,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 arguments,
                 range: _,
                 node_index: _,
+                is_cast: _,
             }) => {
                 // Mark immediately-invoked lambdas as safe — the closure
                 // is consumed right away, so late-binding is not a concern.
@@ -171,6 +172,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             }
             Expr::Lambda(ast::ExprLambda {
                 parameters,
+                returns: _,
                 body,
                 range: _,
                 node_index: _,

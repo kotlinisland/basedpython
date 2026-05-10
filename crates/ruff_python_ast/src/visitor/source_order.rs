@@ -301,6 +301,7 @@ where
             Expr::Tuple(expr) => expr.visit_source_order(visitor),
             Expr::Slice(expr) => expr.visit_source_order(visitor),
             Expr::IpyEscapeCommand(expr) => expr.visit_source_order(visitor),
+            Expr::CallableType(expr) => expr.visit_source_order(visitor),
         }
     }
 

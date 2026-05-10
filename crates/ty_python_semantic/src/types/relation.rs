@@ -2839,6 +2839,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                             enum_literal.enum_class_instance(db),
                             Type::NominalInstance(instance),
                         ),
+                    LiteralValueTypeKind::Float(_) => {
+                        KnownClass::Float.when_subclass_of(db, instance.class(db), self.constraints)
+                    }
+                    LiteralValueTypeKind::Complex(_) => KnownClass::Complex.when_subclass_of(
+                        db,
+                        instance.class(db),
+                        self.constraints,
+                    ),
                 };
                 positive_relation_holds.negate(db, self.constraints)
             }

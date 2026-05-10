@@ -71,8 +71,21 @@ impl Violation for UnnecessaryLambda {
 
 /// PLW0108
 pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
+    // basedpython typed lambdas (`lambda (a: int) -> str: ...`) carry type
+    // information that would be lost if the lambda were inlined
+    if checker.source_type.is_basedpython()
+        && (lambda.returns.is_some()
+            || lambda
+                .parameters
+                .as_deref()
+                .is_some_and(|p| p.iter().any(|param| param.annotation().is_some())))
+    {
+        return;
+    }
+
     let ExprLambda {
         parameters,
+        returns: _,
         body,
         range: _,
         node_index: _,

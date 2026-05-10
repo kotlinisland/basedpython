@@ -1,0 +1,49 @@
+# decorator keyword
+
+`decorator def` declares a function that can be used as a decorator in three call shapes:
+
+- `@d` — direct decoration
+- `@d()` — parens, no options
+- `@d(opt=...)` — parens with options
+
+the first positional parameter is the decorated callable. all other parameters must be
+keyword-only and have defaults — they are the decorator's options
+
+```by
+decorator def d(fn: (...) -> object, option: bool = False) -> int:
+    return 1 if option else len(str(fn))
+
+@d
+def f1(): ...
+
+@d()
+def f2(): ...
+
+@d(option=True)
+def f3(): ...
+```
+
+## rules
+
+- the function must have at least one positional parameter — the decorated callable
+- any remaining parameters are made keyword-only at the call site, and must have
+    defaults
+- the `fn` parameter type is rendered as `Callable[..., object]` in the generated
+    overloads regardless of the user-written annotation. the user-written annotation
+    is preserved on the runtime impl for documentation but is not used for static
+    call-site typing
+- the return type of the user-written function is preserved as the result type of
+    applying the decorator
+
+## scope
+
+`decorator def` is **module-scope only**. inside a class body the keyword is
+rejected — class-method decorators don't need the keyword (use a normal
+`def` returning a callable), and the synthesized overloads would shadow the
+enclosing class's attribute namespace
+
+## why a keyword
+
+a hand-written decorator that supports all three call shapes is tedious and easy to get
+wrong (sentinel handling, overload ordering, recursive dispatch). the keyword removes
+boilerplate and centralizes the pattern so the overloads always match the runtime impl

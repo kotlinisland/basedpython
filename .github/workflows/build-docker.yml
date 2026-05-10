@@ -29,6 +29,11 @@ permissions:
 jobs:
   docker-build:
     name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
+    # basedpython publishes wheels only for now. the Dockerfile builds `--bin ruff`,
+    # which no longer exists (it's `by`/`buff`), so docker is skipped until the
+    # image is reworked to ship both binaries — see ROADMAP. skipping here keeps
+    # the release green without regenerating release.yml (which still calls this)
+    if: false
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && 'release' || '' }}

@@ -1,0 +1,20 @@
+---
+source: crates/ty/tests/cli/api_lockfile.rs
+info:
+  program: by
+  args:
+    - generate-api-file
+    - "--stdout"
+---
+success: true
+exit_code: 0
+----- stdout -----
+#api-lock:v=1
+#tool:by=0.0.0
+#python:default
+#modules:1
+p.C.ro:p[getter]=builtins.int
+p.C.rw:p[getter,setter]=builtins.int
+p.C:c[]
+
+----- stderr -----

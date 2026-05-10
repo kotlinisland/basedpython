@@ -60,6 +60,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                     arguments: Arguments {
@@ -68,6 +69,7 @@ Module(
                                         args: [],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                             optional_vars: None,
@@ -127,6 +129,7 @@ Module(
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
+                                            optional: false,
                                         },
                                     ),
                                     arguments: Arguments {
@@ -135,6 +138,7 @@ Module(
                                         args: [],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                             optional_vars: None,

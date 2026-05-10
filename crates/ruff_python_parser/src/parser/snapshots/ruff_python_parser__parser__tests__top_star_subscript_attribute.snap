@@ -1,0 +1,83 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..30,
+    body: [
+        AnnAssign(
+            StmtAnnAssign {
+                node_index: NodeIndex(None),
+                range: 0..29,
+                target: Name(
+                    ExprName {
+                        node_index: NodeIndex(None),
+                        range: 0..1,
+                        id: Name("a"),
+                        ctx: Store,
+                    },
+                ),
+                annotation: Subscript(
+                    ExprSubscript {
+                        node_index: NodeIndex(None),
+                        range: 3..29,
+                        value: Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 3..26,
+                                value: Attribute(
+                                    ExprAttribute {
+                                        node_index: NodeIndex(None),
+                                        range: 3..18,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 3..14,
+                                                id: Name("collections"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: Name("abc"),
+                                            range: 15..18,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        ctx: Load,
+                                        optional: false,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("Mapping"),
+                                    range: 19..26,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Load,
+                                optional: false,
+                            },
+                        ),
+                        slice: Starred(
+                            ExprStarred {
+                                node_index: NodeIndex(None),
+                                range: 27..28,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 28..28,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        ctx: Load,
+                        is_typeof: false,
+                    },
+                ),
+                value: None,
+                simple: true,
+            },
+        ),
+    ],
+}

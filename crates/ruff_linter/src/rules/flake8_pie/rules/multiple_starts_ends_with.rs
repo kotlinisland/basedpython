@@ -92,6 +92,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 },
             range: _,
             node_index: _,
+            is_cast: _,
         }) = &call
         else {
             continue;
@@ -153,6 +154,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                             },
                         range: _,
                         node_index: _,
+                        is_cast: _,
                     }) = expr
                     else {
                         unreachable!(
@@ -181,6 +183,11 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
+                is_parameter_shape: false,
             });
             let node1 = Expr::Name(ast::ExprName {
                 id: arg_name.into(),
@@ -193,6 +200,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                optional: false,
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let node3 = Expr::Call(ast::ExprCall {
@@ -205,6 +213,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 },
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                is_cast: false,
             });
             let call = node3;
 

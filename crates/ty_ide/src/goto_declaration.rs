@@ -1351,8 +1351,8 @@ x: i<CURSOR>nt = 42
 
         // Should navigate to a stdlib file containing the int class
         assert!(
-            result.contains("builtins.pyi"),
-            "Should navigate to builtins.pyi"
+            result.contains("builtins.pyi") || result.contains("builtins.byi"),
+            "Should navigate to builtins typeshed stub"
         );
         assert!(
             result.contains("class int:"),
@@ -2007,7 +2007,10 @@ def function():
 
         // Should navigate to a typeshed file containing the __doc__ attribute
         assert!(
-            result.contains("types.pyi") || result.contains("builtins.pyi"),
+            result.contains("types.pyi")
+                || result.contains("builtins.pyi")
+                || result.contains("types.byi")
+                || result.contains("builtins.byi"),
             "Should navigate to typeshed file with __doc__ definition"
         );
         assert!(

@@ -24,6 +24,8 @@ enum LiteralValueTypeInner<'db> {
     Enum(EnumLiteralType<'db>, LiteralFlags),
     Bytes(BytesLiteralType<'db>, LiteralFlags),
     LiteralString(LiteralFlags),
+    Float(FloatLiteralType, LiteralFlags),
+    Complex(ComplexLiteralType<'db>, LiteralFlags),
 }
 
 bitflags! {
@@ -86,6 +88,10 @@ pub(crate) enum LiteralValueTypeKind<'db> {
     LiteralString,
     /// A bytes literal
     Bytes(BytesLiteralType<'db>),
+    /// A float literal (basedpython)
+    Float(FloatLiteralType),
+    /// A complex literal (basedpython)
+    Complex(ComplexLiteralType<'db>),
 }
 
 impl<'db> LiteralValueType<'db> {
@@ -107,7 +113,9 @@ impl<'db> LiteralValueType<'db> {
             | LiteralValueTypeInner::String(_, f)
             | LiteralValueTypeInner::Enum(_, f)
             | LiteralValueTypeInner::Bytes(_, f)
-            | LiteralValueTypeInner::LiteralString(f) => f,
+            | LiteralValueTypeInner::LiteralString(f)
+            | LiteralValueTypeInner::Float(_, f)
+            | LiteralValueTypeInner::Complex(_, f) => f,
         }
     }
 
@@ -121,6 +129,8 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeInner::LiteralString(f) => {
                 LiteralValueTypeInner::LiteralString(func(f))
             }
+            LiteralValueTypeInner::Float(v, f) => LiteralValueTypeInner::Float(v, func(f)),
+            LiteralValueTypeInner::Complex(v, f) => LiteralValueTypeInner::Complex(v, func(f)),
         })
     }
 
@@ -142,6 +152,8 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Enum(v) => LiteralValueTypeInner::Enum(v, flags),
             LiteralValueTypeKind::Bytes(v) => LiteralValueTypeInner::Bytes(v, flags),
             LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::LiteralString(flags),
+            LiteralValueTypeKind::Float(v) => LiteralValueTypeInner::Float(v, flags),
+            LiteralValueTypeKind::Complex(v) => LiteralValueTypeInner::Complex(v, flags),
         })
     }
 
@@ -157,6 +169,8 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Enum(v) => LiteralValueTypeInner::Enum(v, flags),
             LiteralValueTypeKind::Bytes(v) => LiteralValueTypeInner::Bytes(v, flags),
             LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::LiteralString(flags),
+            LiteralValueTypeKind::Float(v) => LiteralValueTypeInner::Float(v, flags),
+            LiteralValueTypeKind::Complex(v) => LiteralValueTypeInner::Complex(v, flags),
         })
     }
 
@@ -179,6 +193,8 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeInner::Enum(v, _) => LiteralValueTypeKind::Enum(v),
             LiteralValueTypeInner::Bytes(v, _) => LiteralValueTypeKind::Bytes(v),
             LiteralValueTypeInner::LiteralString(_) => LiteralValueTypeKind::LiteralString,
+            LiteralValueTypeInner::Float(v, _) => LiteralValueTypeKind::Float(v),
+            LiteralValueTypeInner::Complex(v, _) => LiteralValueTypeKind::Complex(v),
         }
     }
 
@@ -255,7 +271,21 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db),
             LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
             LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
+            LiteralValueTypeKind::Float(_) => KnownClass::Float.to_instance(db),
+            LiteralValueTypeKind::Complex(_) => KnownClass::Complex.to_instance(db),
         }
+    }
+}
+
+impl From<FloatLiteralType> for LiteralValueTypeKind<'_> {
+    fn from(v: FloatLiteralType) -> Self {
+        Self::Float(v)
+    }
+}
+
+impl<'db> From<ComplexLiteralType<'db>> for LiteralValueTypeKind<'db> {
+    fn from(v: ComplexLiteralType<'db>) -> Self {
+        Self::Complex(v)
     }
 }
 
@@ -301,6 +331,71 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
+}
+
+/// basedpython: a float literal. The f64 value is stored as its raw bit
+/// pattern split across two `u32`s so the type retains 4-byte alignment
+/// and matches `IntLiteralType`'s footprint
+#[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct FloatLiteralType {
+    high: u32,
+    low: u32,
+}
+
+impl FloatLiteralType {
+    pub(crate) fn from_f64(value: f64) -> Self {
+        let bits = value.to_bits();
+        Self {
+            high: (bits >> 32) as u32,
+            #[expect(clippy::cast_possible_truncation)]
+            low: bits as u32,
+        }
+    }
+
+    pub(crate) fn as_f64(self) -> f64 {
+        f64::from_bits((u64::from(self.high) << 32) | u64::from(self.low))
+    }
+}
+
+impl std::fmt::Display for FloatLiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let v = self.as_f64();
+        if v.fract() == 0.0 && v.is_finite() {
+            write!(f, "{v:.1}")
+        } else {
+            std::fmt::Display::fmt(&v, f)
+        }
+    }
+}
+
+impl std::fmt::Debug for FloatLiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.as_f64(), f)
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct ComplexLiteralType<'db> {
+    /// f64 bits of the real part
+    pub(crate) re_bits: u64,
+    /// f64 bits of the imaginary part
+    pub(crate) im_bits: u64,
+}
+
+impl get_size2::GetSize for ComplexLiteralType<'_> {}
+
+impl<'db> ComplexLiteralType<'db> {
+    pub(crate) fn from_parts(db: &'db dyn Db, re: f64, im: f64) -> Self {
+        Self::new(db, re.to_bits(), im.to_bits())
+    }
+
+    pub(crate) fn re(self, db: &'db dyn Db) -> f64 {
+        f64::from_bits(self.re_bits(db))
+    }
+
+    pub(crate) fn im(self, db: &'db dyn Db) -> f64 {
+        f64::from_bits(self.im_bits(db))
+    }
 }
 
 impl IntLiteralType {

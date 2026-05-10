@@ -674,7 +674,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
+    pub fn name(self, db: &'db dyn Db) -> &'db Name {
         self.typevar(db).name(db)
     }
 
@@ -682,7 +682,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.typevar(db).kind(db)
     }
 
-    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+    pub fn is_paramspec(self, db: &'db dyn Db) -> bool {
         self.kind(db).is_paramspec()
     }
 
@@ -940,13 +940,13 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// class C(reveal_type(Generic[T, U])): ...
     /// ```
     ///
-    /// In the first case, the use of `U` is unbound, and so we have a [`TypeVarInstance`], and its
+    /// In the first case, the use of `U` is unbound, and so we have a `TypeVarInstance`, and its
     /// default value (`T`) is also unbound.
     ///
     /// By using `U` in the generic class, it becomes bound, and so we have a
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).
-    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         bound_typevar_default_type(db, self)
     }
 

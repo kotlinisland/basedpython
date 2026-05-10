@@ -47,6 +47,7 @@ pub use types::ide_support::{
 };
 pub use types::{DisplaySettings, TypeQualifiers};
 
+pub mod api_lockfile;
 mod db;
 mod dunder_all;
 mod fixes;
@@ -172,6 +173,19 @@ pub fn check_file_unwrap(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 }
 
 pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    // basedpython-style display (e.g. `(1, 2)` instead of
+    // `tuple[Literal[1], Literal[2]]`) is enabled while checking `.by` files
+    // so diagnostics for those files render types in the surface syntax
+    let is_basedpython = file.source_type(db).is_basedpython();
+    let body = || -> Result<Box<[Diagnostic]>, Diagnostic> { check_file_inner(db, file) };
+    if is_basedpython {
+        crate::types::display::with_basedpython_display(body)
+    } else {
+        body()
+    }
+}
+
+fn check_file_inner(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.

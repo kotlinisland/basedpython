@@ -1,0 +1,99 @@
+# basedpython: literal-friendly annotations
+
+basedpython diverges from PEP 484 stringified-forward-reference and PEP 586 literal rules:
+
+- a string in annotation/type position is `Literal[<str>]`, not a forward reference. forward refs
+    are unnecessary because basedpython annotations are always deferred
+- float and complex literals are accepted in type position; they currently lower to the nominal
+    `float` / `complex` instance (no exact-literal narrowing yet)
+- `A[T=int]` is a keyword type-arg binding, equivalent to `A[int]` for single-typevar generics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+## string in annotation is a Literal
+
+```by
+a: "asdf" = "asdf"
+reveal_type(a)  # revealed: "asdf"
+```
+
+## string in subscript type position is a Literal
+
+```by
+from typing import Literal
+
+x: Literal["a", "b"] = "a"
+reveal_type(x)  # revealed: "a"
+```
+
+## float literal in annotation is the literal type
+
+```by
+a: 1.5 = 1.5
+reveal_type(a)  # revealed: 1.5
+```
+
+## complex literal in annotation is the literal type
+
+```by
+a: 2j = 2j
+reveal_type(a)  # revealed: 2j
+```
+
+## float and complex value literals preserve type
+
+```by
+a = 1.1
+reveal_type(a)  # revealed: 1.1
+
+b = 2j
+reveal_type(b)  # revealed: 2j
+```
+
+## keyword type-arg binding
+
+```by
+class A[T]: ...
+
+a: A[T=int] = A()
+reveal_type(a)  # revealed: A[int]
+```
+
+## keyword type-arg binding reorders by name
+
+```by
+class B[T, R]: ...
+
+a: B[R=str, T=int] = B()
+reveal_type(a)  # revealed: B[int, str]
+```
+
+## keyword type-arg binding falls back to typevar default
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```by
+class C[T = int, R = str]: ...
+
+a: C[R=int] = C()
+reveal_type(a)  # revealed: C[int, int]
+```
+
+## forward self-reference works without quotes
+
+basedpython annotations are deferred, so a class can refer to itself in its own method signatures
+without stringification
+
+```by
+class A:
+    def make(self) -> A:
+        return A()
+
+reveal_type(A().make())  # revealed: A
+```

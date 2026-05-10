@@ -13,6 +13,7 @@ use super::{
     SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
+use crate::types::class::DynamicNamedTupleAnchor;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -211,7 +212,7 @@ impl<'db> NominalInstanceType<'db> {
         file_to_module(db, file).map(|module| module.name(db))
     }
 
-    pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
@@ -235,7 +236,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     /// Returns whether this is a nominal instance of a particular [`KnownClass`].
-    pub(super) fn has_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub(crate) fn has_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known_class(db) == Some(known_class)
     }
 
@@ -243,7 +244,7 @@ impl<'db> NominalInstanceType<'db> {
     ///
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
-    pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+    pub(crate) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(class) => {
@@ -542,8 +543,74 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 NominalInstanceInner::ExactTuple(source_tuple),
                 NominalInstanceInner::ExactTuple(target_tuple),
             ) => self.check_tuple_type_pair(db, source_tuple, target_tuple),
-            _ => self.check_class_pair(db, source.class(db), target.class(db)),
+            _ => {
+                if let Some(result) =
+                    self.check_anon_named_tuple_pair(db, source.class(db), target.class(db))
+                {
+                    return result;
+                }
+                self.check_class_pair(db, source.class(db), target.class(db))
+            }
         }
+    }
+
+    /// basedpython: structural assignability between two anonymous named
+    /// tuples. Field count must match. Pair-wise the source field type must
+    /// satisfy the relation to the target field type, and field names must
+    /// agree — except that a synthetic positional name (`arg<i>`) on either
+    /// side acts as a wildcard, so positional and named fields are mutually
+    /// assignable when the types line up
+    fn check_anon_named_tuple_pair(
+        &self,
+        db: &'db dyn Db,
+        source: ClassType<'db>,
+        target: ClassType<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let source_nt = match source.class_literal(db) {
+            ClassLiteral::DynamicNamedTuple(nt)
+                if nt.name(db).as_str().starts_with("_AnonNamedTuple_") =>
+            {
+                nt
+            }
+            _ => return None,
+        };
+        let target_nt = match target.class_literal(db) {
+            ClassLiteral::DynamicNamedTuple(nt)
+                if nt.name(db).as_str().starts_with("_AnonNamedTuple_") =>
+            {
+                nt
+            }
+            _ => return None,
+        };
+        let spec_of = |nt: crate::types::class::DynamicNamedTupleLiteral<'db>| match nt.anchor(db) {
+            DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. }
+            | DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => Some(*spec),
+            DynamicNamedTupleAnchor::TypingDefinition(_) => None,
+        };
+        let source_spec = spec_of(source_nt)?;
+        let target_spec = spec_of(target_nt)?;
+        let source_fields = source_spec.fields(db);
+        let target_fields = target_spec.fields(db);
+        if source_fields.len() != target_fields.len() {
+            return Some(self.never());
+        }
+        let mut result = self.always();
+        for (i, (sf, tf)) in source_fields.iter().zip(target_fields.iter()).enumerate() {
+            let positional = format!("arg{i}");
+            let names_compatible = sf.name == tf.name
+                || sf.name.as_str() == positional
+                || tf.name.as_str() == positional;
+            if !names_compatible {
+                return Some(self.never());
+            }
+            result = result.and(db, self.constraints, || {
+                self.check_type_pair(db, sf.ty, tf.ty)
+            });
+            if result.is_never_satisfied(db) {
+                return Some(result);
+            }
+        }
+        Some(result)
     }
 }
 

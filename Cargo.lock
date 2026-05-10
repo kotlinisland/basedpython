@@ -348,6 +348,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
+name = "by_transforms"
+version = "0.0.0"
+dependencies = [
+ "indexmap",
+ "indoc",
+ "ruff_db",
+ "ruff_diagnostics",
+ "ruff_python_ast",
+ "ruff_python_codegen",
+ "ruff_python_parser",
+ "ruff_python_stdlib",
+ "ruff_source_file",
+ "ruff_text_size",
+ "ty_project",
+ "ty_python_core",
+ "ty_python_semantic",
+]
+
+[[package]]
+name = "by_typeshed_patch"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "walkdir",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2095,9 +2124,9 @@ dependencies = [
 
 [[package]]
 name = "minicov"
-version = "0.3.7"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f27fe9f1cc3c22e1687f9446c2083c4c5fc7f0bcf1c7a86bdbded14985895b4b"
+checksum = "4869b6a491569605d66d3952bcdf03df789e5b536e5f0cf7758a7f08a55ae24d"
 dependencies = [
  "cc",
  "walkdir",
@@ -4464,6 +4493,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "argfile",
+ "by_transforms",
  "clap",
  "clap_complete_command",
  "clearscreen",
@@ -4498,6 +4528,7 @@ dependencies = [
  "ty_python_semantic",
  "ty_server",
  "ty_static",
+ "walkdir",
  "wild",
 ]
 

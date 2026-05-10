@@ -1,0 +1,13 @@
+from abc import ABC
+
+
+# OK: `abstract def` lowers to `@abstractmethod` after transpile, so the
+# empty-bodied method is correctly marked abstract.
+abstract class Shape(ABC):
+    abstract def area(self) -> float: ...
+
+
+# Not OK: an empty-bodied method without the `abstract` modifier still
+# triggers B027.
+class Animal(ABC):
+    def speak(self) -> str: ...

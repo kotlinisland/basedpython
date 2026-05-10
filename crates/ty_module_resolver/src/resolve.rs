@@ -41,7 +41,7 @@ use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
-    self as ast, PySourceType, PythonVersion,
+    self as ast, PythonVersion,
     visitor::{Visitor, walk_body},
 };
 
@@ -334,9 +334,7 @@ fn file_to_module_impl<'db, 'a>(
 
     if file.path(db) == module_file.path(db) {
         return Some(module);
-    } else if file.source_type(db) == PySourceType::Python
-        && module_file.source_type(db) == PySourceType::Stub
-    {
+    } else if file.source_type(db).is_py_file() && module_file.source_type(db).is_stub() {
         // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
         // which would make us erroneously believe the `.py` is *not* also this module (breaking things
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
@@ -408,7 +406,9 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         // it adds every dir with a .py to the search-paths (making all test files root modules),
         // unless they see an `__init__.py`, in which case they assume you don't want that.
         let isnt_regular_package = !system.is_file(&candidate_path.join("__init__.py"))
-            && !system.is_file(&candidate_path.join("__init__.pyi"));
+            && !system.is_file(&candidate_path.join("__init__.pyi"))
+            && !system.is_file(&candidate_path.join("__init__.by"))
+            && !system.is_file(&candidate_path.join("__init__.byi"));
         // Any dir with a pyproject.toml or ty.toml is a valid relative desperate search-path and
         // we want all of those to also be valid absolute desperate search-paths. It doesn't
         // make any sense for a folder to have `pyproject.toml` and `__init__.py` but let's
@@ -1455,11 +1455,23 @@ pub(super) fn resolve_file_module(
     } else {
         None
     };
-    let file = stub_file.or_else(|| {
-        module
-            .with_py_extension()
-            .and_then(|path| path.to_file(resolver_state))
-    })?;
+    let by_stub_file = if resolver_state.mode.stubs_allowed() {
+        module.with_byi_extension().to_file(resolver_state)
+    } else {
+        None
+    };
+    let file = stub_file
+        .or(by_stub_file)
+        .or_else(|| {
+            module
+                .with_py_extension()
+                .and_then(|path| path.to_file(resolver_state))
+        })
+        .or_else(|| {
+            module
+                .with_by_extension()
+                .and_then(|path| path.to_file(resolver_state))
+        })?;
 
     // For system files, test if the path has the correct casing.
     // We can skip this step for vendored files or virtual files because
@@ -1892,7 +1904,7 @@ mod tests {
 
         assert_eq!(
             builtins.file(&db).unwrap().path(&db),
-            &stdlib.join("builtins.pyi")
+            &stdlib.join("builtins.byi")
         );
     }
 
@@ -2161,7 +2173,7 @@ mod tests {
         assert_eq!(pydoc_data_topics.search_path(&db).unwrap(), &stdlib);
         assert_eq!(
             pydoc_data_topics.file(&db).unwrap().path(&db),
-            &stdlib.join("pydoc_data/topics.pyi")
+            &stdlib.join("pydoc_data/topics.byi")
         );
     }
 

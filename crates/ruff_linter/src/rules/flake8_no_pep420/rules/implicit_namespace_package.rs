@@ -70,10 +70,10 @@ pub(crate) fn implicit_namespace_package(
     context: &LintContext,
 ) {
     if package.is_none()
-        // Ignore non-`.py` files, which don't require an `__init__.py`.
+        // Ignore non-`.py`/`.by` files, which don't require an `__init__`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
         // Ignore `.pyw` files that are also PySourceType::Python but aren't importable namespaces
-        && path.extension().is_some_and(|ext| ext == "py")
+        && path.extension().is_some_and(|ext| ext == "py" || ext == "by")
         // Ignore any files that are direct children of the project root.
         && path
             .parent()

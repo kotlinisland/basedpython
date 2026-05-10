@@ -85,6 +85,11 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
 
 /// FA102
 pub(crate) fn future_required_type_annotation(checker: &Checker, expr: &Expr, reason: Reason) {
+    // basedpython auto-quotes forward-incompatible annotations at transpile time,
+    // so `from __future__ import annotations` is unnecessary in `.by`/`.byi`
+    if checker.source_type.is_basedpython() {
+        return;
+    }
     checker
         .report_diagnostic(FutureRequiredTypeAnnotation { reason }, expr.range())
         .set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));

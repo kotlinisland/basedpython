@@ -20,7 +20,7 @@ use ty_module_resolver::file_to_module;
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::class::{ClassLiteral, ClassType, DynamicNamedTupleAnchor, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -31,7 +31,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    BindingContext, CallableType, DynamicType, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
@@ -630,6 +630,18 @@ impl<'db> FmtDetailed<'db> for DisplayType<'db> {
                 | LiteralValueTypeKind::String(_)
                 | LiteralValueTypeKind::Bytes(_)
                 | LiteralValueTypeKind::Enum(_),
+            ) if basedpython_display_enabled() => {
+                // basedpython surface syntax — literals render as their bare
+                // repr without the `Literal[...]` wrapper since the wrapper
+                // adds noise without disambiguating
+                representation.fmt_detailed(f)
+            }
+            Some(
+                LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Enum(_),
             ) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::Literal))
                     .write_str("Literal")?;
@@ -652,6 +664,28 @@ impl fmt::Debug for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
+}
+
+thread_local! {
+    /// thread-local switch enabling basedpython-style type display.
+    /// turned on while emitting diagnostics for `.by` files; off otherwise
+    /// so the standard typing-spec display remains the default for `.py`
+    static BASEDPYTHON_DISPLAY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub(crate) fn basedpython_display_enabled() -> bool {
+    BASEDPYTHON_DISPLAY.with(std::cell::Cell::get)
+}
+
+/// Run `f` with basedpython-style type display enabled. Used by
+/// diagnostic emission for `.by` files
+pub(crate) fn with_basedpython_display<R>(f: impl FnOnce() -> R) -> R {
+    BASEDPYTHON_DISPLAY.with(|cell| {
+        let prev = cell.replace(true);
+        let result = f();
+        cell.set(prev);
+        result
+    })
 }
 
 /// Format a file location suffix for disambiguation (e.g., " @ path:line:column")
@@ -743,6 +777,41 @@ struct ClassDisplay<'db> {
 
 impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // basedpython anonymous named tuples render as their surface syntax
+        // `(name: T, ...)` rather than the synthesized `_AnonNamedTuple_<hash>`
+        // class name. Positional fields use the synthetic `arg<i>` name and
+        // are rendered without a label
+        if let ClassLiteral::DynamicNamedTuple(nt) = self.class
+            && nt.name(self.db).as_str().starts_with("_AnonNamedTuple_")
+        {
+            let spec = match nt.anchor(self.db) {
+                DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. }
+                | DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => Some(*spec),
+                DynamicNamedTupleAnchor::TypingDefinition(_) => None,
+            };
+            if let Some(spec) = spec {
+                let fields = spec.fields(self.db);
+                let ty = Type::ClassLiteral(self.class);
+                let mut f = f.with_type(ty);
+                f.write_char('(')?;
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    let synthetic_pos = field.name.as_str() == format!("arg{i}");
+                    if !synthetic_pos {
+                        write!(f, "{}: ", field.name)?;
+                    }
+                    field
+                        .ty
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                }
+                f.write_char(')')?;
+                return Ok(());
+            }
+        }
+
         let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
 
         let ty = Type::ClassLiteral(self.class);
@@ -1244,6 +1313,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         enum_literal.name(self.db)
                     )
                 }
+                LiteralValueTypeKind::Float(v) => write!(f.with_type(self.ty), "{v}"),
+                LiteralValueTypeKind::Complex(c) => {
+                    let re = c.re(self.db);
+                    let im = c.im(self.db);
+                    if re == 0.0 {
+                        write!(f.with_type(self.ty), "{im}j")
+                    } else {
+                        write!(f.with_type(self.ty), "({re}+{im}j)")
+                    }
+                }
             },
             Type::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
@@ -1388,6 +1467,9 @@ struct DisplayTuple<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if basedpython_display_enabled() {
+            return self.fmt_basedpython(f);
+        }
         f.with_type(KnownClass::Tuple.to_class_literal(self.db))
             .write_str("tuple")?;
         f.write_char('[')?;
@@ -1402,21 +1484,6 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                         .fmt_detailed(f)?;
                 }
             }
-
-            // Decoder key for which snippets of text need to be included depending on whether
-            // the tuple contains a prefix and/or suffix:
-            //
-            // tuple[            yyy, ...      ]
-            // tuple[xxx, *tuple[yyy, ...]     ]
-            // tuple[xxx, *tuple[yyy, ...], zzz]
-            // tuple[     *tuple[yyy, ...], zzz]
-            //       PPPPPPPPPPPP        P
-            //            SSSSSSS        SSSSSS
-            //
-            // (Anything that appears above only a P is included only if there's a prefix; anything
-            // above only an S is included only if there's a suffix; anything about both a P and an
-            // S is included if there is either a prefix or a suffix. The initial `tuple[` and
-            // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             TupleSpec::Variable(tuple) => {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
@@ -1427,7 +1494,6 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 }
                 if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
                     f.write_char('*')?;
-                    // Might as well link the type again here too
                     f.with_type(KnownClass::Tuple.to_class_literal(self.db))
                         .write_str("tuple")?;
                     f.write_char('[')?;
@@ -1450,6 +1516,59 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
             }
         }
         f.write_str("]")
+    }
+}
+
+impl<'db> DisplayTuple<'_, 'db> {
+    /// basedpython surface syntax for tuple types:
+    ///   tuple\[T1, T2\]                         → (T1, T2)
+    ///   tuple\[T\]                              → (T,)
+    ///   tuple\[T, ...\]                         → (*: T)
+    ///   tuple\[prefix, *tuple\[V, ...\], suffix\] → (prefix, *: V, suffix)
+    ///   tuple\[()\]                             → ()
+    fn fmt_basedpython(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+            .write_char('(')?;
+        match self.tuple {
+            TupleSpec::Fixed(tuple) => {
+                let elements = tuple.elements_slice();
+                if !elements.is_empty() {
+                    elements
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt_detailed(f)?;
+                    if elements.len() == 1 {
+                        f.write_char(',')?;
+                    }
+                }
+            }
+            TupleSpec::Variable(tuple) => {
+                let mut first = true;
+                for prefix in tuple.prefix_elements() {
+                    if !first {
+                        f.write_str(", ")?;
+                    }
+                    first = false;
+                    prefix
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt_detailed(f)?;
+                }
+                if !first {
+                    f.write_str(", ")?;
+                }
+                f.write_str("*: ")?;
+                tuple
+                    .variable()
+                    .display_with(self.db, self.settings.singleline())
+                    .fmt_detailed(f)?;
+                for suffix in tuple.suffix_elements() {
+                    f.write_str(", ")?;
+                    suffix
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt_detailed(f)?;
+                }
+            }
+        }
+        f.write_char(')')
     }
 }
 
@@ -1634,6 +1753,70 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)
         } else {
+            // basedpython surface syntax: per-typevar use-site variance
+            // projections render the keyword (`out`/`in`/`in out`) inline
+            // before the corresponding type argument. So a specialization
+            // built from `list[out int]` displays as `list[out int]` rather
+            // than `list[int]`.
+            if basedpython_display_enabled()
+                && !self.specialization.projections(self.db).is_empty()
+                && self
+                    .specialization
+                    .projections(self.db)
+                    .iter()
+                    .any(Option::is_some)
+            {
+                use ruff_python_ast::helpers::UseSiteVariance;
+                self.origin
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                let types = self.specialization.types(self.db);
+                let projections = self.specialization.projections(self.db);
+                f.write_char('[')?;
+                for (i, ty) in types.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    match projections.get(i).copied().flatten() {
+                        Some(UseSiteVariance::Out) => f.write_str("out ")?,
+                        Some(UseSiteVariance::In) => f.write_str("in ")?,
+                        Some(UseSiteVariance::InOut) => f.write_str("in out ")?,
+                        None => {}
+                    }
+                    ty.display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                }
+                return f.write_char(']');
+            }
+
+            // basedpython surface syntax: `Top[X[..., Any, ...]]` renders as
+            // `X[..., *, ...]` — each invariant typevar that was materialized
+            // from `Any`/`Unknown` shows as `*`, concrete typevars render
+            // normally. So `Top[dict[str, Any]]` displays as `dict[str, *]`
+            if basedpython_display_enabled()
+                && matches!(
+                    self.specialization.materialization_kind(self.db),
+                    Some(MaterializationKind::Top)
+                )
+            {
+                self.origin
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                let types = self.specialization.types(self.db);
+                f.write_char('[')?;
+                for (i, ty) in types.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    if matches!(ty, Type::Dynamic(DynamicType::Any | DynamicType::Unknown)) {
+                        f.write_char('*')?;
+                    } else {
+                        ty.display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?;
+                    }
+                }
+                return f.write_char(']');
+            }
             let prefix_details = match self.specialization.materialization_kind(self.db) {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
@@ -2490,6 +2673,11 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         /// # Color excluding RED displays through the literal-group path for BLUE.
         /// ```
         fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+            // basedpython displays each union element separately in source order, so
+            // nothing is condensed into a `Literal[...]` group
+            if basedpython_display_enabled() {
+                return None;
+            }
             match ty {
                 Type::LiteralValue(literal)
                     if matches!(
@@ -2820,7 +3008,13 @@ struct DisplayMaybeNegatedType<'db> {
 impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if self.negated {
-            f.write_str("~")?;
+            // basedpython renders negation as `not T`; standard typing-spec
+            // display uses `~T`
+            if basedpython_display_enabled() {
+                f.write_str("not ")?;
+            } else {
+                f.write_str("~")?;
+            }
         }
         DisplayMaybeParenthesizedType {
             ty: self.ty,

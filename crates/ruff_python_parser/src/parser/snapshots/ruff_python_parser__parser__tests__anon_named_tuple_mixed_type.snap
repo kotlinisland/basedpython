@@ -1,0 +1,71 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..20,
+    body: [
+        AnnAssign(
+            StmtAnnAssign {
+                node_index: NodeIndex(None),
+                range: 0..19,
+                target: Name(
+                    ExprName {
+                        node_index: NodeIndex(None),
+                        range: 0..1,
+                        id: Name("a"),
+                        ctx: Store,
+                    },
+                ),
+                annotation: Tuple(
+                    ExprTuple {
+                        node_index: NodeIndex(None),
+                        range: 3..19,
+                        elts: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 4..7,
+                                    id: Name("int"),
+                                    ctx: Load,
+                                },
+                            ),
+                            Named(
+                                ExprNamed {
+                                    node_index: NodeIndex(None),
+                                    range: 9..18,
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 9..13,
+                                            id: Name("name"),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 15..18,
+                                            id: Name("str"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        ctx: Load,
+                        parenthesized: true,
+                        is_anon_named_tuple: true,
+                        is_anon_named_tuple_value: false,
+                        parameter_slash: None,
+                        parameter_star: None,
+                        is_parameter_shape: false,
+                    },
+                ),
+                value: None,
+                simple: true,
+            },
+        ),
+    ],
+}

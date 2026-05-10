@@ -1,0 +1,19 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/lazy_import.by
+---
+## Input
+```bython
+lazy import os
+lazy import os.path as p
+lazy from os import path
+lazy from os import path, getcwd
+```
+
+## Output
+```bython
+lazy import os
+lazy import os.path as p
+lazy from os import path
+lazy from os import path, getcwd
+```

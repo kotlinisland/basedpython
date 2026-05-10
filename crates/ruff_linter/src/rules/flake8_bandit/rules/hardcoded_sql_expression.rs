@@ -211,5 +211,6 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
             }
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_explicit_concatenation(operand),
+        Expr::CallableType(_) => Some(false),
     }
 }

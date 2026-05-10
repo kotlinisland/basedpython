@@ -1,0 +1,38 @@
+[package]
+name = "by_transforms"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+indexmap = { workspace = true }
+ruff_db = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_codegen = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ty_project = { workspace = true, features = ["testing"] }
+ty_python_core = { workspace = true }
+ty_python_semantic = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
+
+[features]
+default = []
+testing-colors = []
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false

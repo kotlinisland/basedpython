@@ -28,6 +28,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         let ExprCall {
             range: _,
             node_index: _,
+            is_cast: _,
             func,
             arguments,
         } = item;

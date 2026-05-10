@@ -1,0 +1,96 @@
+# generic parameter syntax
+
+## motivation
+
+parameter specifications do not actually accept variadic arguments, despite the
+double star notation in the declaration
+
+type parameter declarations also diverge from value
+parameter declarations: there is no positional-only marker, no keyword-only
+marker, and `**kwargs` has no analogue at all
+
+basedpython mirrors value parameter syntax 1-to-1 in type parameter lists, so
+that the same `/`, `*`, `*Args`, `**Kwargs` markers carry the same meaning
+they have in `def`
+
+## syntax
+
+type parameters accept the full set of value parameter markers:
+
+```by
+class A[Positional, /, PositionalOrNamed, *, Named]
+
+class B[Positional, /, PositionalOrNamed, *Args, Named, **Kwargs]
+```
+
+`*Args` behaves the same as a type variable tuple. `**Kwargs` captures a typed
+dictionary of named type arguments
+
+specialization at the call site uses the same positional / keyword form:
+
+```by
+A[
+    int,                  # Positional
+    PositionalOrNamed=str,
+    Named=int,
+]
+
+B[
+    int,                  # Positional
+    str,                  # PositionalOrNamed
+    int,                  # Args
+    str,                  # Args
+    Named=int,
+    foo=str,              # Kwargs
+    bar=int,              # Kwargs
+]
+```
+
+## parameter specifications
+
+parameter specification is replaced by the new enhanced tuple types, declared as a
+bound on a type parameter:
+
+```by
+# `*` here means the projected top type, which differs from `*: object, **: object`
+def f[P: (*: *, **: *)](fn: (**P) -> None) -> (**P) -> int
+```
+
+call-site arguments for any type parameter can use an enhanced tuple type,
+representing the inputs for a callable:
+
+```by
+f[(int, str)](lambda *_: None)
+
+class A[P = (int, *: str)]
+
+A[(bool, a: str, b: str)]
+```
+
+## concatenate replacement
+
+`Concatenate` is replaced with an unpack:
+
+```by
+def f[P: (*: *, **: *)](fn: (**P) -> None) -> (int, **P) -> None
+```
+
+## callable attribute access
+
+`Callable` exposes its parameter and return types as attributes-as-types,
+forwarded from its `Parameters` type parameter:
+
+```by
+class Callable[Parameters: (*: *, **: *), Return]:
+    @type_check_only
+    args: Parameters.args
+
+    @type_check_only
+    kwargs: Parameters.kwargs
+
+    @type_check_only
+    returns: Return
+
+class A[Fn: (*: *, **: *) -> object]:
+    def f(self, *args: *Fn.args, **kwargs: **Fn.kwargs) -> Fn.returns
+```

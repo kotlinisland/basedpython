@@ -351,6 +351,10 @@ fn handle_enclosed_comment<'a>(
         | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, source),
         AnyNodeRef::ExprTuple(ast::ExprTuple {
             parenthesized: true,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
             ..
         }) => handle_bracketed_end_of_line_comment(comment, source),
         AnyNodeRef::ExprGenerator(generator) if generator.parenthesized => {

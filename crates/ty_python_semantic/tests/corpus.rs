@@ -129,7 +129,11 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
             let result = std::panic::catch_unwind(|| pull_types(&db, file));
 
-            let expected_to_fail = if path.extension().map(|e| e == "pyi").unwrap_or(false) {
+            let expected_to_fail = if path
+                .extension()
+                .map(|e| e == "pyi" || e == "byi")
+                .unwrap_or(false)
+            {
                 pyi_expected_to_fail
             } else {
                 py_expected_to_fail
@@ -152,7 +156,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             file.sync(&mut db);
         };
 
-        if source.extension() == Some("pyi") {
+        if matches!(source.extension(), Some("pyi" | "byi")) {
             println!("checking {relative_path}");
             let pyi_dest = root.join(source_filename);
             check_with_file_name(&pyi_dest);

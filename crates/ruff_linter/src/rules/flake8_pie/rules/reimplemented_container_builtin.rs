@@ -62,6 +62,7 @@ impl Violation for ReimplementedContainerBuiltin {
 pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLambda) {
     let ExprLambda {
         parameters,
+        returns: _,
         body,
         range: _,
         node_index: _,

@@ -57,6 +57,10 @@ pub(crate) struct Parser<'src> {
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
 
+    /// basedpython: depth of nested class bodies currently being parsed.
+    /// Used to recognise `init(...)` as a method shorthand only inside a class.
+    pub(super) class_body_depth: u32,
+
     /// Current parser recursion depth remaining before the depth limit is exceeded.
     depth_remaining: u16,
 
@@ -90,6 +94,7 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
+            class_body_depth: 0,
             depth_remaining,
             max_nesting_depth,
         }
@@ -357,6 +362,15 @@ impl<'src> Parser<'src> {
         self.tokens.peek2()
     }
 
+    /// Returns the kind and range of the `n`th non-trivia token ahead of the current one
+    /// without consuming. `peek_nth(0)` is equivalent to [`peek`] (the next token after the
+    /// current one); `peek_nth(1)` is one past that, etc.
+    ///
+    /// [`peek`]: Parser::peek
+    fn peek_nth(&mut self, n: usize) -> (TokenKind, TextRange) {
+        self.tokens.peek_nth(n)
+    }
+
     /// Returns the current token kind.
     #[inline]
     fn current_token_kind(&self) -> TokenKind {
@@ -484,6 +498,11 @@ impl<'src> Parser<'src> {
     /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
     /// [`TextRange`] if its minimum version is less than [`Parser::target_version`].
     fn add_unsupported_syntax_error(&mut self, kind: UnsupportedSyntaxErrorKind, range: TextRange) {
+        // basedpython transpiles modern syntax (PEP 695 type params, etc.) down to
+        // the runtime target version, so the source itself is not constrained
+        if self.options.is_basedpython {
+            return;
+        }
         if kind.is_unsupported(self.options.target_version) {
             self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
                 kind,

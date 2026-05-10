@@ -53,22 +53,37 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // are more than two, then `leading_comments` will preserve the correct number of newlines.
         empty_lines_after_leading_comments(comments.leading(item)).fmt(f)?;
 
-        write!(
-            f,
-            [
-                FormatDecorators {
-                    decorators: decorator_list,
-                    leading_definition_comments,
-                },
-                clause(
-                    ClauseHeader::Function(item),
-                    &format_with(|f| format_function_header(f, item)),
-                    trailing_definition_comments,
-                    body,
-                    SuiteKind::Function,
-                ),
-            ]
-        )?;
+        // basedpython: `def f()` with no body — no colon, no suite
+        if body.is_empty() {
+            write!(
+                f,
+                [
+                    FormatDecorators {
+                        decorators: decorator_list,
+                        leading_definition_comments,
+                    },
+                    format_with(|f| format_function_header(f, item)),
+                    hard_line_break(),
+                ]
+            )?;
+        } else {
+            write!(
+                f,
+                [
+                    FormatDecorators {
+                        decorators: decorator_list,
+                        leading_definition_comments,
+                    },
+                    clause(
+                        ClauseHeader::Function(item),
+                        &format_with(|f| format_function_header(f, item)),
+                        trailing_definition_comments,
+                        body,
+                        SuiteKind::Function,
+                    ),
+                ]
+            )?;
+        }
 
         // If the function contains trailing comments, insert newlines before them.
         // For example, given:

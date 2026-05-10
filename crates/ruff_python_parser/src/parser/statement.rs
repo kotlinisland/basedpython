@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
-    Operator, PythonVersion, Stmt, Suite, WithItem,
+    Operator, PythonVersion, Stmt, Suite, Variance, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -78,6 +78,26 @@ const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
     TokenKind::RightShiftEqual,
 ]);
 
+/// basedpython modifier keywords that may appear (in any order, any count) before
+/// `def`/`class`/`let`/`name = ...`. `abstract` is also an introducer for the
+/// `abstract a: T` annotation form, which is handled separately.
+fn is_modifier_kw(text: &str) -> bool {
+    matches!(
+        text,
+        "final"
+            | "abstract"
+            | "open"
+            | "override"
+            | "static"
+            | "data"
+            | "enum"
+            | "frozen"
+            | "export"
+            | "public"
+            | "private"
+    )
+}
+
 impl<'src> Parser<'src> {
     /// Returns `true` if the current token is the start of a compound statement.
     pub(super) fn at_compound_stmt(&self) -> bool {
@@ -121,6 +141,14 @@ impl<'src> Parser<'src> {
                 Stmt::FunctionDef(self.parse_function_definition(DecoratorList::new(), start))
             }
             TokenKind::Class => {
+                // `class def f(cls):` — classmethod shorthand
+                if self.peek() == TokenKind::Def {
+                    return self.parse_with_modifier(start, DecoratorList::new());
+                }
+                // `class a = 1` — class variable declaration
+                if self.peek() == TokenKind::Name && self.peek2().1 == TokenKind::Equal {
+                    return self.parse_class_var_decl(start);
+                }
                 Stmt::ClassDef(self.parse_class_definition(DecoratorList::new(), start))
             }
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
@@ -145,9 +173,656 @@ impl<'src> Parser<'src> {
                     }
                 }
 
+                // basedpython: `init(...)` inside a class body is shorthand
+                // for `def __init__(...)`. The synthetic `__init_method__`
+                // decorator carries the keyword range so the transform can
+                // rewrite `init` to `def __init__` and emit self-assignments
+                // for any `let` parameters.
+                if self.class_body_depth > 0
+                    && token == TokenKind::Name
+                    && self.peek() == TokenKind::Lpar
+                    && self.src_text(self.current_token_range()) == "init"
+                {
+                    self.error_if_not_basedpython(
+                        "`init(...)` method shorthand is not valid in .py files".to_string(),
+                    );
+                    return Stmt::FunctionDef(self.parse_init_method(start));
+                }
+
+                // Handle basedpython modifier keywords and introducer keywords:
+                //   - modifier chains (final, abstract, open, override, static, data, enum,
+                //     frozen, export, public, private) before def/class/let/assignment
+                //   - single-keyword introducers: let, newtype, protocol, abstract a: T
+                if token == TokenKind::Name
+                    && let Some(stmt) = self.try_parse_modifier_or_introducer(start)
+                {
+                    return stmt;
+                }
+
                 self.parse_single_simple_statement()
             }
         }
+    }
+
+    /// If the current token starts a basedpython modifier chain or introducer keyword
+    /// (`let`, `newtype`, `protocol`, `abstract a: T`, or any combination of modifiers
+    /// before `def`/`class`/`let`/`name = ...`), parse the corresponding statement.
+    /// Returns `None` when no modifier/introducer pattern matches and the caller should
+    /// fall through to ordinary statement parsing.
+    ///
+    /// This walks forward via [`Parser::peek_nth`] over consecutive modifier-keyword
+    /// `Name` tokens — there is no fixed bound on chain length.
+    fn try_parse_modifier_or_introducer(&mut self, start: TextSize) -> Option<Stmt> {
+        let kw = self.src_text(self.current_token_range());
+
+        // single-keyword introducers without modifier-chain support
+        if kw == "newtype"
+            && self.peek() == TokenKind::Name
+            && self.peek_nth(1).0 == TokenKind::Equal
+        {
+            self.error_if_not_basedpython(
+                "`newtype` declarations are not valid in .py files".to_string(),
+            );
+            return Some(self.parse_newtype_decl(start));
+        }
+        if kw == "protocol" && self.peek() == TokenKind::Name {
+            self.error_if_not_basedpython(
+                "`protocol` class syntax is not valid in .py files".to_string(),
+            );
+            return Some(self.parse_protocol_def(start));
+        }
+        if kw == "decorator" && self.peek() == TokenKind::Def {
+            self.error_if_not_basedpython(
+                "`decorator def` syntax is not valid in .py files".to_string(),
+            );
+            return Some(self.parse_decorator_def(start));
+        }
+
+        // `sentinel NAME` → lowered to `NAME = Sentinel("NAME")`
+        if kw == "sentinel"
+            && self.peek() == TokenKind::Name
+            && matches!(
+                self.peek_nth(1).0,
+                TokenKind::Newline | TokenKind::Semi | TokenKind::EndOfFile
+            )
+        {
+            self.error_if_not_basedpython(
+                "`sentinel` declarations are not valid in .py files".to_string(),
+            );
+            return Some(self.parse_sentinel_decl(start));
+        }
+
+        // The current token must itself be a modifier or an introducer
+        // (`let` and bare `abstract a: T`) for a chain or introducer to be possible.
+        if !is_modifier_kw(kw) && kw != "let" {
+            return None;
+        }
+
+        // Walk forward over consecutive modifier-keyword Name tokens.
+        // `idx` counts how many tokens (current + lookahead) we have classified as
+        // modifiers; index 0 is the current token, index >=1 uses peek_nth(idx - 1).
+        let mut idx: usize = 0;
+        loop {
+            let (kind, range) = if idx == 0 {
+                (self.current_token_kind(), self.current_token_range())
+            } else {
+                self.peek_nth(idx - 1)
+            };
+
+            match kind {
+                TokenKind::Def | TokenKind::Class | TokenKind::Async => {
+                    // chain of `idx` modifiers followed by def / async def / class
+                    if idx == 0 {
+                        return None;
+                    }
+                    self.error_if_not_basedpython(format!(
+                        "`{kw}` is a basedpython modifier and is not valid in .py files"
+                    ));
+                    return Some(self.parse_with_modifier(start, DecoratorList::new()));
+                }
+                TokenKind::Name => {
+                    let text = self.src_text(range);
+                    if text == "let" {
+                        // [modifiers] let name [: T] = value
+                        self.error_if_not_basedpython(
+                            "`let` declarations are not valid in .py files".to_string(),
+                        );
+                        for _ in 0..idx {
+                            self.bump(TokenKind::Name);
+                        }
+                        return Some(self.parse_let_decl(start));
+                    }
+                    if is_modifier_kw(text) {
+                        idx += 1;
+                        continue;
+                    }
+                    // non-modifier Name token. could be a variable name in
+                    // `[modifiers] name = value` or `abstract name : T`.
+                    let following = if idx == 0 {
+                        self.peek()
+                    } else {
+                        self.peek_nth(idx).0
+                    };
+                    return match following {
+                        TokenKind::Equal if idx > 0 => {
+                            self.error_if_not_basedpython(format!(
+                                "`{kw}` modifier on assignments is not valid in .py files"
+                            ));
+                            Some(self.parse_modifier_assign_decl(start))
+                        }
+                        TokenKind::Colon if idx == 1 && self.is_abstract_modifier_at(0) => {
+                            // bare `abstract a: T` — sole `abstract` modifier ahead of name
+                            self.error_if_not_basedpython(
+                                "`abstract` annotations are not valid in .py files".to_string(),
+                            );
+                            Some(self.parse_abstract_annot_decl(start))
+                        }
+                        TokenKind::Colon if idx == 1 && self.is_visibility_modifier_at(0) => {
+                            // bare `private a: T`, `public a: T`, or `export a: T`
+                            self.error_if_not_basedpython(format!(
+                                "`{kw}` annotations are not valid in .py files"
+                            ));
+                            Some(self.parse_visibility_annot_decl(start))
+                        }
+                        _ => None,
+                    };
+                }
+                _ => return None,
+            }
+        }
+    }
+
+    /// Emits a parse error at the current token range if the parser is not in
+    /// basedpython mode. Used to gate basedpython-only syntax in `.py` files.
+    pub(super) fn error_if_not_basedpython(&mut self, message: String) {
+        if !self.options.is_basedpython {
+            self.add_error(
+                ParseErrorType::BasedPythonOnly(message),
+                self.current_token_range(),
+            );
+        }
+    }
+
+    /// Returns whether the modifier-keyword token at chain position `idx` is `abstract`.
+    /// Position 0 is the current token; positions >=1 use [`Parser::peek_nth`].
+    fn is_abstract_modifier_at(&mut self, idx: usize) -> bool {
+        let range = if idx == 0 {
+            self.current_token_range()
+        } else {
+            self.peek_nth(idx - 1).1
+        };
+        self.src_text(range) == "abstract"
+    }
+
+    /// Returns whether the modifier-keyword token at chain position `idx` is a
+    /// visibility keyword (`private`, `public`, or `export`).
+    fn is_visibility_modifier_at(&mut self, idx: usize) -> bool {
+        let range = if idx == 0 {
+            self.current_token_range()
+        } else {
+            self.peek_nth(idx - 1).1
+        };
+        matches!(self.src_text(range), "private" | "public" | "export")
+    }
+
+    /// Parses a basedpython modifier keyword statement such as `final class Foo:`,
+    /// `static def foo():`, or `class def f(cls):`.
+    ///
+    /// The modifier keyword(s) are consumed and a synthetic `Decorator` is constructed
+    /// pointing at the modifier text in the source. The downstream `modifiers` transform
+    /// uses the decorator to emit the appropriate `@decorator` line.
+    /// Parse a basedpython modifier chain (`class def`, `static def`, `final
+    /// class`, …) into a function/class def. `decorators` holds any real
+    /// `@`-decorators already parsed before the modifier (e.g. the `@overload`
+    /// in `@overload class def open(...)`); the synthetic modifier decorators are
+    /// appended after them.
+    fn parse_with_modifier(&mut self, start: TextSize, mut decorators: DecoratorList) -> Stmt {
+        loop {
+            let modifier_start = self.current_token_range().start();
+
+            // Determine the logical modifier name from the keyword text(s).
+            // The synthetic decorator range covers exactly the modifier text(s) + trailing
+            // whitespace up to (but not including) the class/def keyword. The transform
+            // uses this to replace the modifier prefix with `@decorator\n{indent}`.
+            let modifier_name: &'static str = if self.at(TokenKind::Class) {
+                // `class def f(cls):` → @classmethod
+                self.bump(TokenKind::Class);
+                "classmethod"
+            } else {
+                let kw = self.src_text(self.current_token_range()).to_owned();
+                match kw.as_str() {
+                    "frozen" => {
+                        self.bump(TokenKind::Name); // consume "frozen"
+                        // consume "data"
+                        self.bump(TokenKind::Name);
+                        "frozen_data_class"
+                    }
+                    "data" => {
+                        self.bump(TokenKind::Name);
+                        "data_class"
+                    }
+                    "enum" => {
+                        self.bump(TokenKind::Name);
+                        "enum_class"
+                    }
+                    "final" => {
+                        self.bump(TokenKind::Name);
+                        "final"
+                    }
+                    "abstract" => {
+                        self.bump(TokenKind::Name);
+                        "abstract"
+                    }
+                    "override" => {
+                        self.bump(TokenKind::Name);
+                        "override"
+                    }
+                    "open" => {
+                        self.bump(TokenKind::Name);
+                        "open"
+                    }
+                    "static" => {
+                        self.bump(TokenKind::Name);
+                        "static"
+                    }
+                    "export" | "public" => {
+                        self.bump(TokenKind::Name);
+                        "export"
+                    }
+                    "private" => {
+                        self.bump(TokenKind::Name);
+                        "private"
+                    }
+                    _ => unreachable!("unexpected modifier keyword"),
+                }
+            };
+
+            let modifier_end = self.current_token_range().start();
+            let decorator_range = TextRange::new(modifier_start, modifier_end);
+
+            decorators.push(ast::Decorator {
+                expression: Expr::Name(ast::ExprName {
+                    id: Name::new_static(modifier_name),
+                    // synthetic decorator: the surface keyword is *not* a
+                    // reference to a runtime name, so don't expose it to
+                    // name-resolution passes (pyflakes F821 in particular)
+                    ctx: ExprContext::Invalid,
+                    range: decorator_range,
+                    node_index: AtomicNodeIndex::NONE,
+                }),
+                range: decorator_range,
+                node_index: AtomicNodeIndex::NONE,
+            });
+
+            // stop when we reach the def / async def / class being modified
+            if self.at(TokenKind::Def) || self.at(TokenKind::Class) || self.at(TokenKind::Async) {
+                break;
+            }
+            // another modifier keyword follows — keep looping
+            if self.at(TokenKind::Name) {
+                let kw = self.src_text(self.current_token_range());
+                if matches!(
+                    kw,
+                    "data"
+                        | "enum"
+                        | "frozen"
+                        | "abstract"
+                        | "open"
+                        | "static"
+                        | "export"
+                        | "public"
+                        | "private"
+                        | "override"
+                ) {
+                    continue;
+                }
+            }
+            break;
+        }
+
+        if self.at(TokenKind::Async) {
+            // `abstract async def`, `final async def`, … — the modifier applies
+            // to an async function
+            self.bump(TokenKind::Async);
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                is_async: true,
+                ..self.parse_function_definition(decorators, start)
+            })
+        } else if self.at(TokenKind::Def) {
+            Stmt::FunctionDef(self.parse_function_definition(decorators, start))
+        } else {
+            Stmt::ClassDef(self.parse_class_definition(decorators, start))
+        }
+    }
+
+    /// Parses `class a = 1` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `a: ClassVar = 1`.
+    fn parse_class_var_decl(&mut self, start: TextSize) -> Stmt {
+        // consume "class"
+        self.bump(TokenKind::Class);
+        let name = self.parse_identifier();
+        self.bump(TokenKind::Equal);
+        let value = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        // Synthetic annotation pointing at the "class" keyword text in the source
+        // so the transform can identify this form.
+        let class_range = TextRange::new(start, name.range.start());
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let annotation = Expr::Name(ast::ExprName {
+            id: Name::new_static("__classvar__"),
+            ctx: ExprContext::Invalid,
+            range: class_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: Some(Box::new(value)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `let x = 5` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `x: Final = 5`.
+    fn parse_let_decl(&mut self, start: TextSize) -> Stmt {
+        let let_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "let"
+        let name = self.parse_identifier();
+        let let_name = Expr::Name(ast::ExprName {
+            id: Name::new_static("__let__"),
+            ctx: ExprContext::Invalid,
+            range: let_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        // optional `: annotation` before `=`
+        let annotation = if self.eat(TokenKind::Colon) {
+            let type_ann = self.parse_conditional_expression_or_higher().expr;
+            let slice_range = type_ann.range();
+            Expr::Subscript(ast::ExprSubscript {
+                value: Box::new(let_name),
+                slice: Box::new(type_ann),
+                ctx: ExprContext::Load,
+                range: TextRange::new(let_range.start(), slice_range.end()),
+                node_index: AtomicNodeIndex::NONE,
+                is_typeof: false,
+            })
+        } else {
+            let_name
+        };
+        self.bump(TokenKind::Equal);
+        let value = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: Some(Box::new(value)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `final x = 5` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `x: Final = 5` at module scope or `x = 5` inside a class.
+    /// Parses a basedpython modifier-chain assignment such as `final a = 1`,
+    /// `override a = 1`, or `final override a = 1` — any non-empty sequence of
+    /// modifier keywords (see [`is_modifier_kw`]) followed by `name = value`.
+    ///
+    /// Produces a synthetic [`AnnAssign`] whose annotation is a `Name` with id
+    /// `"__modifier_assign__"` and a range covering the modifier prefix in the
+    /// source. The downstream `modifiers` transform reads the modifier names
+    /// directly from that source range — no per-combination sentinel needed.
+    ///
+    /// Caller must position the parser at the first modifier keyword in the chain.
+    ///
+    /// [`AnnAssign`]: ast::StmtAnnAssign
+    fn parse_modifier_assign_decl(&mut self, start: TextSize) -> Stmt {
+        let modifier_start = self.current_token_range().start();
+        // consume modifier keywords until we reach the variable name (the Name
+        // token immediately followed by `=`).
+        loop {
+            let (next_kind, _) = self.peek_nth(0);
+            if next_kind == TokenKind::Equal {
+                break;
+            }
+            self.bump(TokenKind::Name);
+        }
+        let name = self.parse_identifier();
+        self.bump(TokenKind::Equal);
+        let value = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let annotation = Expr::Name(ast::ExprName {
+            id: Name::new_static("__modifier_assign__"),
+            ctx: ExprContext::Invalid,
+            range: TextRange::new(modifier_start, name.range.start()),
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: Some(Box::new(value)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `newtype Foo = int` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `Foo = NewType("Foo", int)`.
+    fn parse_newtype_decl(&mut self, start: TextSize) -> Stmt {
+        let newtype_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "newtype"
+        let name = self.parse_identifier();
+        self.bump(TokenKind::Equal);
+        let value = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let annotation = Expr::Name(ast::ExprName {
+            id: Name::new_static("__newtype__"),
+            ctx: ExprContext::Invalid,
+            range: newtype_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: Some(Box::new(value)),
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `sentinel A` → produces a synthetic
+    /// `AnnAssign { target: A, annotation: __sentinel__, value: None }`
+    /// that the `sentinel` transform rewrites to `A = Sentinel("A")`.
+    fn parse_sentinel_decl(&mut self, start: TextSize) -> Stmt {
+        let kw_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "sentinel"
+        let name = self.parse_identifier();
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let annotation = Expr::Name(ast::ExprName {
+            id: Name::new_static("__sentinel__"),
+            ctx: ExprContext::Invalid,
+            range: kw_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(annotation),
+            value: None,
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `abstract a: int` → produces a synthetic `AnnAssign` that the
+    /// `modifiers` transform rewrites to `a: int` (strips the `abstract` prefix).
+    /// The real annotation is stored as the `value` field so the transform can reconstruct it.
+    fn parse_abstract_annot_decl(&mut self, start: TextSize) -> Stmt {
+        self.parse_modifier_annot_decl(start, "__abstract_annot__")
+    }
+
+    fn parse_visibility_annot_decl(&mut self, start: TextSize) -> Stmt {
+        self.parse_modifier_annot_decl(start, "__visibility_annot__")
+    }
+
+    /// Parses `<modifier> name: T [= v]` and emits an `AnnAssign` whose
+    /// annotation is a synthetic `Name(synthetic_id)` spanning the modifier
+    /// prefix. The downstream transform deletes that prefix from the source
+    /// text, leaving `name: T [= v]` behind.
+    fn parse_modifier_annot_decl(&mut self, start: TextSize, synthetic_id: &'static str) -> Stmt {
+        let modifier_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume modifier keyword
+        let name = self.parse_identifier();
+        self.bump(TokenKind::Colon); // consume ":"
+        let annotation_expr = self
+            .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+            .expr;
+        let value = if self.eat(TokenKind::Equal) {
+            Some(Box::new(
+                self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
+                    .expr,
+            ))
+        } else {
+            // no `= value`: stash the user-typed annotation expression in `value`
+            // (matches the historical `abstract a: T` shape; transform only uses
+            // ranges, not AST semantics)
+            Some(Box::new(annotation_expr))
+        };
+        let target = Expr::Name(ast::ExprName {
+            id: name.id.clone(),
+            ctx: ExprContext::Store,
+            range: name.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let synthetic_ann = Expr::Name(ast::ExprName {
+            id: Name::new_static(synthetic_id),
+            ctx: ExprContext::Invalid,
+            range: TextRange::new(modifier_range.start(), name.range.start()),
+            node_index: AtomicNodeIndex::NONE,
+        });
+        self.eat(TokenKind::Semi);
+        self.eat(TokenKind::Newline);
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target: Box::new(target),
+            annotation: Box::new(synthetic_ann),
+            value,
+            simple: true,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    /// Parses `decorator def name(...)` — a function definition with a synthetic
+    /// decorator (name `"decorator_keyword"`) that the `decorator_keyword`
+    /// transform expands into overloads + a runtime dispatcher
+    fn parse_decorator_def(&mut self, start: TextSize) -> Stmt {
+        let kw_start = self.current_token_range().start();
+        self.bump(TokenKind::Name); // consume "decorator"
+        let def_start = self.current_token_range().start();
+        let decorator_range = TextRange::new(kw_start, def_start);
+
+        let decorator = ast::Decorator {
+            expression: Expr::Name(ast::ExprName {
+                id: Name::new_static("decorator_keyword"),
+                ctx: ExprContext::Invalid,
+                range: decorator_range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            range: decorator_range,
+            node_index: AtomicNodeIndex::NONE,
+        };
+
+        Stmt::FunctionDef(self.parse_function_definition(vec![decorator].into(), start))
+    }
+
+    /// Parses `protocol Foo:` — a class that uses `Protocol` as its base — without
+    /// requiring an explicit `class` keyword. Produces a `ClassDef` with a synthetic
+    /// `Decorator` (name `"protocol_class"`) that the `modifiers` transform rewrites
+    /// to `class Foo(Protocol):`.
+    fn parse_protocol_def(&mut self, start: TextSize) -> Stmt {
+        let protocol_start = self.current_token_range().start();
+        self.bump(TokenKind::Name); // consume "protocol"
+        let class_name_start = self.current_token_range().start();
+        let decorator_range = TextRange::new(protocol_start, class_name_start);
+
+        let decorator = ast::Decorator {
+            expression: Expr::Name(ast::ExprName {
+                id: Name::new_static("protocol_class"),
+                ctx: ExprContext::Invalid,
+                range: decorator_range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            range: decorator_range,
+            node_index: AtomicNodeIndex::NONE,
+        };
+
+        let name = self.parse_identifier();
+        let type_params = self.try_parse_type_params();
+        let arguments = self
+            .at(TokenKind::Lpar)
+            .then(|| Box::new(self.parse_arguments()));
+        let body = if self.eat(TokenKind::Colon) {
+            self.parse_body(Clause::Class)
+        } else {
+            self.eat(TokenKind::Newline);
+            Suite::new()
+        };
+
+        Stmt::ClassDef(ast::StmtClassDef {
+            range: self.node_range(start),
+            decorator_list: vec![decorator].into(),
+            name,
+            type_params: type_params.map(Box::new),
+            arguments,
+            body,
+            node_index: AtomicNodeIndex::NONE,
+        })
     }
 
     /// Parses a single simple statement.
@@ -502,6 +1177,10 @@ impl<'src> Parser<'src> {
         let Expr::Tuple(ast::ExprTuple {
             elts,
             parenthesized: false,
+            is_anon_named_tuple: false,
+            is_anon_named_tuple_value: false,
+            parameter_slash: None,
+            parameter_star: None,
             ..
         }) = expr
         else {
@@ -549,6 +1228,10 @@ impl<'src> Parser<'src> {
 
                 if let Some(ast::ExprTuple {
                     parenthesized: false,
+                    is_anon_named_tuple: false,
+                    is_anon_named_tuple_value: false,
+                    parameter_slash: None,
+                    parameter_star: None,
                     ..
                 }) = exc.as_tuple_expr()
                 {
@@ -572,6 +1255,10 @@ impl<'src> Parser<'src> {
 
             if let Some(ast::ExprTuple {
                 parenthesized: false,
+                is_anon_named_tuple: false,
+                is_anon_named_tuple_value: false,
+                parameter_slash: None,
+                parameter_star: None,
                 ..
             }) = cause.as_tuple_expr()
             {
@@ -1678,6 +2365,10 @@ impl<'src> Parser<'src> {
                 parsed_expr.expr,
                 Expr::Tuple(ast::ExprTuple {
                     parenthesized: false,
+                    is_anon_named_tuple: false,
+                    is_anon_named_tuple_value: false,
+                    parameter_slash: None,
+                    parameter_star: None,
                     ..
                 })
             ) {
@@ -2033,6 +2724,10 @@ impl<'src> Parser<'src> {
                     returns.expr,
                     Expr::Tuple(ast::ExprTuple {
                         parenthesized: false,
+                        is_anon_named_tuple: false,
+                        is_anon_named_tuple_value: false,
+                        parameter_slash: None,
+                        parameter_star: None,
                         ..
                     })
                 ) {
@@ -2066,13 +2761,31 @@ impl<'src> Parser<'src> {
             None
         };
 
-        self.expect(TokenKind::Colon);
-
-        // test_err function_def_empty_body
-        // def foo():
-        // def foo() -> int:
-        // x = 42
-        let body = self.parse_body(Clause::FunctionDef);
+        // basedpython: `def f(a: int) -> int` (no colon, no body) is permitted as
+        // a bodyless overload declaration. The `overload` transform adds `@overload`
+        // to consecutive bodyless defs with the same name and a `: ...` stub body.
+        // recovery parity with upstream ruff: if the colon is missing but the next
+        // line is indented, parse it as the body so references inside resolve to
+        // parameters (matches `def f(x\n    return x`-style truncated headers)
+        let body = if self.eat(TokenKind::Colon) {
+            // test_err function_def_empty_body
+            // def foo():
+            // def foo() -> int:
+            // x = 42
+            self.parse_body(Clause::FunctionDef)
+        } else if self.at(TokenKind::Newline) && self.peek() == TokenKind::Indent {
+            self.add_error(
+                ParseErrorType::OtherError("Expected `:` after function header".to_string()),
+                self.current_token_range(),
+            );
+            self.parse_body(Clause::FunctionDef)
+        } else {
+            self.error_if_not_basedpython(
+                "function declarations without a body are not valid in .py files".to_string(),
+            );
+            self.eat(TokenKind::Newline);
+            Suite::new()
+        };
 
         ast::StmtFunctionDef {
             name,
@@ -2085,6 +2798,141 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    /// Parses `init(...)` — basedpython shorthand for `def __init__(...)` inside a
+    /// class body. The keyword text is captured by a synthetic `__init_method__`
+    /// decorator; the `init_method` transform replaces it with `def __init__` and
+    /// promotes any `let` parameters into `self.<name>: <ann> = <name>` body lines.
+    ///
+    /// The function is named `__init__` directly so ty's semantic analysis (which
+    /// scans `__init__` body for `self.X = ...` assignments) sees the synthesised
+    /// body statements created from each `let` parameter
+    fn parse_init_method(&mut self, start: TextSize) -> ast::StmtFunctionDef {
+        let init_range = self.current_token_range();
+        self.bump(TokenKind::Name); // consume "init"
+
+        let decorator = ast::Decorator {
+            expression: Expr::Name(ast::ExprName {
+                id: Name::new_static("__init_method__"),
+                ctx: ExprContext::Invalid,
+                range: init_range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            range: init_range,
+            node_index: AtomicNodeIndex::NONE,
+        };
+
+        let name = ast::Identifier {
+            id: Name::new_static("__init__"),
+            range: init_range,
+            node_index: AtomicNodeIndex::NONE,
+        };
+
+        let parameters = self.parse_parameters(FunctionKind::FunctionDef);
+
+        // synthesise `self.<name>: <ann> = <name>` for every `let`-prefixed parameter
+        // and prepend to the body so ty's instance-attribute analysis picks them up
+        let synthetic_body = self.synthesize_let_assignments(&parameters);
+
+        // bodyless form is permitted: `init(self, let a: int)` with no `:`
+        let user_body = if self.eat(TokenKind::Colon) {
+            self.parse_body(Clause::FunctionDef)
+        } else {
+            self.eat(TokenKind::Newline);
+            Suite::new()
+        };
+
+        let body: Suite = synthetic_body.into_iter().chain(user_body).collect();
+
+        ast::StmtFunctionDef {
+            name,
+            type_params: None,
+            parameters: Box::new(parameters),
+            body,
+            decorator_list: vec![decorator].into(),
+            is_async: false,
+            returns: None,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    /// Build the synthetic `self.<name>: <ann> = <name>` statements for each
+    /// `let`-prefixed parameter. A parameter is recognised as `let`-prefixed
+    /// when the source span between its node start and its name has the form
+    /// `let ` — the parser consumes the keyword but does not record it on the
+    /// `Parameter` node, so we read it back from the source
+    fn synthesize_let_assignments(&self, params: &ast::Parameters) -> Vec<Stmt> {
+        let mut out = Vec::new();
+        for p in &params.posonlyargs {
+            self.maybe_synth_let_assign(&p.parameter, &mut out);
+        }
+        for p in &params.args {
+            self.maybe_synth_let_assign(&p.parameter, &mut out);
+        }
+        if let Some(v) = &params.vararg {
+            self.maybe_synth_let_assign(v, &mut out);
+        }
+        for p in &params.kwonlyargs {
+            self.maybe_synth_let_assign(&p.parameter, &mut out);
+        }
+        if let Some(k) = &params.kwarg {
+            self.maybe_synth_let_assign(k, &mut out);
+        }
+        out
+    }
+
+    fn maybe_synth_let_assign(&self, param: &ast::Parameter, out: &mut Vec<Stmt>) {
+        let prefix_start = usize::from(param.range.start());
+        let prefix_end = usize::from(param.name.range.start());
+        let prefix = &self.source[prefix_start..prefix_end];
+        if !prefix.trim_start().starts_with("let") {
+            return;
+        }
+        let name_range = param.name.range;
+        let name_id = param.name.id.clone();
+        let self_expr = Expr::Name(ast::ExprName {
+            id: Name::new_static("self"),
+            ctx: ExprContext::Load,
+            range: param.range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let attr_target = Expr::Attribute(ast::ExprAttribute {
+            value: Box::new(self_expr),
+            attr: ast::Identifier {
+                id: name_id.clone(),
+                range: name_range,
+                node_index: AtomicNodeIndex::NONE,
+            },
+            ctx: ExprContext::Store,
+            range: param.range,
+            node_index: AtomicNodeIndex::NONE,
+            optional: false,
+        });
+        let value_expr = Expr::Name(ast::ExprName {
+            id: name_id,
+            ctx: ExprContext::Load,
+            range: name_range,
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let stmt = match &param.annotation {
+            Some(ann) => Stmt::AnnAssign(ast::StmtAnnAssign {
+                target: Box::new(attr_target),
+                annotation: ann.clone(),
+                value: Some(Box::new(value_expr)),
+                simple: false,
+                range: param.range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+            None => Stmt::Assign(ast::StmtAssign {
+                targets: vec![attr_target],
+                value: Box::new(value_expr),
+                range: param.range,
+                node_index: AtomicNodeIndex::NONE,
+            }),
+        };
+        out.push(stmt);
     }
 
     /// Parses a class definition.
@@ -2138,13 +2986,33 @@ impl<'src> Parser<'src> {
             .at(TokenKind::Lpar)
             .then(|| Box::new(self.parse_arguments()));
 
-        self.expect(TokenKind::Colon);
-
-        // test_err class_def_empty_body
-        // class Foo:
-        // class Foo():
-        // x = 42
-        let body = self.parse_body(Clause::Class);
+        // basedpython: `class Foo` (no colon, no body) is permitted as an
+        // empty declaration. the AST records `body: vec![]`, which the
+        // `empty_declarations` transform expands to `: ...`. upstream Python
+        // would error here; if the colon is present we still require a body
+        let body = if self.eat(TokenKind::Colon) {
+            // test_err class_def_empty_body
+            // class Foo:
+            // class Foo():
+            // x = 42
+            self.class_body_depth += 1;
+            let body = self.parse_body(Clause::Class);
+            self.class_body_depth -= 1;
+            body
+        } else {
+            if !self.options.is_basedpython {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "class without body requires `: ...` in .py files".to_string(),
+                    ),
+                    self.node_range(start),
+                );
+            }
+            // a non-body class consumes its own statement terminator since
+            // there's no `parse_body` to do it for us
+            self.eat(TokenKind::Newline);
+            Suite::new()
+        };
 
         ast::StmtClassDef {
             range: self.node_range(start),
@@ -2985,6 +3853,18 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
+        // basedpython: a modifier keyword may follow the decorators, e.g.
+        // `@overload class def open(...)` or `@final static def helper(...)`.
+        // route to the modifier parser, carrying the decorators we just parsed so
+        // the synthetic modifier decorator is appended after them. a bare `class`
+        // (not `class def`) stays a normal decorated class definition below.
+        let at_modifier = (self.at(TokenKind::Class) && self.peek() == TokenKind::Def)
+            || (self.at(TokenKind::Name)
+                && is_modifier_kw(self.src_text(self.current_token_range())));
+        if at_modifier {
+            return self.parse_with_modifier(start, decorators);
+        }
+
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
             TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
@@ -3042,6 +3922,22 @@ impl<'src> Parser<'src> {
     /// This could either be a single statement that's on the same line as the
     /// clause header or an indented block.
     fn parse_body(&mut self, parent_clause: Clause) -> Suite {
+        // a function body is not "directly in a class suite". reset the
+        // class-body depth while parsing it so a plain `init(...)` *call* inside
+        // a method isn't mistaken for the basedpython init-method shorthand,
+        // which is only recognised directly in a class body. nested classes
+        // inside the body re-establish their own depth
+        if matches!(parent_clause, Clause::FunctionDef) {
+            let saved = std::mem::take(&mut self.class_body_depth);
+            let body = self.parse_body_inner(parent_clause);
+            self.class_body_depth = saved;
+            body
+        } else {
+            self.parse_body_inner(parent_clause)
+        }
+    }
+
+    fn parse_body_inner(&mut self, parent_clause: Clause) -> Suite {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
 
@@ -3123,6 +4019,19 @@ impl<'src> Parser<'src> {
         function_kind: FunctionKind,
         allow_star_annotation: AllowStarAnnotation,
     ) -> ast::Parameter {
+        // basedpython: optional `let` prefix on a parameter marks it for
+        // auto-attribute-assignment inside an `init(...)` shorthand. The
+        // prefix is detected from the source span between `start` and the
+        // parameter name by the `init_method` transform — no AST field needed
+        if self.at(TokenKind::Name)
+            && self.src_text(self.current_token_range()) == "let"
+            && self.peek() == TokenKind::Name
+        {
+            self.error_if_not_basedpython(
+                "`let` parameter modifier is not valid in .py files".to_string(),
+            );
+            self.bump(TokenKind::Name);
+        }
         let name = self.parse_identifier();
 
         // Annotations are only allowed for function definition. For lambda expression,
@@ -3682,6 +4591,22 @@ impl<'src> Parser<'src> {
             // type X[T: (int, int) = int] = int
             // type X[T: int = int, U: (int, int) = int] = int
         } else {
+            // basedpython variance keywords: `out T`, `in T`, `in out T`
+            let variance = if self.eat(TokenKind::In) {
+                if self.at(TokenKind::Name) && self.src_text(self.current_token_range()) == "out" {
+                    self.bump(TokenKind::Name);
+                    Some(Variance::Bivariant)
+                } else {
+                    Some(Variance::Contravariant)
+                }
+            } else if self.at(TokenKind::Name) && self.src_text(self.current_token_range()) == "out"
+            {
+                self.bump(TokenKind::Name);
+                Some(Variance::Covariant)
+            } else {
+                None
+            };
+
             let name = self.parse_identifier();
 
             let bound = if self.eat(TokenKind::Colon) {
@@ -3757,6 +4682,7 @@ impl<'src> Parser<'src> {
                 name,
                 bound,
                 default,
+                variance,
                 node_index: AtomicNodeIndex::NONE,
             })
         }

@@ -168,6 +168,18 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                     {
                         continue;
                     }
+
+                    // basedpython: a run of consecutive bodyless `def`s with the
+                    // same name is treated as an `@overload` group at transpile time
+                    if checker.source_type.is_basedpython()
+                        && checker
+                            .semantic()
+                            .statement(node_id)
+                            .as_function_def_stmt()
+                            .is_some_and(|function| function.body.is_empty())
+                    {
+                        continue;
+                    }
                 }
             } else {
                 // A binding in a class body creates a class attribute; it doesn't rebind names

@@ -399,6 +399,7 @@ impl UnittestAssert {
                     },
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    is_cast: false,
                 };
                 let isinstance = node1.into();
                 if matches!(self, UnittestAssert::IsInstance) {
@@ -436,6 +437,7 @@ impl UnittestAssert {
                     attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    optional: false,
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node2 = ast::ExprCall {
@@ -448,6 +450,7 @@ impl UnittestAssert {
                     },
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    is_cast: false,
                 };
                 let re_search = node2.into();
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {

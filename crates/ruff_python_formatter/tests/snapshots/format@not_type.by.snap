@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/not_type.by
+---
+## Input
+```bython
+a: not int
+b: list[not int]
+
+
+def f(x: not None) -> not str: ...
+
+
+type Y = not None
+```
+
+## Output
+```bython
+a: not int
+b: list[not int]
+
+
+def f(x: not None) -> not str: ...
+
+
+type Y = not None
+```

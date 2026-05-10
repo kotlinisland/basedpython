@@ -205,10 +205,12 @@ impl<'a> Resolver<'a> {
         // required to) contain some `__init__.py` files.
         let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();
         for file in files {
-            if file.ends_with("__init__.py") {
-                if let Some(parent) = file.parent() {
-                    package_cache.insert(parent, true);
-                }
+            if matches!(
+                file.file_name().and_then(|n| n.to_str()),
+                Some("__init__.py" | "__init__.pyi" | "__init__.by" | "__init__.byi")
+            ) && let Some(parent) = file.parent()
+            {
+                package_cache.insert(parent, true);
             }
         }
 

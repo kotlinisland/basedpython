@@ -407,7 +407,7 @@ impl Project {
         );
     }
 
-    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
+    pub fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
         if !self.should_check_file(db, file) {
             return Vec::new();
         }

@@ -757,6 +757,33 @@ class Child(Parent):
     def foo(self): ...  # fine because `Any` is in the MRO
 ```
 
+## basedpython: `override def` modifier
+
+in basedpython, the `override` keyword before `def` carries the same semantics as `@typing.override`
+without needing the import
+
+### legitimate override is fine
+
+```by
+class Parent:
+    def foo(self) -> int:
+        return 0
+
+class Child(Parent):
+    override def foo(self) -> int:
+        return 1
+```
+
+### `override def` with no super-method is reported
+
+```by
+class Parent: ...
+
+class Child(Parent):
+    override def foo(self) -> int:  # error: [invalid-explicit-override]
+        return 0
+```
+
 ## Overloaded methods with explicit receiver annotations
 
 When checking an override, overloads with explicit receiver annotations only need to be considered

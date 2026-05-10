@@ -384,9 +384,9 @@ impl From<ruff_db::system::FileType> for FileType {
 }
 
 /// Returns true if and only if the given file extension corresponds
-/// to a Python source or stub file.
+/// to a Python source or stub file (or their basedpython counterparts).
 fn is_python_extension(ext: &str) -> bool {
-    matches!(ext, "py" | "pyi")
+    matches!(ext, "py" | "pyi" | "by" | "byi")
 }
 
 #[cfg(test)]
@@ -595,7 +595,7 @@ mod tests {
             list_snapshot_filter(&db, |m| m.name(&db).as_str() == "builtins"),
             @r#"
         [
-            Module::File("builtins", "std-vendored", "stdlib/builtins.pyi", Module, Some(Builtins)),
+            Module::File("builtins", "std-vendored", "stdlib/builtins.byi", Module, Some(Builtins)),
         ]
         "#,
         );
@@ -856,7 +856,7 @@ mod tests {
             list_snapshot_filter(&db, |m| m.name(&db).as_str().contains("pydoc_data")),
             @r#"
         [
-            Module::File("pydoc_data", "std-vendored", "stdlib/pydoc_data/__init__.pyi", Package, None),
+            Module::File("pydoc_data", "std-vendored", "stdlib/pydoc_data/__init__.byi", Package, None),
         ]
         "#,
         );

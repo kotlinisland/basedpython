@@ -127,6 +127,24 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
             // dynamically, so as to avoid the parent rendering its child's comments.
             let comments = f.context().comments().clone();
             let leading_value_comments = comments.leading(self.value);
+            // basedpython `**: T` extra-items marker in a typed-dict literal:
+            // `Starred(Starred(T))` lowers back to `**: T` source, not `****T`
+            if let Expr::Starred(outer) = self.value
+                && let Expr::Starred(inner) = outer.value.as_ref()
+            {
+                return write!(
+                    f,
+                    [
+                        leading_comments(leading_value_comments),
+                        group(&format_args![
+                            token("**"),
+                            token(":"),
+                            space(),
+                            inner.value.format()
+                        ])
+                    ]
+                );
+            }
             write!(
                 f,
                 [

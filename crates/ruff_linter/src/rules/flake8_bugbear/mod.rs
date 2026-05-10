@@ -21,6 +21,10 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
+    #[test_case(
+        Rule::AbstractBaseClassWithoutAbstractMethod,
+        Path::new("B024_basedpython.by")
+    )]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
     #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
     #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
@@ -32,6 +36,10 @@ mod tests {
     #[test_case(Rule::DuplicateValue, Path::new("B033.py"))]
     #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.py"))]
     #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.pyi"))]
+    #[test_case(
+        Rule::EmptyMethodWithoutAbstractDecorator,
+        Path::new("B027_basedpython.by")
+    )]
     #[test_case(Rule::ExceptWithEmptyTuple, Path::new("B029.py"))]
     #[test_case(Rule::ExceptWithNonExceptionClasses, Path::new("B030.py"))]
     #[test_case(Rule::FStringDocstring, Path::new("B021.py"))]
@@ -51,6 +59,7 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_basedpython.by"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"))]

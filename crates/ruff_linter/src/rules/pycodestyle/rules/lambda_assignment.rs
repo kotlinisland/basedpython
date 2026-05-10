@@ -63,6 +63,13 @@ pub(crate) fn lambda_assignment(
     annotation: Option<&Expr>,
     stmt: &Stmt,
 ) {
+    // basedpython supports typed lambda syntax (`lambda (x: int) -> int: ...`),
+    // and an annotated lambda binding is the idiomatic way to express a typed
+    // function value, so the rewrite-as-`def` advice does not apply
+    if checker.source_type.is_basedpython() {
+        return;
+    }
+
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };

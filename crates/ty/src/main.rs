@@ -27,7 +27,7 @@ pub fn main() -> ExitStatus {
 
         // This communicates that this isn't a linter error but ty itself hard-errored for
         // some reason (e.g. failed to resolve the configuration)
-        writeln!(stderr, "{}", "ty failed".red().bold()).ok();
+        writeln!(stderr, "{}", "by failed".red().bold()).ok();
         // Currently we generally only see one error, but e.g. with io errors when resolving
         // the configuration it is help to chain errors ("resolving configuration failed" ->
         // "failed to read file: subdir/pyproject.toml")

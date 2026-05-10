@@ -60,6 +60,9 @@ pub struct PyFormatOptions {
     /// is enabled.
     docstring_code_line_width: DocstringCodeLineWidth,
 
+    /// whether the file being formatted is a basedpython `.by` file
+    is_basedpython: bool,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 
@@ -97,6 +100,7 @@ impl Default for PyFormatOptions {
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
+            is_basedpython: false,
             preview: PreviewMode::default(),
             nested_string_quote_style: NestedStringQuoteStyle::default(),
         }
@@ -106,7 +110,14 @@ impl Default for PyFormatOptions {
 impl PyFormatOptions {
     /// Otherwise sets the defaults. Returns none if the extension is unknown
     pub fn from_extension(path: &Path) -> Self {
-        Self::from_source_type(PySourceType::from(path))
+        let is_basedpython = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext == "by" || ext == "byi");
+        Self {
+            is_basedpython,
+            ..Self::from_source_type(PySourceType::from(path))
+        }
     }
 
     pub fn from_source_type(source_type: PySourceType) -> Self {
@@ -154,6 +165,16 @@ impl PyFormatOptions {
 
     pub const fn nested_string_quote_style(&self) -> NestedStringQuoteStyle {
         self.nested_string_quote_style
+    }
+
+    pub const fn is_basedpython(&self) -> bool {
+        self.is_basedpython
+    }
+
+    #[must_use]
+    pub fn with_is_basedpython(mut self, is_basedpython: bool) -> Self {
+        self.is_basedpython = is_basedpython;
+        self
     }
 
     #[must_use]

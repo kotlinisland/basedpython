@@ -67,6 +67,7 @@ Module(
                             node_index: NodeIndex(None),
                             range: 16..28,
                             parameters: None,
+                            returns: None,
                             body: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),

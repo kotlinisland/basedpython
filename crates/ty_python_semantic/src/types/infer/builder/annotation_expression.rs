@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_dotted_name;
+use ty_python_core::scope::ScopeKind;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
@@ -140,6 +141,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
         }
 
+        // basedpython annotation markers — `let x = v`, `class a = v`,
+        // `[modifiers] a = v`, `newtype X = T`, `abstract a: T`, `sentinel A`
+        // parse to AnnAssign with a synthetic Name/Subscript annotation whose
+        // id is one of `__let__`, `__classvar__`, `__modifier_assign__`,
+        // `__newtype__`, `__abstract_annot__`, `__sentinel__`.
+        // resolve them so ty applies the right qualifier without a transpile step
+        if let Some(result) = self.synthetic_annotation_marker(annotation) {
+            self.store_expression_type(annotation, result.inner_type());
+            self.store_qualifiers(annotation, result.qualifiers());
+            return result;
+        }
+
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let annotation_ty = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
@@ -210,7 +223,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .with_qualifier(inferred.qualifiers())
                         }
                         SpecialFormType::TypeQualifier(qualifier) => {
-                            let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                            // basedpython: a parenthesized tuple in the slice
+                            // is the `tuple[...]` type-expression form
+                            // (`ClassVar[(int, str)]` ≡ `ClassVar[tuple[int, str]]`,
+                            // `ClassVar[(*: T)]` ≡ `ClassVar[tuple[T, ...]]`),
+                            // so treat it as a single argument rather than
+                            // unwrapping its elements
+                            let basedpython_tuple_type = matches!(slice, ast::Expr::Tuple(t)
+                                if self.is_basedpython_file() && t.parenthesized);
+                            let arguments = if let ast::Expr::Tuple(tuple) = slice
+                                && !basedpython_tuple_type
+                            {
                                 &*tuple.elts
                             } else {
                                 std::slice::from_ref(slice)
@@ -291,7 +314,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                                 TypeAndQualifiers::declared(Type::unknown())
                             };
-                            if slice.is_tuple_expr() {
+                            // when the slice is a basedpython tuple-type
+                            // expression, the recursive
+                            // `infer_annotation_expression_impl` call already
+                            // stored the type for the tuple slice — don't
+                            // double-store
+                            if slice.is_tuple_expr() && !basedpython_tuple_type {
                                 self.store_expression_type(slice, type_and_qualifiers.inner_type());
                             }
                             type_and_qualifiers
@@ -320,11 +348,78 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation_ty
     }
 
+    /// detect basedpython synthetic annotation markers and return the equivalent
+    /// `TypeAndQualifiers`. returns `None` for ordinary annotations
+    fn synthetic_annotation_marker(
+        &mut self,
+        annotation: &ast::Expr,
+    ) -> Option<TypeAndQualifiers<'db>> {
+        let in_class_scope = self
+            .index
+            .scope(self.scope().file_scope_id(self.db()))
+            .kind()
+            == ScopeKind::Class;
+
+        match annotation {
+            ast::Expr::Name(name) => match name.id.as_str() {
+                "__let__" => {
+                    let qualifiers = if in_class_scope {
+                        TypeQualifiers::empty()
+                    } else {
+                        TypeQualifiers::FINAL
+                    };
+                    Some(TypeAndQualifiers::new(
+                        Type::unknown(),
+                        TypeOrigin::Declared,
+                        qualifiers,
+                    ))
+                }
+                "__classvar__" => Some(TypeAndQualifiers::new(
+                    Type::unknown(),
+                    TypeOrigin::Declared,
+                    TypeQualifiers::CLASS_VAR,
+                )),
+                "__modifier_assign__" => Some(TypeAndQualifiers::declared(Type::unknown())),
+                "__sentinel__" => Some(TypeAndQualifiers::declared(Type::unknown())),
+                _ => None,
+            },
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let ast::Expr::Name(value_name) = value.as_ref() else {
+                    return None;
+                };
+                if value_name.id.as_str() != "__let__" {
+                    return None;
+                }
+                // typed `let x: T = v` — slice is the actual type
+                let inner = self.infer_type_expression(slice);
+                let qualifiers = if in_class_scope {
+                    TypeQualifiers::empty()
+                } else {
+                    TypeQualifiers::FINAL
+                };
+                Some(TypeAndQualifiers::new(
+                    inner,
+                    TypeOrigin::Declared,
+                    qualifiers,
+                ))
+            }
+            _ => None,
+        }
+    }
+
     /// Infer the type of a string annotation expression.
     fn infer_string_annotation_expression(
         &mut self,
         string: &ast::ExprStringLiteral,
     ) -> TypeAndQualifiers<'db> {
+        // basedpython: string in annotation is `Literal[<str>]`, not a forward ref
+        if self.is_basedpython_file() {
+            let value = string.value.to_str();
+            return TypeAndQualifiers::declared(crate::types::Type::string_literal(
+                self.db(),
+                value,
+            ));
+        }
         match parse_string_annotation(&self.context, self.inference_flags(), string) {
             Some(parsed) => {
                 self.string_annotations

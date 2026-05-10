@@ -3,9 +3,9 @@ requires = ["maturin>=1.9.3,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "ruff"
-version = "0.15.15"
-description = "An extremely fast Python linter and code formatter, written in Rust."
+name = "basedpython"
+version = "0.0.1a1"
+description = "a transpiler for both Python and basedpython"
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
@@ -20,7 +20,7 @@ keywords = [
     "clippy",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 1 - Planning",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
@@ -35,25 +35,34 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Rust",
+    "Topic :: Software Development",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Pre-processors",
+    "Topic :: Software Development :: Code Generators",
 ]
 
 [project.urls]
-Repository = "https://github.com/astral-sh/ruff"
-Documentation = "https://docs.astral.sh/ruff/"
-Changelog = "https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md"
+Repository = "https://github.com/KotlinIsland/basedpython"
+Documentation = "https://kotlinisland.github.io/basedpython/"
+Changelog = "https://github.com/KotlinIsland/basedpython/blob/main/CHANGELOG.md"
 
+[dependency-groups]
+docs = [
+    "zensical",
+]
+
+# builds the standalone distribution crate, which produces both the `by`
+# (type-checker / transpiler) and `buff` (linter / formatter) binaries. maturin
+# packages every bin of the target crate as a console script, so the wheel ships
+# both. no python module: a single `python -m basedpython` would be ambiguous
+# between the two tools, so they're exposed purely as the `by` and `buff` scripts
 [tool.maturin]
 bindings = "bin"
-manifest-path = "crates/ruff/Cargo.toml"
-module-name = "ruff"
-python-source = "python"
+manifest-path = "crates/basedpython/Cargo.toml"
 strip = true
-exclude = [
-    "crates/ruff_linter/resources/test/fixtures/**/*",
-    "crates/ruff_linter/src/rules/*/snapshots/**/*"
-]
 
 [tool.ruff]
 target-version = "py38"

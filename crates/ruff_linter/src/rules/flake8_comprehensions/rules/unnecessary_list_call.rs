@@ -52,6 +52,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
         arguments,
         range: _,
         node_index: _,
+        is_cast: _,
     } = call;
 
     if !arguments.keywords.is_empty() {

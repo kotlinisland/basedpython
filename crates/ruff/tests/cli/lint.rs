@@ -10,7 +10,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 
 use crate::CliTest;
 
-const BIN_NAME: &str = "ruff";
+const BIN_NAME: &str = "buff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
 impl CliTest {

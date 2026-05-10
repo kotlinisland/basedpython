@@ -1,0 +1,8 @@
+a: not int
+b: list[not int]
+
+
+def f(x: not None) -> not str: ...
+
+
+type Y = not None

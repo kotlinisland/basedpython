@@ -60,6 +60,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
                                     node_index: NodeIndex(None),
@@ -124,6 +125,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
                                     node_index: NodeIndex(None),
@@ -197,6 +199,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
                                     node_index: NodeIndex(None),
@@ -256,6 +259,7 @@ Module(
                                     kwarg: None,
                                 },
                             ),
+                            returns: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
                                     node_index: NodeIndex(None),
@@ -315,6 +319,7 @@ Module(
                                     ),
                                 },
                             ),
+                            returns: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
                                     node_index: NodeIndex(None),

@@ -362,6 +362,7 @@ pub(crate) fn format_source(
         SourceKind::Python {
             code: unformatted,
             is_stub,
+            is_basedpython,
         } => {
             let py_source_type = source_kind.py_source_type();
             let options = settings.to_format_options(py_source_type, unformatted, path);
@@ -403,6 +404,7 @@ pub(crate) fn format_source(
                 Ok(FormattedSource::Formatted(SourceKind::Python {
                     code: formatted,
                     is_stub: *is_stub,
+                    is_basedpython: *is_basedpython,
                 }))
             }
         }
@@ -1299,6 +1301,7 @@ mod tests {
         let source_kind = SourceKind::Python {
             code: "1".to_string(),
             is_stub: false,
+            is_basedpython: false,
         };
 
         let panic_error = catch_unwind(|| {
@@ -1401,10 +1404,12 @@ mod tests {
             &SourceKind::Python {
                 code: unformatted.to_string(),
                 is_stub: false,
+                is_basedpython: false,
             },
             &SourceKind::Python {
                 code: formatted.to_string(),
                 is_stub: false,
+                is_basedpython: false,
             },
         );
         assert_eq!(

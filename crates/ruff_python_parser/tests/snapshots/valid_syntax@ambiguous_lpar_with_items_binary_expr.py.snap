@@ -374,6 +374,7 @@ Module(
                                                 },
                                             ),
                                             ctx: Load,
+                                            is_typeof: false,
                                         },
                                     ),
                                     op: Add,

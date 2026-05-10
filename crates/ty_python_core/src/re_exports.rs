@@ -348,7 +348,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::Expr::IpyEscapeCommand(_)
             | ast::Expr::Dict(_)
             | ast::Expr::Set(_)
-            | ast::Expr::Await(_) => walk_expr(self, expr),
+            | ast::Expr::Await(_)
+            | ast::Expr::CallableType(_) => walk_expr(self, expr),
         }
     }
 }
@@ -415,7 +416,8 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ast::Expr::IpyEscapeCommand(_)
             | ast::Expr::Dict(_)
             | ast::Expr::Set(_)
-            | ast::Expr::Await(_) => walk_expr(self, expr),
+            | ast::Expr::Await(_)
+            | ast::Expr::CallableType(_) => walk_expr(self, expr),
         }
     }
 }

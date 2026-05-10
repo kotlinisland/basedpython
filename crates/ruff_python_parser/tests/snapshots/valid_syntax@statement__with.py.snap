@@ -357,6 +357,7 @@ Module(
                                         args: [],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                             optional_vars: Some(
@@ -414,6 +415,7 @@ Module(
                                         args: [],
                                         keywords: [],
                                     },
+                                    is_cast: false,
                                 },
                             ),
                             optional_vars: Some(
@@ -435,6 +437,7 @@ Module(
                                             node_index: NodeIndex(None),
                                         },
                                         ctx: Store,
+                                        optional: false,
                                     },
                                 ),
                             ),

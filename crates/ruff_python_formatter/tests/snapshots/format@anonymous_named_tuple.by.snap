@@ -1,0 +1,23 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/anonymous_named_tuple.by
+---
+## Input
+```bython
+x: (name: str, age: int)
+y = (name="hi", age=1)
+
+
+def f(p: (a: int, b: str)) -> (c: bool, d: int):
+    return (c=True, d=0)
+```
+
+## Output
+```bython
+x: (name: str, age: int)
+y = (name="hi", age=1)
+
+
+def f(p: (a: int, b: str)) -> (c: bool, d: int):
+    return (c=True, d=0)
+```

@@ -173,6 +173,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 })),
                 slice: Box::new(expr.clone()),
                 ctx: ast::ExprContext::Load,
+                is_typeof: false,
             });
             let content = checker.generator().expr(&new_expr);
             Ok(Fix::unsafe_edits(

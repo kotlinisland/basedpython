@@ -1,0 +1,127 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+ModModule {
+    node_index: NodeIndex(None),
+    range: 0..30,
+    body: [
+        Assign(
+            StmtAssign {
+                node_index: NodeIndex(None),
+                range: 0..29,
+                targets: [
+                    Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 0..1,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                ],
+                value: Tuple(
+                    ExprTuple {
+                        node_index: NodeIndex(None),
+                        range: 4..29,
+                        elts: [
+                            Named(
+                                ExprNamed {
+                                    node_index: NodeIndex(None),
+                                    range: 5..19,
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 5..9,
+                                            id: Name("name"),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            node_index: NodeIndex(None),
+                                            range: 10..19,
+                                            left: Call(
+                                                ExprCall {
+                                                    node_index: NodeIndex(None),
+                                                    range: 10..15,
+                                                    func: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 10..13,
+                                                            id: Name("foo"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 13..15,
+                                                        node_index: NodeIndex(None),
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                    is_cast: false,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 18..19,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            Named(
+                                ExprNamed {
+                                    node_index: NodeIndex(None),
+                                    range: 21..28,
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 21..24,
+                                            id: Name("age"),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 25..28,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 25..26,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("y"),
+                                                range: 27..28,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Load,
+                                            optional: false,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        ctx: Load,
+                        parenthesized: true,
+                        is_anon_named_tuple: false,
+                        is_anon_named_tuple_value: true,
+                        parameter_slash: None,
+                        parameter_star: None,
+                        is_parameter_shape: false,
+                    },
+                ),
+            },
+        ),
+    ],
+}

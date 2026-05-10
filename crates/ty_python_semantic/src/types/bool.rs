@@ -312,6 +312,10 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bool(bool) => Truthiness::from(bool),
                 LiteralValueTypeKind::String(str) => Truthiness::from(!str.value(db).is_empty()),
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+                LiteralValueTypeKind::Float(f) => Truthiness::from(f.as_f64() != 0.0),
+                LiteralValueTypeKind::Complex(c) => {
+                    Truthiness::from(c.re(db) != 0.0 || c.im(db) != 0.0)
+                }
             },
 
             Type::TypeAlias(alias) => visitor.visit(*self, || {

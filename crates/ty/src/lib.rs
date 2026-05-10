@@ -1,4 +1,5 @@
 mod args;
+mod by_commands;
 mod logging;
 mod printer;
 mod python_version;
@@ -33,16 +34,25 @@ use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
+use crate::args::{CheckCommand, Command, ExplainCommand, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
+    run_from_args(wild::args_os())
+}
+
+/// run ty with an explicit arg list — used by `by` to pass remapped args without a subprocess
+pub fn run_from_args<I, T>(iter: I) -> anyhow::Result<ExitStatus>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<std::ffi::OsString> + Clone,
+{
     setup_rayon();
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
-    let args = wild::args_os();
+    let args = iter.into_iter().map(Into::into);
     let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
         .context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
@@ -50,7 +60,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
-        Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
+        Command::Version { output_format } => Ok(by_commands::cmd_version_by(output_format)),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
 
@@ -70,22 +80,132 @@ pub fn run() -> anyhow::Result<ExitStatus> {
                 Ok(ExitStatus::Success)
             }
         },
+        Command::Run {
+            module,
+            min_version,
+        } => by_commands::cmd_run(&module, &min_version),
+        Command::Build { min_version } => by_commands::cmd_build(&min_version),
+        Command::Transpile {
+            file,
+            reverse,
+            min_version,
+        } => by_commands::cmd_transpile(file.as_ref(), reverse, &min_version),
+        Command::GenerateApiFile {
+            output,
+            stdout,
+            project,
+            python,
+            python_version,
+        } => run_generate_api_file(output, stdout, project, python, python_version),
     }
 }
 
-pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
-    let mut stdout = Printer::default().stream_for_requested_summary().lock();
-    let version_info = crate::version::version();
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "args are owned in clap; passing by value keeps the call site flat"
+)]
+fn run_generate_api_file(
+    output: Option<std::path::PathBuf>,
+    stdout: bool,
+    project: Option<SystemPathBuf>,
+    python: Option<SystemPathBuf>,
+    python_version: Option<crate::python_version::PythonVersion>,
+) -> anyhow::Result<ExitStatus> {
+    use ty_project::metadata::options::EnvironmentOptions;
+    use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+    use ty_python_semantic::api_lockfile::generate_api_lockfile;
 
-    match output_format {
-        HelpFormat::Text => {
-            writeln!(stdout, "ty {}", &version_info)?;
-        }
-        HelpFormat::Json => {
-            serde_json::to_writer_pretty(&mut stdout, &version_info)?;
-        }
+    let cwd = {
+        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+            anyhow!(
+                "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
+                path.display()
+            )
+        })?
+    };
+
+    let project_path = project
+        .as_ref()
+        .map(|p| {
+            if p.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(p, &cwd))
+            } else {
+                Err(anyhow!("Provided project path `{p}` is not a directory"))
+            }
+        })
+        .transpose()?
+        .unwrap_or_else(|| cwd.clone());
+
+    let system = OsSystem::new(&cwd);
+
+    let mut project_metadata = ProjectMetadata::discover(&project_path, &system)?;
+    project_metadata.apply_configuration_files(&system)?;
+
+    let cli_options = ty_project::metadata::options::Options {
+        environment: Some(EnvironmentOptions {
+            python_version: python_version.map(Into::into).map(RangedValue::cli),
+            python: python.map(RelativePathBuf::cli),
+            ..EnvironmentOptions::default()
+        }),
+        ..ty_project::metadata::options::Options::default()
+    };
+    let overrides = ProjectOptionsOverrides::new(None, cli_options);
+    project_metadata.apply_overrides(&overrides);
+
+    let db = ProjectDatabase::fallible(project_metadata, system)?;
+    let project = db.project();
+
+    // walk first-party files only. exclude transpiler build output
+    // (`out/`, `build/`, `dist/`) and editor artefacts so the lockfile
+    // tracks user source rather than regenerated artefacts
+    let indexed = project.files(&db);
+    let mut first_party_files: Vec<_> = indexed
+        .iter()
+        .copied()
+        .filter(|file| {
+            let path = file.path(&db);
+            // only system paths in first-party search paths
+            let ruff_db::files::FilePath::System(system_path) = path else {
+                return false;
+            };
+            // skip any file whose path passes through a build-output dir
+            let path_str = system_path.as_str();
+            for excluded in ["/out/", "/build/", "/dist/"] {
+                if path_str.contains(excluded) {
+                    return false;
+                }
+            }
+            if path_str.starts_with("out/")
+                || path_str.starts_with("build/")
+                || path_str.starts_with("dist/")
+            {
+                return false;
+            }
+            ty_module_resolver::file_to_module(&db, *file)
+                .and_then(|module| module.search_path(&db).cloned())
+                .is_some_and(|sp| sp.is_first_party())
+        })
+        .collect();
+    first_party_files.sort_by_key(|file| file.path(&db).as_str().to_string());
+
+    let python_version_str = python_version
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_owned());
+    let lockfile = generate_api_lockfile(&db, first_party_files, &python_version_str);
+
+    if stdout {
+        use std::io::Write;
+        let mut out = std::io::stdout().lock();
+        out.write_all(lockfile.as_bytes())?;
+    } else {
+        let output_path = output.unwrap_or_else(|| std::path::PathBuf::from("api.lock"));
+        std::fs::write(&output_path, lockfile)
+            .with_context(|| format!("Failed to write {}", output_path.display()))?;
     }
-    Ok(())
+
+    std::mem::forget(db);
+    Ok(ExitStatus::Success)
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {

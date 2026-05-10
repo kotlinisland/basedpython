@@ -570,6 +570,7 @@ impl DocumentQuery {
             Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python {
                 code: document.contents().to_string(),
                 is_stub: source_type.is_stub(),
+                is_basedpython: source_type.is_basedpython(),
             },
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())

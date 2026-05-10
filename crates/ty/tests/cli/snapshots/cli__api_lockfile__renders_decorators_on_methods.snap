@@ -1,0 +1,28 @@
+---
+source: crates/ty/tests/cli/api_lockfile.rs
+info:
+  program: by
+  args:
+    - generate-api-file
+    - "--stdout"
+---
+success: true
+exit_code: 0
+----- stdout -----
+#api-lock:v=1
+#tool:by=0.0.0
+#python:default
+#modules:1
+deco.C.abs:d{abstractmethod}(self:deco.C)->builtins.int
+deco.C.cm:d{classmethod}(cls:type[C])->builtins.int
+deco.C.coro:d{async}(self:deco.C)->types.CoroutineType[Any,Any,builtins.int]
+deco.C.fin:d{final}(self:deco.C)->builtins.int
+deco.C.ov:d{overload}(self:deco.C,x:builtins.int)->builtins.int
+deco.C.ov:d{overload}(self:deco.C,x:builtins.str)->builtins.str
+deco.C.sm:d{staticmethod}(x:builtins.int)->builtins.int
+deco.C:c[]
+deco.abstractmethod:r=abc.abstractmethod
+deco.final:r=typing.final
+deco.overload:r=typing.overload
+
+----- stderr -----

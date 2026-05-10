@@ -1,0 +1,23 @@
+abstract class B:
+    abstract def f(self) -> int
+
+
+final class C:
+    @override
+    def m(self) -> int:
+        return 1
+
+
+# `@`-decorator before a `class def` / `static def` modifier (e.g. decorated
+# classmethod overloads like `tarfile.open`)
+class D:
+    @overload
+    class def open(cls, x: int) -> int: ...
+    @overload
+    static def make(x: str) -> str: ...
+
+
+# a modifier on an `async def` (e.g. `contextlib`'s `abstract async def __aexit__`)
+class E:
+    abstract async def f(self) -> int
+    final async def g(self) -> int

@@ -348,6 +348,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::TString(_)
         | AnyNodeRef::StringLiteral(_)
         | AnyNodeRef::BytesLiteral(_)
-        | AnyNodeRef::Identifier(_) => false,
+        | AnyNodeRef::Identifier(_)
+        | AnyNodeRef::ExprCallableType(_) => false,
     }
 }

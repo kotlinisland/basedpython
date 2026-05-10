@@ -143,6 +143,11 @@ pub(crate) fn add_required_imports(
     context: &LintContext,
 ) {
     for required_import in settings.isort.required_imports.iter().rev() {
+        // basedpython auto-quotes forward references at transpile time, so
+        // `from __future__ import annotations` is unnecessary in `.by`/`.byi` sources
+        if source_type.is_basedpython() && required_import.is_future_import() {
+            continue;
+        }
         add_required_import(
             required_import,
             parsed,

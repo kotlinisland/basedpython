@@ -126,6 +126,7 @@ impl OperatorPrecedence {
 
             // Not a real python expression, so treat as lowest as well
             ExprRef::IpyEscapeCommand(_) => Self::None,
+            ExprRef::CallableType(_) => Self::None,
         }
     }
 
@@ -172,6 +173,8 @@ impl From<Operator> for OperatorPrecedence {
             Operator::BitOr => Self::BitOr,
             // Exponentiation **
             Operator::Pow => Self::Exponent,
+            // basedpython: None-coalescing ?? has same precedence as boolean or
+            Operator::Coalesce => Self::Or,
         }
     }
 }

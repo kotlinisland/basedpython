@@ -1081,6 +1081,73 @@ static_assert(not is_subtype_of(DerivedContravariant[B], DerivedContravariant[A]
 static_assert(is_subtype_of(DerivedContravariant[A], DerivedContravariant[B]))
 ```
 
+## basedpython explicit variance syntax
+
+basedpython allows annotating variance directly on the type parameter with `out T` (covariant),
+`in T` (contravariant), and `in out T` (bivariant). these override inference.
+
+### class
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+# `out T` forces covariance even on an empty body (which would otherwise be bivariant)
+class Covariant[out T]:
+    pass
+
+static_assert(is_subtype_of(Covariant[B], Covariant[A]))
+static_assert(not is_subtype_of(Covariant[A], Covariant[B]))
+
+# `in T` forces contravariance
+class Contravariant[in T]:
+    pass
+
+static_assert(not is_subtype_of(Contravariant[B], Contravariant[A]))
+static_assert(is_subtype_of(Contravariant[A], Contravariant[B]))
+
+# `in out T` forces bivariance
+class Bivariant[in out T]:
+    pass
+
+static_assert(is_subtype_of(Bivariant[B], Bivariant[A]))
+static_assert(is_subtype_of(Bivariant[A], Bivariant[B]))
+```
+
+### type alias
+
+`out T` / `in T` syntax is accepted on type alias statements. the explicit variance applies to the
+typevar, consistent with the body.
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+class Producer[T]:
+    def get(self) -> T:
+        raise ValueError
+
+# out T is consistent with Producer's covariance; the alias is covariant
+type CovariantAlias[out T] = Producer[T]
+
+static_assert(is_subtype_of(CovariantAlias[B], CovariantAlias[A]))
+static_assert(not is_subtype_of(CovariantAlias[A], CovariantAlias[B]))
+
+class Consumer[T]:
+    def set(self, value: T) -> None:
+        pass
+
+# in T is consistent with Consumer's contravariance
+type ContravariantAlias[in T] = Consumer[T]
+
+static_assert(not is_subtype_of(ContravariantAlias[B], ContravariantAlias[A]))
+static_assert(is_subtype_of(ContravariantAlias[A], ContravariantAlias[B]))
+```
+
 [linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
 [typeis-spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis

@@ -815,3 +815,34 @@ class F[T]:
 def taxa(xs: I[N]):
     reveal_type(F(xs))  # revealed: F[N]
 ```
+
+## basedpython: `newtype` declaration
+
+in basedpython, `newtype Foo = T` is shorthand for `Foo = NewType("Foo", T)`. ty produces the same
+`KnownInstance(NewType)` so the resulting symbol behaves as a NewType in type expressions
+
+### `newtype` over a class type
+
+```by
+newtype UserId = int
+
+reveal_type(UserId)  # revealed: <NewType pseudo-class 'UserId'>
+
+def takes_user(u: UserId) -> int:
+    return u + 0
+
+x = UserId(7)
+reveal_type(x)  # revealed: UserId
+takes_user(x)  # ok
+takes_user(7)  # error: [invalid-argument-type]
+```
+
+### nested `newtype`
+
+```by
+newtype UserId = int
+newtype AdminId = UserId
+
+a = AdminId(UserId(1))
+reveal_type(a)  # revealed: AdminId
+```

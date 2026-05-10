@@ -39,7 +39,7 @@ pub enum LanguageId {
 impl From<&str> for LanguageId {
     fn from(language_id: &str) -> Self {
         match language_id {
-            "python" => Self::Python,
+            "python" | "by" => Self::Python,
             _ => Self::Other,
         }
     }

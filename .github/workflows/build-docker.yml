@@ -32,8 +32,11 @@ jobs:
     # basedpython publishes wheels only for now. the Dockerfile builds `--bin ruff`,
     # which no longer exists (it's `by`/`buff`), so docker is skipped until the
     # image is reworked to ship both binaries — see ROADMAP. skipping here keeps
-    # the release green without regenerating release.yml (which still calls this)
-    if: false
+    # the release green without regenerating release.yml (which still calls this).
+    # gated on a repo variable (unset by default) rather than a literal `false`
+    # so it can be re-enabled without editing the workflow, and so actionlint
+    # doesn't flag a constant condition
+    if: ${{ vars.ENABLE_DOCKER_BUILD == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && 'release' || '' }}

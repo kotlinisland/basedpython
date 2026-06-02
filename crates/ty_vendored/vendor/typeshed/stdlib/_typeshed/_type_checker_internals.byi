@@ -10,7 +10,6 @@ from collections.abc import Awaitable, Generator, Iterable, Mapping
 from typing import Any, ClassVar, Generic, TypeVar
 from typing_extensions import Never
 
-_T = TypeVar("_T")
 
 # Used for an undocumented mypy feature. Does not exist at runtime.
 promote = object()
@@ -34,7 +33,7 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     # can go through.
     def setdefault(self, k: Never, default: object) -> object
     # Mypy plugin hook for 'pop' expects that 'default' has a type variable type.
-    def pop(self, k: Never, default: _T = ...) -> object  # pyright: ignore[reportInvalidTypeVarUse]
+    def pop[Element](self, k: Never, default: Element = ...) -> object  # pyright: ignore[reportInvalidTypeVarUse]
     def update(self, m: typing_extensions.Self, /) -> None
     def __delitem__(self, k: Never) -> None
     def items(self) -> dict_items[str, object]
@@ -72,15 +71,6 @@ class NamedTupleFallback(tuple[Any, ...]):
         def __replace__(self, **kwargs: Any) -> typing_extensions.Self
 
 # Non-default variations to accommodate couroutines, and `AwaitableGenerator` having a 4th type parameter.
-_S = TypeVar("_S")
-_YieldT_co = TypeVar("_YieldT_co", covariant=True)
-_SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
-_ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
 # The parameters correspond to Generator, but the 4th is the original type.
-class AwaitableGenerator(
-    Awaitable[_ReturnT_nd_co],
-    Generator[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co],
-    Generic[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co, _S],
-    metaclass=ABCMeta,
-)
+class AwaitableGenerator[out Element, in SendT_nd, out ReturnT_nd, in out Other](Awaitable[ReturnT_nd], Generator[Element, SendT_nd, ReturnT_nd], metaclass=ABCMeta)

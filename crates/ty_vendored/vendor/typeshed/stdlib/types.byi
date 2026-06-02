@@ -72,10 +72,6 @@ if sys.version_info >= (3, 15):
 
 # Note, all classes "defined" here require special handling.
 
-_T1 = TypeVar("_T1")
-_T2 = TypeVar("_T2")
-_KT_co = TypeVar("_KT_co", covariant=True)
-_VT_co = TypeVar("_VT_co", covariant=True)
 
 # Make sure this class definition stays roughly in line with `builtins.function`
 final class FunctionType:
@@ -294,50 +290,50 @@ final class CodeType:
         __replace__ = replace
         """The same as replace()."""
 
-final class MappingProxyType(Mapping[_KT_co, _VT_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
+final class MappingProxyType[out Key, out Value](Mapping[Key, Value]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
     """Read-only proxy of a mapping."""
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
     """Return hash(self)."""
 
-    def __new__(cls, mapping: SupportsKeysAndGetItem[_KT_co, _VT_co]) -> Self
-    def __getitem__(self, key: _KT_co, /) -> _VT_co:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+    def __new__(cls, mapping: SupportsKeysAndGetItem[Key, Value]) -> Self
+    def __getitem__(self, key: Key, /) -> Value:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
         """Return self[key]."""
 
-    def __iter__(self) -> Iterator[_KT_co]:
+    def __iter__(self) -> Iterator[Key]:
         """Implement iter(self)."""
 
     def __len__(self) -> int:
         """Return len(self)."""
 
     def __eq__(self, value: object, /) -> bool
-    def copy(self) -> dict[_KT_co, _VT_co]:
+    def copy(self) -> dict[Key, Value]:
         """D.copy() -> a shallow copy of D"""
 
-    def keys(self) -> KeysView[_KT_co]:
+    def keys(self) -> KeysView[Key]:
         """D.keys() -> a set-like object providing a view on D's keys"""
 
-    def values(self) -> ValuesView[_VT_co]:
+    def values(self) -> ValuesView[Value]:
         """D.values() -> an object providing a view on D's values"""
 
-    def items(self) -> ItemsView[_KT_co, _VT_co]:
+    def items(self) -> ItemsView[Key, Value]:
         """D.items() -> a set-like object providing a view on D's items"""
 
-    def get(self, key: _KT_co, /) -> _VT_co | None:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: Key, /) -> Value | None:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
         """Return the value for key if key is in the mapping, else default."""
-    def get(self, key: _KT_co, default: _VT_co, /) -> _VT_co  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
-    def get(self, key: _KT_co, default: _T2, /) -> _VT_co | _T2  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: Key, default: Value, /) -> Value  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get[T2](self, key: Key, default: T2, /) -> Value | T2  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
-    def __reversed__(self) -> Iterator[_KT_co]:
+    def __reversed__(self) -> Iterator[Key]:
         """D.__reversed__() -> reverse iterator"""
 
-    def __or__(self, value: Mapping[_T1, _T2], /) -> dict[_KT_co | _T1, _VT_co | _T2]:
+    def __or__[T1, T2](self, value: Mapping[T1, T2], /) -> dict[Key | T1, Value | T2]:
         """Return self|value."""
 
-    def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT_co | _T1, _VT_co | _T2]:
+    def __ror__[T1, T2](self, value: Mapping[T1, T2], /) -> dict[Key | T1, Value | T2]:
         """Return value|self."""
 
 if sys.version_info >= (3, 12):
@@ -421,11 +417,8 @@ final class CellType:
     __hash__: ClassVar[None]  # type: ignore[assignment]
     cell_contents: Any
 
-_YieldT_co = TypeVar("_YieldT_co", covariant=True)
-_SendT_contra = TypeVar("_SendT_contra", contravariant=True, default=None)
-_ReturnT_co = TypeVar("_ReturnT_co", covariant=True, default=None)
 
-final class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
+final class GeneratorType[out Element, in Sent = None, out Return = None](Generator[Element, Sent, Return]):
     @property
     def gi_code(self) -> CodeType: ...
     @property
@@ -433,7 +426,7 @@ final class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
     @property
     def gi_running(self) -> bool: ...
     @property
-    def gi_yieldfrom(self) -> Iterator[_YieldT_co] | None:
+    def gi_yieldfrom(self) -> Iterator[Element] | None:
         """object being iterated by yield from, or None"""
     if sys.version_info >= (3, 11):
         @property
@@ -450,15 +443,15 @@ final class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _YieldT_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
-    def send(self, arg: _SendT_contra, /) -> _YieldT_co:
+    def send(self, arg: Sent, /) -> Element:
         """send(value) -> send 'value' into generator,
         return next yielded value or raise StopIteration.
         """
 
-    def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /) -> _YieldT_co:
+    def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /) -> Element:
         """throw(value)
         throw(type[,value[,tb]])
 
@@ -467,13 +460,13 @@ final class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
         the (type, val, tb) signature is deprecated,
         and may be removed in a future version of Python.
         """
-    def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co
+    def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> Element
 
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
             """See PEP 585"""
 
-final class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
+final class AsyncGeneratorType[out Element, in Sent = None](AsyncGenerator[Element, Sent]):
     @property
     def ag_await(self) -> Awaitable[Any] | None:
         """object being awaited on, or None"""
@@ -500,15 +493,15 @@ final class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
     def __aiter__(self) -> Self:
         """Return an awaitable, that resolves in asynchronous iterator."""
 
-    def __anext__(self) -> Coroutine[Any, Any, _YieldT_co]:
+    def __anext__(self) -> Coroutine[Any, Any, Element]:
         """Return a value or raise StopAsyncIteration."""
 
-    def asend(self, val: _SendT_contra, /) -> Coroutine[Any, Any, _YieldT_co]:
+    def asend(self, val: Sent, /) -> Coroutine[Any, Any, Element]:
         """asend(v) -> send 'v' in generator."""
 
     async def athrow(
         self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /
-    ) -> _YieldT_co:
+    ) -> Element:
         """athrow(value)
         athrow(type[,value[,tb]])
 
@@ -516,7 +509,7 @@ final class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
         the (type, val, tb) signature is deprecated,
         and may be removed in a future version of Python.
         """
-    async def athrow(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co
+    async def athrow(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> Element
 
     def aclose(self) -> Coroutine[Any, Any, None]:
         """aclose() -> raise GeneratorExit inside generator."""
@@ -525,10 +518,8 @@ final class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
         """See PEP 585"""
 
 # Non-default variations to accommodate coroutines
-_SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
-_ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
-final class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
+final class CoroutineType[out Element, in SendT_nd, out ReturnT_nd](Coroutine[Element, SendT_nd, ReturnT_nd]):
     __name__: str
     """name of the coroutine"""
 
@@ -557,15 +548,15 @@ final class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co
     def close(self) -> None:
         """close() -> raise GeneratorExit inside coroutine."""
 
-    def __await__(self) -> Generator[Any, None, _ReturnT_nd_co]:
+    def __await__(self) -> Generator[Any, None, ReturnT_nd]:
         """Return an iterator to be used in await expression."""
 
-    def send(self, arg: _SendT_nd_contra, /) -> _YieldT_co:
+    def send(self, arg: SendT_nd, /) -> Element:
         """send(arg) -> send 'arg' into coroutine,
         return next iterated value or raise StopIteration.
         """
 
-    def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /) -> _YieldT_co:
+    def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /) -> Element:
         """throw(value)
         throw(type[,value[,traceback]])
 
@@ -574,7 +565,7 @@ final class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co
         the (type, val, tb) signature is deprecated,
         and may be removed in a future version of Python.
         """
-    def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co
+    def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> Element
 
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
@@ -878,14 +869,11 @@ class DynamicClassAttribute(property):
     def setter(self, fset: Callable[[Any, Any], object]) -> DynamicClassAttribute
     def deleter(self, fdel: Callable[[Any], object]) -> DynamicClassAttribute
 
-_Fn = TypeVar("_Fn", bound=Callable[..., object])
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
 
 # it's not really an Awaitable, but can be used in an await expression. Real type: Generator & Awaitable
-def coroutine(func: Callable[_P, Generator[Any, Any, _R]]) -> Callable[_P, Awaitable[_R]]:
+def coroutine[**P, R](func: Callable[P, Generator[Any, Any, R]]) -> Callable[P, Awaitable[R]]:
     """Convert regular generator function to a coroutine."""
-def coroutine(func: _Fn) -> _Fn
+def coroutine[Fn: Callable[..., object]](func: Fn) -> Fn
 
 @disjoint_base
 class GenericAlias:

@@ -43,7 +43,6 @@ from types import TracebackType
 from typing import IO, Any, BinaryIO, Final, Generic, Literal, Protocol, TextIO, TypeVar, type_check_only
 from typing_extensions import Self, disjoint_base
 
-_S = TypeVar("_S", bound=str)
 
 if sys.version_info >= (3, 14):
     DEFAULT_BUFFER_SIZE: Final = 131072
@@ -546,17 +545,16 @@ class _BufferedReaderStream(Protocol):
     # def fileno(self) -> int: ...
     # def isatty(self) -> bool: ...
 
-_BufferedReaderStreamT = TypeVar("_BufferedReaderStreamT", bound=_BufferedReaderStream, default=_BufferedReaderStream)
 
 @disjoint_base
-class BufferedReader(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_BufferedReaderStreamT]):  # type: ignore[misc]  # incompatible definitions of methods in the base classes
+class BufferedReader[in out BufferedReaderStreamT: _BufferedReaderStream = _BufferedReaderStream](BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incompatible definitions of methods in the base classes
     """Create a new buffered reader using the given readable raw IO object."""
 
-    raw: _BufferedReaderStreamT
+    raw: BufferedReaderStreamT
     if sys.version_info >= (3, 14):
-        def __init__(self, raw: _BufferedReaderStreamT, buffer_size: int = 131072) -> None
+        def __init__(self, raw: BufferedReaderStreamT, buffer_size: int = 131072) -> None
     else:
-        def __init__(self, raw: _BufferedReaderStreamT, buffer_size: int = 8192) -> None
+        def __init__(self, raw: BufferedReaderStreamT, buffer_size: int = 8192) -> None
 
     def peek(self, size: int = 0, /) -> bytes
     def seek(self, target: int, whence: int = 0, /) -> int
@@ -586,10 +584,9 @@ class _BufferedWriterStream(Protocol):
     # def fileno(self) -> int: ...
     # def isatty(self) -> bool: ...
 
-_BufferedWriterStreamT = TypeVar("_BufferedWriterStreamT", bound=_BufferedWriterStream, default=_BufferedWriterStream)
 
 @disjoint_base
-class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_BufferedWriterStreamT]):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
+class BufferedWriter[in out BufferedWriterStreamT: _BufferedWriterStream = _BufferedWriterStream](BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
     """A buffer for a writeable sequential RawIO object.
 
     The constructor creates a BufferedWriter for the given writeable raw
@@ -597,11 +594,11 @@ class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_Buffere
     DEFAULT_BUFFER_SIZE.
     """
 
-    raw: _BufferedWriterStreamT
+    raw: BufferedWriterStreamT
     if sys.version_info >= (3, 14):
-        def __init__(self, raw: _BufferedWriterStreamT, buffer_size: int = 131072) -> None
+        def __init__(self, raw: BufferedWriterStreamT, buffer_size: int = 131072) -> None
     else:
-        def __init__(self, raw: _BufferedWriterStreamT, buffer_size: int = 8192) -> None
+        def __init__(self, raw: BufferedWriterStreamT, buffer_size: int = 8192) -> None
 
     def write(self, buffer: ReadableBuffer, /) -> int
     def seek(self, target: int, whence: int = 0, /) -> int
@@ -629,7 +626,7 @@ class BufferedRandom(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore
     def truncate(self, pos: int | None = None, /) -> int
 
 @disjoint_base
-class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStreamT, _BufferedWriterStreamT]):
+class BufferedRWPair[in out BufferedReaderStreamT: _BufferedReaderStream = _BufferedReaderStream, in out BufferedWriterStreamT: _BufferedWriterStream = _BufferedWriterStream](BufferedIOBase, _BufferedIOBase):
     """A buffered reader and writer object together.
 
     A buffered reader object and buffered writer object put together to
@@ -643,11 +640,11 @@ class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStr
 
     if sys.version_info >= (3, 14):
         def __init__(
-            self, reader: _BufferedReaderStreamT, writer: _BufferedWriterStreamT, buffer_size: int = 131072, /
+            self, reader: BufferedReaderStreamT, writer: BufferedWriterStreamT, buffer_size: int = 131072, /
         ) -> None
     else:
         def __init__(
-            self, reader: _BufferedReaderStreamT, writer: _BufferedWriterStreamT, buffer_size: int = 8192, /
+            self, reader: BufferedReaderStreamT, writer: BufferedWriterStreamT, buffer_size: int = 8192, /
         ) -> None
 
     def peek(self, size: int = 0, /) -> bytes
@@ -751,10 +748,9 @@ class _WrappedBuffer(Protocol):
     # def seek(self, offset: Literal[0], whence: Literal[2]) -> int: ...
     # def tell(self) -> int: ...
 
-_BufferT_co = TypeVar("_BufferT_co", bound=_WrappedBuffer, default=_WrappedBuffer, covariant=True)
 
 @disjoint_base
-class TextIOWrapper(TextIOBase, _TextIOBase, TextIO, Generic[_BufferT_co]):  # type: ignore[misc]  # incompatible definitions of write in the base classes
+class TextIOWrapper[out BufferT: _WrappedBuffer = _WrappedBuffer](TextIOBase, _TextIOBase, TextIO):  # type: ignore[misc]  # incompatible definitions of write in the base classes
     """Character and line based layer over a BufferedIOBase object, buffer.
 
     encoding gives the name of the encoding that the stream will be
@@ -787,7 +783,7 @@ class TextIOWrapper(TextIOBase, _TextIOBase, TextIO, Generic[_BufferT_co]):  # t
 
     def __init__(
         self,
-        buffer: _BufferT_co,
+        buffer: BufferT,
         encoding: str | None = None,
         errors: str | None = None,
         newline: str | None = None,
@@ -796,7 +792,7 @@ class TextIOWrapper(TextIOBase, _TextIOBase, TextIO, Generic[_BufferT_co]):  # t
     ) -> None
     # Equals the "buffer" argument passed in to the constructor.
     @property
-    def buffer(self) -> _BufferT_co: ...  # type: ignore[override]
+    def buffer(self) -> BufferT: ...  # type: ignore[override]
     @property
     def line_buffering(self) -> bool: ...
     @property
@@ -817,7 +813,7 @@ class TextIOWrapper(TextIOBase, _TextIOBase, TextIO, Generic[_BufferT_co]):  # t
 
     def readline(self, size: int = -1, /) -> str  # type: ignore[override]
     # Equals the "buffer" argument passed in to the constructor.
-    def detach(self) -> _BufferT_co  # type: ignore[override]
+    def detach(self) -> BufferT  # type: ignore[override]
     # TextIOWrapper's version of seek only supports a limited subset of
     # operations.
     def seek(self, cookie: int, whence: int = 0, /) -> int:
@@ -912,4 +908,4 @@ def text_encoding(encoding: None, stacklevel: int = 2, /) -> Literal["locale", "
     This can be used in APIs with an encoding=None parameter.
     However, please consider using encoding="utf-8" for new APIs.
     """
-def text_encoding(encoding: _S, stacklevel: int = 2, /) -> _S
+def text_encoding[Other: str](encoding: Other, stacklevel: int = 2, /) -> Other

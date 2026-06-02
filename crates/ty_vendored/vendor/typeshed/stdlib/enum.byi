@@ -40,8 +40,6 @@ if sys.version_info >= (3, 13):
 if sys.version_info >= (3, 15):
     __all__ += ["show_flag_values", "bin"]
 
-_EnumMemberT = TypeVar("_EnumMemberT")
-_EnumerationT = TypeVar("_EnumerationT", bound=type[Enum])
 
 # The following all work:
 # >>> from enum import Enum
@@ -58,21 +56,21 @@ _EnumNames: TypeAlias = str | Iterable[str] | Iterable[Iterable[str | Any]] | Ma
 _Signature: TypeAlias = Any  # TODO: Unable to import Signature from inspect module
 
 if sys.version_info >= (3, 11):
-    class nonmember(Generic[_EnumMemberT]):
+    class nonmember[in out EnumMemberT]:
         """
         Protects item from becoming an Enum member during class creation.
         """
 
-        value: _EnumMemberT
-        def __init__(self, value: _EnumMemberT) -> None
+        value: EnumMemberT
+        def __init__(self, value: EnumMemberT) -> None
 
-    class member(Generic[_EnumMemberT]):
+    class member[in out EnumMemberT]:
         """
         Forces item to become an Enum member during class creation.
         """
 
-        value: _EnumMemberT
-        def __init__(self, value: _EnumMemberT) -> None
+        value: EnumMemberT
+        def __init__(self, value: EnumMemberT) -> None
 
 class _EnumDict(dict[str, Any]):
     """
@@ -135,12 +133,12 @@ class EnumMeta(type):
         ) -> _typeshed.Self
 
     class def __prepare__(metacls, cls: str, bases: (*: type), **kwds: Any) -> _EnumDict: ...  # type: ignore[override]
-    def __iter__(self: type[_EnumMemberT]) -> Iterator[_EnumMemberT]:
+    def __iter__[EnumMemberT](self: type[EnumMemberT]) -> Iterator[EnumMemberT]:
         """
         Return members in definition order.
         """
 
-    def __reversed__(self: type[_EnumMemberT]) -> Iterator[_EnumMemberT]:
+    def __reversed__[EnumMemberT](self: type[EnumMemberT]) -> Iterator[EnumMemberT]:
         """
         Return members in reverse definition order.
         """
@@ -165,13 +163,13 @@ class EnumMeta(type):
     else:
         def __contains__(self: type[Any], obj: object) -> bool
 
-    def __getitem__(self: type[_EnumMemberT], name: str) -> _EnumMemberT:
+    def __getitem__[EnumMemberT](self: type[EnumMemberT], name: str) -> EnumMemberT:
         """
         Return the member matching `name`.
         """
 
     @_builtins_property
-    def __members__(self: type[_EnumMemberT]) -> types.MappingProxyType[str, _EnumMemberT]:
+    def __members__[EnumMemberT](self: type[EnumMemberT]) -> types.MappingProxyType[str, EnumMemberT]:
         """
         Returns a mapping of member name->value.
 
@@ -192,7 +190,7 @@ class EnumMeta(type):
     def __dir__(self) -> list[str]
 
     # Overload 1: Value lookup on an already existing enum class (simple case)
-    def __call__(cls: type[_EnumMemberT], value: Any, names: None = None) -> _EnumMemberT:
+    def __call__[EnumMemberT](cls: type[EnumMemberT], value: Any, names: None = None) -> EnumMemberT:
         """
         Either returns an existing member, or creates a new enum class.
 
@@ -302,7 +300,7 @@ class EnumMeta(type):
     # <Foo.X: (1, 2, 3)>
     #
     if sys.version_info >= (3, 12):
-        def __call__(cls: type[_EnumMemberT], value: Any, *values: Any) -> _EnumMemberT:
+        def __call__[EnumMemberT](cls: type[EnumMemberT], value: Any, *values: Any) -> EnumMemberT:
             """
             Either returns an existing member, or creates a new enum class.
 
@@ -488,7 +486,7 @@ else:
 
         def __new__(cls, value: int) -> Self
 
-def unique(enumeration: _EnumerationT) -> _EnumerationT:
+def unique[EnumerationT: type[Enum]](enumeration: EnumerationT) -> EnumerationT:
     """
     Class decorator for enumerations ensuring unique member values.
     """
@@ -568,7 +566,7 @@ if sys.version_info >= (3, 11):
         """
 
         def __init__(self, *checks: EnumCheck) -> None
-        def __call__(self, enumeration: _EnumerationT) -> _EnumerationT
+        def __call__[EnumerationT: type[Enum]](self, enumeration: EnumerationT) -> EnumerationT
 
     class FlagBoundary(StrEnum):
         """
@@ -594,7 +592,7 @@ if sys.version_info >= (3, 11):
         use enum_name instead of class.enum_name
         """
 
-    def global_enum(cls: _EnumerationT, update_str: bool = False) -> _EnumerationT:
+    def global_enum[EnumerationT: type[Enum]](cls: EnumerationT, update_str: bool = False) -> EnumerationT:
         """
         decorator that makes the repr() of an enum member reference its module
         instead of its class; also exports all members to the enum's module's
@@ -705,4 +703,4 @@ class auto:
 
 if sys.version_info >= (3, 11):
     def pickle_by_global_name(self: Enum, proto: int) -> str
-    def pickle_by_enum_name(self: _EnumMemberT, proto: int) -> (Callable[..., Any], (type[_EnumMemberT], str))
+    def pickle_by_enum_name[EnumMemberT](self: EnumMemberT, proto: int) -> (Callable[..., Any], (type[EnumMemberT], str))

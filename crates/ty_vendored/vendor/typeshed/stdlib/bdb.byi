@@ -9,8 +9,6 @@ from typing import IO, Any, Final, Literal, ParamSpec, SupportsInt, TypeAlias, T
 
 __all__ = ["BdbQuit", "Bdb", "Breakpoint"]
 
-_T = TypeVar("_T")
-_P = ParamSpec("_P")
 _Backend: TypeAlias = Literal["settrace", "monitoring"]
 
 # A union of code-object flags at runtime.
@@ -307,7 +305,7 @@ class Bdb:
         globals defaults to __main__.dict; locals defaults to globals.
         """
 
-    def runcall(self, func: Callable[_P, _T], /, *args: _P.args, **kwds: _P.kwargs) -> _T | None:
+    def runcall[**P, Element](self, func: Callable[P, Element], /, *args: P.args, **kwds: P.kwargs) -> Element | None:
         """Debug a single function call.
 
         Return the result of the function call.

@@ -25,12 +25,6 @@ from .util import Finalize as _Finalize
 
 __all__ = ["BaseManager", "SyncManager", "BaseProxy", "Token", "SharedMemoryManager"]
 
-_T = TypeVar("_T")
-_T1 = TypeVar("_T1")
-_T2 = TypeVar("_T2")
-_KT = TypeVar("_KT")
-_VT = TypeVar("_VT")
-_S = TypeVar("_S")
 
 class Namespace:
     def __init__(self, **kwds: Any) -> None
@@ -82,10 +76,10 @@ class BaseProxy:
 
     def __reduce__(self) -> (Any, (Any, Any, str, dict[Any, Any]))
 
-class ValueProxy(BaseProxy, Generic[_T]):
-    def get(self) -> _T
-    def set(self, value: _T) -> None
-    value: _T
+class ValueProxy[in out Element](BaseProxy):
+    def get(self) -> Element
+    def set(self, value: Element) -> None
+    value: Element
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -93,43 +87,43 @@ class ValueProxy(BaseProxy, Generic[_T]):
         """
 
 if sys.version_info >= (3, 13):
-    class _BaseDictProxy(BaseProxy, MutableMapping[_KT, _VT]):
+    class _BaseDictProxy[in out Key, in out Value](BaseProxy, MutableMapping[Key, Value]):
         __builtins__: ClassVar[dict[str, Any]]
         def __len__(self) -> int
-        def __getitem__(self, key: _KT, /) -> _VT
-        def __setitem__(self, key: _KT, value: _VT, /) -> None
-        def __delitem__(self, key: _KT, /) -> None
-        def __iter__(self) -> Iterator[_KT]
-        def copy(self) -> dict[_KT, _VT]
+        def __getitem__(self, key: Key, /) -> Value
+        def __setitem__(self, key: Key, value: Value, /) -> None
+        def __delitem__(self, key: Key, /) -> None
+        def __iter__(self) -> Iterator[Key]
+        def copy(self) -> dict[Key, Value]
 
-        def get(self, key: _KT, /) -> _VT | None
-        def get(self, key: _KT, default: _VT, /) -> _VT
-        def get(self, key: _KT, default: _T, /) -> _VT | _T
+        def get(self, key: Key, /) -> Value | None
+        def get(self, key: Key, default: Value, /) -> Value
+        def get[Element](self, key: Key, default: Element, /) -> Value | Element
 
-        def pop(self, key: _KT, /) -> _VT
-        def pop(self, key: _KT, default: _VT, /) -> _VT
-        def pop(self, key: _KT, default: _T, /) -> _VT | _T
+        def pop(self, key: Key, /) -> Value
+        def pop(self, key: Key, default: Value, /) -> Value
+        def pop[Element](self, key: Key, default: Element, /) -> Value | Element
 
-        def keys(self) -> list[_KT]  # type: ignore[override]
-        def items(self) -> list[(_KT, _VT)]  # type: ignore[override]
-        def values(self) -> list[_VT]  # type: ignore[override]
+        def keys(self) -> list[Key]  # type: ignore[override]
+        def items(self) -> list[(Key, Value)]  # type: ignore[override]
+        def values(self) -> list[Value]  # type: ignore[override]
         if sys.version_info >= (3, 14):
             # Next methods are copied from builtins.dict
-            def fromkeys(self, iterable: Iterable[_T], value: None = None, /) -> dict[_T, Any | None]
-            def fromkeys(self, iterable: Iterable[_T], value: _S, /) -> dict[_T, _S]
+            def fromkeys[Element](self, iterable: Iterable[Element], value: None = None, /) -> dict[Element, Any | None]
+            def fromkeys[Element, Other](self, iterable: Iterable[Element], value: Other, /) -> dict[Element, Other]
 
-            def __reversed__(self) -> Iterator[_KT]
+            def __reversed__(self) -> Iterator[Key]
 
-            def __or__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]
-            def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]
+            def __or__(self, value: dict[Key, Value], /) -> dict[Key, Value]
+            def __or__[T1, T2](self, value: dict[T1, T2], /) -> dict[Key | T1, Value | T2]
 
-            def __ror__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]
-            def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]
+            def __ror__(self, value: dict[Key, Value], /) -> dict[Key, Value]
+            def __ror__[T1, T2](self, value: dict[T1, T2], /) -> dict[Key | T1, Value | T2]
 
-            def __ior__(self, value: SupportsKeysAndGetItem[_KT, _VT], /) -> Self
-            def __ior__(self, value: Iterable[(_KT, _VT)], /) -> Self
+            def __ior__(self, value: SupportsKeysAndGetItem[Key, Value], /) -> Self
+            def __ior__(self, value: Iterable[(Key, Value)], /) -> Self
 
-    class DictProxy(_BaseDictProxy[_KT, _VT]):
+    class DictProxy[in out Key, in out Value](_BaseDictProxy[Key, Value]):
         def __class_getitem__(cls, args: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
@@ -137,107 +131,107 @@ if sys.version_info >= (3, 13):
             """
 
 else:
-    class DictProxy(BaseProxy, MutableMapping[_KT, _VT]):
+    class DictProxy[in out Key, in out Value](BaseProxy, MutableMapping[Key, Value]):
         __builtins__: ClassVar[dict[str, Any]]
         def __len__(self) -> int
-        def __getitem__(self, key: _KT, /) -> _VT
-        def __setitem__(self, key: _KT, value: _VT, /) -> None
-        def __delitem__(self, key: _KT, /) -> None
-        def __iter__(self) -> Iterator[_KT]
-        def copy(self) -> dict[_KT, _VT]
+        def __getitem__(self, key: Key, /) -> Value
+        def __setitem__(self, key: Key, value: Value, /) -> None
+        def __delitem__(self, key: Key, /) -> None
+        def __iter__(self) -> Iterator[Key]
+        def copy(self) -> dict[Key, Value]
 
-        def get(self, key: _KT, /) -> _VT | None
-        def get(self, key: _KT, default: _VT, /) -> _VT
-        def get(self, key: _KT, default: _T, /) -> _VT | _T
+        def get(self, key: Key, /) -> Value | None
+        def get(self, key: Key, default: Value, /) -> Value
+        def get[Element](self, key: Key, default: Element, /) -> Value | Element
 
-        def pop(self, key: _KT, /) -> _VT
-        def pop(self, key: _KT, default: _VT, /) -> _VT
-        def pop(self, key: _KT, default: _T, /) -> _VT | _T
+        def pop(self, key: Key, /) -> Value
+        def pop(self, key: Key, default: Value, /) -> Value
+        def pop[Element](self, key: Key, default: Element, /) -> Value | Element
 
-        def keys(self) -> list[_KT]  # type: ignore[override]
-        def items(self) -> list[(_KT, _VT)]  # type: ignore[override]
-        def values(self) -> list[_VT]  # type: ignore[override]
+        def keys(self) -> list[Key]  # type: ignore[override]
+        def items(self) -> list[(Key, Value)]  # type: ignore[override]
+        def values(self) -> list[Value]  # type: ignore[override]
 
 if sys.version_info >= (3, 14):
-    class _BaseSetProxy(BaseProxy, MutableSet[_T]):
+    class _BaseSetProxy[in out Element](BaseProxy, MutableSet[Element]):
         __builtins__: ClassVar[dict[str, Any]]
         # Copied from builtins.set
-        def add(self, element: _T, /) -> None
-        def copy(self) -> set[_T]
+        def add(self, element: Element, /) -> None
+        def copy(self) -> set[Element]
         def clear(self) -> None
-        def difference(self, *s: Iterable[Any]) -> set[_T]
+        def difference(self, *s: Iterable[Any]) -> set[Element]
         def difference_update(self, *s: Iterable[Any]) -> None
-        def discard(self, element: _T, /) -> None
-        def intersection(self, *s: Iterable[Any]) -> set[_T]
+        def discard(self, element: Element, /) -> None
+        def intersection(self, *s: Iterable[Any]) -> set[Element]
         def intersection_update(self, *s: Iterable[Any]) -> None
         def isdisjoint(self, s: Iterable[Any], /) -> bool
         def issubset(self, s: Iterable[Any], /) -> bool
         def issuperset(self, s: Iterable[Any], /) -> bool
-        def pop(self) -> _T
-        def remove(self, element: _T, /) -> None
-        def symmetric_difference(self, s: Iterable[_T], /) -> set[_T]
-        def symmetric_difference_update(self, s: Iterable[_T], /) -> None
-        def union(self, *s: Iterable[_S]) -> set[_T | _S]
-        def update(self, *s: Iterable[_T]) -> None
+        def pop(self) -> Element
+        def remove(self, element: Element, /) -> None
+        def symmetric_difference(self, s: Iterable[Element], /) -> set[Element]
+        def symmetric_difference_update(self, s: Iterable[Element], /) -> None
+        def union[Other](self, *s: Iterable[Other]) -> set[Element | Other]
+        def update(self, *s: Iterable[Element]) -> None
         def __len__(self) -> int
         def __contains__(self, o: object, /) -> bool
-        def __iter__(self) -> Iterator[_T]
-        def __and__(self, value: AbstractSet[object], /) -> set[_T]
+        def __iter__(self) -> Iterator[Element]
+        def __and__(self, value: AbstractSet[object], /) -> set[Element]
         def __iand__(self, value: AbstractSet[object], /) -> Self
-        def __or__(self, value: AbstractSet[_S], /) -> set[_T | _S]
-        def __ior__(self, value: AbstractSet[_T], /) -> Self  # type: ignore[override,misc]
-        def __sub__(self, value: AbstractSet[_T | None], /) -> set[_T]
+        def __or__[Other](self, value: AbstractSet[Other], /) -> set[Element | Other]
+        def __ior__(self, value: AbstractSet[Element], /) -> Self  # type: ignore[override,misc]
+        def __sub__(self, value: AbstractSet[Element | None], /) -> set[Element]
         def __isub__(self, value: AbstractSet[object], /) -> Self
-        def __xor__(self, value: AbstractSet[_S], /) -> set[_T | _S]
-        def __ixor__(self, value: AbstractSet[_T], /) -> Self  # type: ignore[override,misc]
+        def __xor__[Other](self, value: AbstractSet[Other], /) -> set[Element | Other]
+        def __ixor__(self, value: AbstractSet[Element], /) -> Self  # type: ignore[override,misc]
         def __le__(self, value: AbstractSet[object], /) -> bool
         def __lt__(self, value: AbstractSet[object], /) -> bool
         def __ge__(self, value: AbstractSet[object], /) -> bool
         def __gt__(self, value: AbstractSet[object], /) -> bool
         def __eq__(self, value: object, /) -> bool
-        def __rand__(self, value: AbstractSet[object], /) -> set[_T]
-        def __ror__(self, value: AbstractSet[_S], /) -> set[_T | _S]  # type: ignore[misc]
-        def __rsub__(self, value: AbstractSet[_T], /) -> set[_T]
-        def __rxor__(self, value: AbstractSet[_S], /) -> set[_T | _S]  # type: ignore[misc]
+        def __rand__(self, value: AbstractSet[object], /) -> set[Element]
+        def __ror__[Other](self, value: AbstractSet[Other], /) -> set[Element | Other]  # type: ignore[misc]
+        def __rsub__(self, value: AbstractSet[Element], /) -> set[Element]
+        def __rxor__[Other](self, value: AbstractSet[Other], /) -> set[Element | Other]  # type: ignore[misc]
         def __class_getitem__(cls, item: Any, /) -> GenericAlias
 
-    class SetProxy(_BaseSetProxy[_T])
+    class SetProxy[in out Element](_BaseSetProxy[Element])
 
-class BaseListProxy(BaseProxy, MutableSequence[_T]):
+class BaseListProxy[in out Element](BaseProxy, MutableSequence[Element]):
     __builtins__: ClassVar[dict[str, Any]]
     def __len__(self) -> int
-    def __add__(self, x: list[_T], /) -> list[_T]
+    def __add__(self, x: list[Element], /) -> list[Element]
     def __delitem__(self, i: SupportsIndex | slice[SupportsIndex | None], /) -> None
 
-    def __getitem__(self, i: SupportsIndex, /) -> _T
-    def __getitem__(self, s: slice[SupportsIndex | None], /) -> list[_T]
+    def __getitem__(self, i: SupportsIndex, /) -> Element
+    def __getitem__(self, s: slice[SupportsIndex | None], /) -> list[Element]
 
-    def __setitem__(self, i: SupportsIndex, o: _T, /) -> None
-    def __setitem__(self, s: slice[SupportsIndex | None], o: Iterable[_T], /) -> None
+    def __setitem__(self, i: SupportsIndex, o: Element, /) -> None
+    def __setitem__(self, s: slice[SupportsIndex | None], o: Iterable[Element], /) -> None
 
-    def __mul__(self, n: SupportsIndex, /) -> list[_T]
-    def __rmul__(self, n: SupportsIndex, /) -> list[_T]
+    def __mul__(self, n: SupportsIndex, /) -> list[Element]
+    def __rmul__(self, n: SupportsIndex, /) -> list[Element]
     def __imul__(self, value: SupportsIndex, /) -> Self
-    def __reversed__(self) -> Iterator[_T]
-    def append(self, object: _T, /) -> None
-    def extend(self, iterable: Iterable[_T], /) -> None
-    def pop(self, index: SupportsIndex = ..., /) -> _T
-    def index(self, value: _T, start: SupportsIndex = ..., stop: SupportsIndex = ..., /) -> int
-    def count(self, value: _T, /) -> int
-    def insert(self, index: SupportsIndex, object: _T, /) -> None
-    def remove(self, value: _T, /) -> None
+    def __reversed__(self) -> Iterator[Element]
+    def append(self, object: Element, /) -> None
+    def extend(self, iterable: Iterable[Element], /) -> None
+    def pop(self, index: SupportsIndex = ..., /) -> Element
+    def index(self, value: Element, start: SupportsIndex = ..., stop: SupportsIndex = ..., /) -> int
+    def count(self, value: Element, /) -> int
+    def insert(self, index: SupportsIndex, object: Element, /) -> None
+    def remove(self, value: Element, /) -> None
     if sys.version_info >= (3, 14):
         # Next methods are copied from builtins.list
         def clear(self) -> None
-        def copy(self) -> list[_T]
+        def copy(self) -> list[Element]
 
     # Use BaseListProxy[SupportsRichComparisonT] for the first overload rather than [SupportsRichComparison]
     # to work around invariance
     def sort(self: BaseListProxy[SupportsRichComparisonT], *, key: None = None, reverse: bool = ...) -> None
-    def sort(self, *, key: Callable[[_T], SupportsRichComparison], reverse: bool = ...) -> None
+    def sort(self, *, key: Callable[[Element], SupportsRichComparison], reverse: bool = ...) -> None
 
-class ListProxy(BaseListProxy[_T]):
-    def __iadd__(self, value: Iterable[_T], /) -> Self  # type: ignore[override]
+class ListProxy[in out Element](BaseListProxy[Element]):
+    def __iadd__(self, value: Iterable[Element], /) -> Self  # type: ignore[override]
     def __imul__(self, value: SupportsIndex, /) -> Self  # type: ignore[override]
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, args: Any, /) -> Any:
@@ -284,7 +278,7 @@ class Server:
         Handle requests from the proxies in a particular process/thread
         """
 
-    def fallback_getvalue(self, conn: _ServerConnection, ident: str, obj: _T) -> _T
+    def fallback_getvalue[Element](self, conn: _ServerConnection, ident: str, obj: Element) -> Element
     def fallback_str(self, conn: _ServerConnection, ident: str, obj: Any) -> str
     def fallback_repr(self, conn: _ServerConnection, ident: str, obj: Any) -> str
     def dummy(self, c: _ServerConnection) -> None
@@ -416,25 +410,25 @@ class SyncManager(BaseManager):
     def JoinableQueue(self, maxsize: int = ...) -> queue.Queue[Any]
     def RLock(self) -> threading.RLock
     def Semaphore(self, value: int = 1) -> threading.Semaphore
-    def Array(self, typecode: Any, sequence: Sequence[_T]) -> Sequence[_T]
-    def Value(self, typecode: Any, value: _T) -> ValueProxy[_T]
+    def Array[Element](self, typecode: Any, sequence: Sequence[Element]) -> Sequence[Element]
+    def Value[Element](self, typecode: Any, value: Element) -> ValueProxy[Element]
 
     # Overloads are copied from builtins.dict.__init__
     def dict(self) -> DictProxy[Any, Any]
-    def dict(self, **kwargs: _VT) -> DictProxy[str, _VT]
-    def dict(self, map: SupportsKeysAndGetItem[_KT, _VT], /) -> DictProxy[_KT, _VT]
-    def dict(self, map: SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> DictProxy[str, _VT]
-    def dict(self, iterable: Iterable[(_KT, _VT)], /) -> DictProxy[_KT, _VT]
-    def dict(self, iterable: Iterable[(str, _VT)], /, **kwargs: _VT) -> DictProxy[str, _VT]
+    def dict[Value](self, **kwargs: Value) -> DictProxy[str, Value]
+    def dict[Key, Value](self, map: SupportsKeysAndGetItem[Key, Value], /) -> DictProxy[Key, Value]
+    def dict[Value](self, map: SupportsKeysAndGetItem[str, Value], /, **kwargs: Value) -> DictProxy[str, Value]
+    def dict[Key, Value](self, iterable: Iterable[(Key, Value)], /) -> DictProxy[Key, Value]
+    def dict[Value](self, iterable: Iterable[(str, Value)], /, **kwargs: Value) -> DictProxy[str, Value]
     def dict(self, iterable: Iterable[list[str]], /) -> DictProxy[str, str]
     def dict(self, iterable: Iterable[list[bytes]], /) -> DictProxy[bytes, bytes]
 
     # Overloads are copied from builtins.list.__init__
-    def list(self, iterable: Iterable[_T], /) -> ListProxy[_T]
+    def list[Element](self, iterable: Iterable[Element], /) -> ListProxy[Element]
     def list(self) -> ListProxy[Any]
 
     if sys.version_info >= (3, 14):
-        def set(self, iterable: Iterable[_T], /) -> SetProxy[_T]
+        def set[Element](self, iterable: Iterable[Element], /) -> SetProxy[Element]
         def set(self) -> SetProxy[Any]
 
 class RemoteError(Exception)

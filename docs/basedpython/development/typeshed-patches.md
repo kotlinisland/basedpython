@@ -1,30 +1,60 @@
 # typeshed patches
 
 basedpython vendors typeshed as `.byi` stubs, regenerated from upstream ruff's
-`.pyi` on every sync (see the upstream-sync workflow). the mechanical pipeline —
-reverse-transpile, then a pinned pep 695 ruff-fix — recovers most of what
-basedpython needs, but a few stubs carry semantics that no mechanical step can
-reconstruct. typeshed patches restore those, deterministically, so a fresh sync
-always reproduces the committed tree
+`.pyi` on every sync (see the upstream-sync workflow). reverse-transpile
+recovers most of what basedpython needs, but the stubs still arrive in the
+legacy `TypeVar(...)` + `Generic[...]` form, and a few carry semantics no
+mechanical step can reconstruct. the `by_typeshed_patch` crate fixes both,
+deterministically, so a fresh sync always reproduces the committed tree
 
-the `by_typeshed_patch` crate owns this. each patch is a small rust module under
-`crates/by_typeshed_patch/src/patches/`, registered in `all_patches()`
+it does two things:
+
+- **semantic patches** — small rust modules under
+    `crates/by_typeshed_patch/src/patches/`, registered in `all_patches()`,
+    each restoring one deliberate basedpython choice (see
+    `mapping-key-covariance` below)
+- **pep 695 conversion** — `crates/by_typeshed_patch/src/pep695.rs` rewrites
+    every legacy generic class into a pep 695 header with explicit variance
+    keywords (`out`/`in`/`in out`) and nice type-parameter names
+    (`_KT_co` → `Key`, `_T_co` → `Element`, ...). this is the bulk of the diff
 
 ## where patches sit in the sync
 
-`scripts/sync_typeshed_by.sh` runs three phases:
+`scripts/sync_typeshed_by.sh` runs two phases:
 
 1. **reverse-transpile** — every upstream `.pyi` becomes a `.byi`
-1. **ast patches** — `by_typeshed_patch` walks the tree and applies every
-    registered patch
-1. **pep 695 ruff-fix** — `UP046,UP047,UP040 --fix --unsafe-fixes` migrates
-    legacy `TypeVar(...)` + `Generic[...]` headers to pep 695 class headers
+1. **`by_typeshed_patch`** — for each `.byi`: apply the registered semantic
+    patches, re-parse, then run the pep 695 conversion
 
-patches run in phase 2, **before** the ruff-fix. so a patch sees the legacy
-form: typevars are declared with `TypeVar(...)` and referenced as plain names in
-class bases and method signatures. there are no pep 695 type-parameter lists yet,
-and no `out`/`in` variance keywords — those are what phase 3 derives. write
-patches against the legacy form
+basedpython owns the pep 695 migration itself, which is what
+lets it emit the explicit variance and nice names
+
+the two passes run in order with a re-parse between them, because a semantic
+patch may rewrite a typevar reference (e.g. covariance) that the conversion then
+renames. **semantic patches see the legacy form**: typevars declared with
+`TypeVar(...)` and referenced as plain names in class bases and method
+signatures, with no pep 695 type-parameter lists and no variance keywords yet.
+write them against that form
+
+## the pep 695 conversion
+
+`pep695::convert_module` reads every module-level `TypeVar`/`TypeVarTuple`/
+`ParamSpec` declaration (recording variance, bound, constraints, default) and
+rewrites each generic class header. variance maps covariant → `out`,
+contravariant → `in`, invariant → `in out` (basedpython has no bivariant
+spelling — `in out` *is* explicit invariance). names come from a curated table
+for the core containers and a mechanical fallback (strip the leading underscore
+and the `_co`/`_contra` suffix) for everything else; within one class colliding
+names get a numeric suffix
+
+it is deliberately conservative. a class is only rewritten when every type
+parameter resolves to a known module-level typevar — anything it can't fully
+characterise (an imported typevar, an unusual base) is left in legacy form
+rather than risking a broken stub. generic functions and type aliases are left
+alone too. a typevar declaration is removed only once every reference to it has
+been consumed by a conversion, and only when it is private (`_`-prefixed):
+public typevars like `AnyStr` may be re-exported and imported by other modules,
+so they always survive
 
 ## the `Patch` trait
 
@@ -78,6 +108,17 @@ every `_KT` name within. `MutableMapping`, which needs an invariant key for
 `__setitem__`, is a separate class and is left untouched.
 `collections.abc.Mapping` and `_collections_abc.Mapping` both re-export
 `typing.Mapping`, so the single rewrite covers every surface path
+
+the pep 695 conversion then runs over the patched source and, seeing two
+covariant key/value typevars, produces the final header:
+
+```by
+class Mapping[out Key, out Value](Collection[Key]):
+    def __getitem__(self, key: Key, /) -> Value: ...
+```
+
+`MutableMapping`, whose `_KT`/`_VT` stayed invariant, becomes
+`class MutableMapping[in out Key, in out Value](Mapping[Key, Value])`
 
 ## adding a new patch
 

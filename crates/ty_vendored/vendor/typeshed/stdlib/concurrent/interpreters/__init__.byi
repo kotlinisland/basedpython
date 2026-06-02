@@ -36,8 +36,6 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
         "list_all",
     ]
 
-    _R = TypeVar("_R")
-    _P = ParamSpec("_P")
 
     class ExecutionFailed(InterpreterError):
         """An unhandled exception happened during execution.
@@ -121,7 +119,7 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
             in other threads.
             """
 
-        def call(self, callable: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        def call[**P, R](self, callable: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
             """Call the object in the interpreter with given args/kwargs.
 
             Nearly all callables, args, kwargs, and return values are
@@ -135,7 +133,7 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
             happens with Interpreter.exec().
             """
 
-        def call_in_thread(self, callable: Callable[_P, object], /, *args: _P.args, **kwargs: _P.kwargs) -> threading.Thread:
+        def call_in_thread[**P](self, callable: Callable[P, object], /, *args: P.args, **kwargs: P.kwargs) -> threading.Thread:
             """Return a new thread that calls the object in the interpreter.
 
             The return value and any raised exception are discarded.

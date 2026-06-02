@@ -31,8 +31,6 @@ from distutils.file_util import _BytesPathT, _StrPathT
 from typing import Any, ClassVar, Literal, TypeVar
 from typing_extensions import TypeVarTuple, Unpack
 
-_CommandT = TypeVar("_CommandT", bound=Command)
-_Ts = TypeVarTuple("_Ts")
 
 class Command:
     """Abstract base class for defining command classes, the "worker bees"
@@ -204,7 +202,7 @@ class Command:
     def reinitialize_command(self, command: Literal["sdist"], reinit_subcommands: bool | Literal[0, 1] = 0) -> sdist
     def reinitialize_command(self, command: Literal["upload"], reinit_subcommands: bool | Literal[0, 1] = 0) -> upload
     def reinitialize_command(self, command: str, reinit_subcommands: bool | Literal[0, 1] = 0) -> Command
-    def reinitialize_command(self, command: _CommandT, reinit_subcommands: bool | Literal[0, 1] = 0) -> _CommandT
+    def reinitialize_command[CommandT: Command](self, command: CommandT, reinit_subcommands: bool | Literal[0, 1] = 0) -> CommandT
 
     def run_command(self, command: str) -> None:
         """Run some other command: uses the 'run_command()' method of
@@ -221,8 +219,8 @@ class Command:
         """
 
     def warn(self, msg: str) -> None
-    def execute(
-        self, func: Callable[[Unpack[_Ts]], Unused], args: (Unpack[_Ts],), msg: str | None = None, level: int = 1
+    def execute[*Ts](
+        self, func: Callable[[Unpack[Ts]], Unused], args: (Unpack[Ts],), msg: str | None = None, level: int = 1
     ) -> None
     def mkpath(self, name: str, mode: int = 0o777) -> None
 
@@ -288,12 +286,12 @@ class Command:
         group: str | None = None,
     ) -> str
 
-    def make_file(
+    def make_file[*Ts](
         self,
         infiles: str | list[str] | (*: str),
         outfile: StrOrBytesPath,
-        func: Callable[[Unpack[_Ts]], Unused],
-        args: (Unpack[_Ts],),
+        func: Callable[[Unpack[Ts]], Unused],
+        args: (Unpack[Ts],),
         exec_msg: str | None = None,
         skip_msg: str | None = None,
         level: Unused = 1,

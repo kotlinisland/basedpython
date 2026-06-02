@@ -40,9 +40,6 @@ if sys.platform == "win32":
 if sys.version_info >= (3, 11):
     from ctypes._endian import BigEndianUnion as BigEndianUnion, LittleEndianUnion as LittleEndianUnion
 
-_CT = TypeVar("_CT", bound=_CData)
-_T = TypeVar("_T", default=Any)
-_DLLT = TypeVar("_DLLT", bound=CDLL)
 
 if sys.version_info >= (3, 14):
     @deprecated("ctypes.POINTER with string")
@@ -53,9 +50,9 @@ if sys.version_info >= (3, 14):
         so calling this function repeatedly is cheap.
         """
     def POINTER(cls: None) -> type[c_void_p]
-    def POINTER(cls: type[_CT]) -> type[_Pointer[_CT]]
+    def POINTER[CT: _CData](cls: type[CT]) -> type[_Pointer[CT]]
 
-    def pointer(obj: _CT) -> _Pointer[_CT]:
+    def pointer[CT: _CData](obj: CT) -> _Pointer[CT]:
         """Create a new pointer instance, pointing to 'obj'.
 
         The returned object is of the type POINTER(type(obj)). Note that if you
@@ -141,11 +138,11 @@ class PyDLL(CDLL):
     Python exceptions are handled correctly.
     """
 
-class LibraryLoader(Generic[_DLLT]):
-    def __init__(self, dlltype: type[_DLLT]) -> None
-    def __getattr__(self, name: str) -> _DLLT
-    def __getitem__(self, name: str) -> _DLLT
-    def LoadLibrary(self, name: str) -> _DLLT
+class LibraryLoader[in out DLLT: CDLL]:
+    def __init__(self, dlltype: type[DLLT]) -> None
+    def __getattr__(self, name: str) -> DLLT
+    def __getitem__(self, name: str) -> DLLT
+    def LoadLibrary(self, name: str) -> DLLT
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -214,9 +211,8 @@ _CVoidPLike: TypeAlias = _PointerLike | Array[Any] | _CArgObject | int
 # when memmove(buf, b'foo', 4) was intended.
 _CVoidConstPLike: TypeAlias = _CVoidPLike | bytes
 
-_CastT = TypeVar("_CastT", bound=_CanCastTo)
 
-def cast(obj: _CData | _CDataType | _CArgObject | int, typ: type[_CastT]) -> _CastT
+def cast[CastT: _CanCastTo](obj: _CData | _CDataType | _CArgObject | int, typ: type[CastT]) -> CastT
 def create_string_buffer(init: int | bytes, size: int | None = None) -> Array[c_char]:
     """create_string_buffer(aBytes) -> character array
     create_string_buffer(anInteger) -> character array
@@ -236,7 +232,7 @@ if sys.version_info < (3, 15):
     def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None: ...
 
 @deprecated("Soft deprecated since Python 3.13. Use multiplication instead.")
-def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...
+def ARRAY[CT: _CData](typ: CT, len: int) -> Array[CT]: ...
 
 if sys.platform == "win32":
     def DllCanUnloadNow() -> int
@@ -288,7 +284,7 @@ if sys.version_info >= (3, 14):
         Return a memoryview representing the memory at void *ptr.
         """
 
-class py_object(_CanCastTo, _SimpleCData[_T]):
+class py_object[in out Element = Any](_CanCastTo, _SimpleCData[Element]):
     _type_: ClassVar[Literal["O"]]
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:

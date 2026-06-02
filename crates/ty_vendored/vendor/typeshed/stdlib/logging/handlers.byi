@@ -21,7 +21,6 @@ from types import TracebackType
 from typing import Any, ClassVar, Final, Protocol, TypeVar, type_check_only
 from typing_extensions import Self
 
-_T = TypeVar("_T")
 
 DEFAULT_TCP_LOGGING_PORT: Final = 9020
 DEFAULT_UDP_LOGGING_PORT: Final = 9021
@@ -595,9 +594,9 @@ class HTTPHandler(Handler):
         """
 
 @type_check_only
-class _QueueLike(Protocol[_T]):
-    def get(self) -> _T
-    def put_nowait(self, item: _T, /) -> None
+class _QueueLike[in out Element](Protocol):
+    def get(self) -> Element
+    def put_nowait(self, item: Element, /) -> None
 
 class QueueHandler(Handler):
     """

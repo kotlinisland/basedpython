@@ -117,7 +117,6 @@ __all__ = [
 if sys.version_info < (3, 14):
     __all__ += ["URLopener", "FancyURLopener"]
 
-_T = TypeVar("_T")
 
 # The actual type is `addinfourl | HTTPResponse`, but users would need to use `typing.cast` or `isinstance` to narrow the type,
 # so we use `Any` instead.
@@ -374,7 +373,7 @@ class Request:
     def set_proxy(self, host: str, type: str) -> None
 
     def get_header(self, header_name: str) -> str | None
-    def get_header(self, header_name: str, default: _T) -> str | _T
+    def get_header[Element](self, header_name: str, default: Element) -> str | Element
 
     def header_items(self) -> list[(str, str)]
     def has_proxy(self) -> bool

@@ -19,8 +19,6 @@ else:
 __all__ = ()
 
 _LockLike: TypeAlias = synchronize.Lock | synchronize.RLock
-_T = TypeVar("_T")
-_CT = TypeVar("_CT", bound=_CData)
 
 class ProcessError(Exception)
 class BufferTooShort(ProcessError)
@@ -113,37 +111,37 @@ class BaseContext:
     ) -> _Pool:
         """Returns a process pool object"""
 
-    def RawValue(self, typecode_or_type: type[_CT], *args: Any) -> _CT:
+    def RawValue[CT: _CData](self, typecode_or_type: type[CT], *args: Any) -> CT:
         """Returns a shared object"""
     def RawValue(self, typecode_or_type: str, *args: Any) -> Any
 
-    def RawArray(self, typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
+    def RawArray[CT: _CData](self, typecode_or_type: type[CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[CT]:
         """Returns a shared array"""
     def RawArray(self, typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any
 
-    def Value(
-        self, typecode_or_type: type[_SimpleCData[_T]], *args: Any, lock: Literal[True] | _LockLike = True
-    ) -> Synchronized[_T]:
+    def Value[Element](
+        self, typecode_or_type: type[_SimpleCData[Element]], *args: Any, lock: Literal[True] | _LockLike = True
+    ) -> Synchronized[Element]:
         """Returns a synchronized shared object"""
-    def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[False]) -> Synchronized[_CT]
-    def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[_CT]
+    def Value[CT: _CData](self, typecode_or_type: type[CT], *args: Any, lock: Literal[False]) -> Synchronized[CT]
+    def Value[CT: _CData](self, typecode_or_type: type[CT], *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[CT]
     def Value(self, typecode_or_type: str, *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[Any]
     def Value(self, typecode_or_type: str | type[_CData], *args: Any, lock: bool | _LockLike = True) -> Any
 
-    def Array(
-        self, typecode_or_type: type[_SimpleCData[_T]], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
-    ) -> SynchronizedArray[_T]:
+    def Array[Element](
+        self, typecode_or_type: type[_SimpleCData[Element]], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
+    ) -> SynchronizedArray[Element]:
         """Returns a synchronized shared array"""
     def Array(
         self, typecode_or_type: type[c_char], size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True
     ) -> SynchronizedString
-    def Array(
+    def Array[Element](
         self,
-        typecode_or_type: type[_SimpleCData[_T]],
+        typecode_or_type: type[_SimpleCData[Element]],
         size_or_initializer: int | Sequence[Any],
         *,
         lock: Literal[True] | _LockLike = True,
-    ) -> SynchronizedArray[_T]
+    ) -> SynchronizedArray[Element]
     def Array(
         self, typecode_or_type: str, size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True
     ) -> SynchronizedArray[Any]

@@ -7,7 +7,6 @@ from typing import ClassVar, Literal, TypeVar
 
 from .pytree import Base, Leaf, Node
 
-_N = TypeVar("_N", bound=Base)
 
 class BaseFix:
     """Optional base class for fixers.
@@ -54,7 +53,7 @@ class BaseFix:
         The main refactoring tool should call this.
         """
 
-    def match(self, node: _N) -> Literal[False] | dict[str, _N]:
+    def match[N: Base](self, node: N) -> Literal[False] | dict[str, N]:
         """Returns match for a given parse tree node.
 
         Should return a true or false object (not necessarily a bool).

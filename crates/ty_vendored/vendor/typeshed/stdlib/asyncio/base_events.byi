@@ -32,9 +32,6 @@ from typing_extensions import TypeVarTuple, Unpack
 # Keep asyncio.__all__ updated with any changes to __all__ here
 __all__ = ("BaseEventLoop", "Server")
 
-_T = TypeVar("_T")
-_Ts = TypeVarTuple("_Ts")
-_ProtocolT = TypeVar("_ProtocolT", bound=BaseProtocol)
 _Context: TypeAlias = dict[str, Any]
 _ExceptionHandler: TypeAlias = Callable[[AbstractEventLoop, _Context], object]
 _ProtocolFactory: TypeAlias = Callable[[], BaseProtocol]
@@ -96,7 +93,7 @@ class BaseEventLoop(AbstractEventLoop):
     def run_forever(self) -> None:
         """Run until stop() is called."""
 
-    def run_until_complete(self, future: _AwaitableLike[_T]) -> _T:
+    def run_until_complete[Element](self, future: _AwaitableLike[Element]) -> Element:
         """Run until the Future is done.
 
         If the argument is a coroutine, it is wrapped in a Task.
@@ -133,7 +130,7 @@ class BaseEventLoop(AbstractEventLoop):
     async def shutdown_asyncgens(self) -> None:
         """Shutdown all active asynchronous generators."""
     # Methods scheduling callbacks.  All these return Handles.
-    def call_soon(self, callback: Callable[[Unpack[_Ts]], object], *args: *_Ts, context: Context | None = None) -> Handle:
+    def call_soon[*Ts](self, callback: Callable[[Unpack[Ts]], object], *args: *Ts, context: Context | None = None) -> Handle:
         """Arrange for a callback to be called as soon as possible.
 
         This operates as a FIFO queue: callbacks are called in the
@@ -144,8 +141,8 @@ class BaseEventLoop(AbstractEventLoop):
         the callback when it is called.
         """
 
-    def call_later(
-        self, delay: float, callback: Callable[[Unpack[_Ts]], object], *args: *_Ts, context: Context | None = None
+    def call_later[*Ts](
+        self, delay: float, callback: Callable[[Unpack[Ts]], object], *args: *Ts, context: Context | None = None
     ) -> TimerHandle:
         """Arrange for a callback to be called at a given time.
 
@@ -163,8 +160,8 @@ class BaseEventLoop(AbstractEventLoop):
         the callback when it is called.
         """
 
-    def call_at(
-        self, when: float, callback: Callable[[Unpack[_Ts]], object], *args: *_Ts, context: Context | None = None
+    def call_at[*Ts](
+        self, when: float, callback: Callable[[Unpack[Ts]], object], *args: *Ts, context: Context | None = None
     ) -> TimerHandle:
         """Like call_later(), but uses an absolute time.
 
@@ -183,26 +180,26 @@ class BaseEventLoop(AbstractEventLoop):
         """Create a Future object attached to the loop."""
     # Tasks methods
     if sys.version_info >= (3, 14):
-        def create_task(
+        def create_task[Element](
             self,
-            coro: _CoroutineLike[_T],
+            coro: _CoroutineLike[Element],
             *,
             name: object = None,
             context: Context | None = None,
             eager_start: bool | None = None,
-        ) -> Task[_T]:
+        ) -> Task[Element]:
             """Schedule or begin executing a coroutine object.
 
             Return a task object.
             """
     elif sys.version_info >= (3, 11):
-        def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
+        def create_task[Element](self, coro: _CoroutineLike[Element], *, name: object = None, context: Context | None = None) -> Task[Element]:
             """Schedule a coroutine object.
 
             Return a task object.
             """
     else:
-        def create_task(self, coro: _CoroutineLike[_T], *, name: object = None) -> Task[_T]:
+        def create_task[Element](self, coro: _CoroutineLike[Element], *, name: object = None) -> Task[Element]:
             """Schedule a coroutine object.
 
             Return a task object.
@@ -223,12 +220,12 @@ class BaseEventLoop(AbstractEventLoop):
     def get_task_factory(self) -> _TaskFactory | None:
         """Return a task factory, or None if the default one is in use."""
     # Methods for interacting with threads
-    def call_soon_threadsafe(
-        self, callback: Callable[[Unpack[_Ts]], object], *args: *_Ts, context: Context | None = None
+    def call_soon_threadsafe[*Ts](
+        self, callback: Callable[[Unpack[Ts]], object], *args: *Ts, context: Context | None = None
     ) -> Handle:
         """Like call_soon(), but thread-safe."""
 
-    def run_in_executor(self, executor: Executor | None, func: Callable[[Unpack[_Ts]], _T], *args: *_Ts) -> Future[_T]
+    def run_in_executor[*Ts, Element](self, executor: Executor | None, func: Callable[[Unpack[Ts]], Element], *args: *Ts) -> Future[Element]
     def set_default_executor(self, executor: ThreadPoolExecutor) -> None  # type: ignore[override]
     # Network I/O methods returning Futures.
     async def getaddrinfo(
@@ -244,9 +241,9 @@ class BaseEventLoop(AbstractEventLoop):
     async def getnameinfo(self, sockaddr: (str, int) | (str, int, int, int), flags: int = 0) -> (str, str)
 
     if sys.version_info >= (3, 12):
-        async def create_connection(
+        async def create_connection[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             host: str = ...,
             port: int = ...,
             *,
@@ -262,7 +259,7 @@ class BaseEventLoop(AbstractEventLoop):
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
             all_errors: bool = False,
-        ) -> (Transport, _ProtocolT):
+        ) -> (Transport, ProtocolT):
             """Connect to a TCP server.
 
             Create a streaming transport connection to a given internet host and
@@ -274,9 +271,9 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
-        async def create_connection(
+        async def create_connection[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             host: None = None,
             port: None = None,
             *,
@@ -292,11 +289,11 @@ class BaseEventLoop(AbstractEventLoop):
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
             all_errors: bool = False,
-        ) -> (Transport, _ProtocolT)
+        ) -> (Transport, ProtocolT)
     elif sys.version_info >= (3, 11):
-        async def create_connection(
+        async def create_connection[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             host: str = ...,
             port: int = ...,
             *,
@@ -311,7 +308,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_shutdown_timeout: float | None = None,
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
-        ) -> (Transport, _ProtocolT):
+        ) -> (Transport, ProtocolT):
             """Connect to a TCP server.
 
             Create a streaming transport connection to a given internet host and
@@ -323,9 +320,9 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
-        async def create_connection(
+        async def create_connection[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             host: None = None,
             port: None = None,
             *,
@@ -340,11 +337,11 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_shutdown_timeout: float | None = None,
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
-        ) -> (Transport, _ProtocolT)
+        ) -> (Transport, ProtocolT)
     else:
-        async def create_connection(
+        async def create_connection[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             host: str = ...,
             port: int = ...,
             *,
@@ -358,7 +355,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_handshake_timeout: float | None = None,
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
-        ) -> (Transport, _ProtocolT):
+        ) -> (Transport, ProtocolT):
             """Connect to a TCP server.
 
             Create a streaming transport connection to a given internet host and
@@ -370,9 +367,9 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
-        async def create_connection(
+        async def create_connection[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             host: None = None,
             port: None = None,
             *,
@@ -386,7 +383,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_handshake_timeout: float | None = None,
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
-        ) -> (Transport, _ProtocolT)
+        ) -> (Transport, ProtocolT)
 
     if sys.version_info >= (3, 13):
         # 3.13 added `keep_alive`.
@@ -558,15 +555,15 @@ class BaseEventLoop(AbstractEventLoop):
             immediately.
             """
 
-        async def connect_accepted_socket(
+        async def connect_accepted_socket[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             sock: socket,
             *,
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
-        ) -> (Transport, _ProtocolT)
+        ) -> (Transport, ProtocolT)
     else:
         async def start_tls(
             self,
@@ -584,14 +581,14 @@ class BaseEventLoop(AbstractEventLoop):
             immediately.
             """
 
-        async def connect_accepted_socket(
+        async def connect_accepted_socket[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             sock: socket,
             *,
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
-        ) -> (Transport, _ProtocolT)
+        ) -> (Transport, ProtocolT)
 
     async def sock_sendfile(
         self, sock: socket, file: IO[bytes], offset: int = 0, count: int | None = None, *, fallback: bool | None = True
@@ -622,9 +619,9 @@ class BaseEventLoop(AbstractEventLoop):
         sendfile syscall and fallback is False.
         """
     if sys.version_info >= (3, 11):
-        async def create_datagram_endpoint(  # type: ignore[override]
+        async def create_datagram_endpoint[ProtocolT: BaseProtocol](  # type: ignore[override]
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             local_addr: (str, int) | str | None = None,
             remote_addr: (str, int) | str | None = None,
             *,
@@ -634,12 +631,12 @@ class BaseEventLoop(AbstractEventLoop):
             reuse_port: bool | None = None,
             allow_broadcast: bool | None = None,
             sock: socket | None = None,
-        ) -> (DatagramTransport, _ProtocolT):
+        ) -> (DatagramTransport, ProtocolT):
             """Create datagram connection."""
     else:
-        async def create_datagram_endpoint(
+        async def create_datagram_endpoint[ProtocolT: BaseProtocol](
             self,
-            protocol_factory: Callable[[], _ProtocolT],
+            protocol_factory: Callable[[], ProtocolT],
             local_addr: (str, int) | str | None = None,
             remote_addr: (str, int) | str | None = None,
             *,
@@ -650,18 +647,18 @@ class BaseEventLoop(AbstractEventLoop):
             reuse_port: bool | None = None,
             allow_broadcast: bool | None = None,
             sock: socket | None = None,
-        ) -> (DatagramTransport, _ProtocolT):
+        ) -> (DatagramTransport, ProtocolT):
             """Create datagram connection."""
     # Pipes and subprocesses.
-    async def connect_read_pipe(
-        self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
-    ) -> (ReadTransport, _ProtocolT)
-    async def connect_write_pipe(
-        self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
-    ) -> (WriteTransport, _ProtocolT)
-    async def subprocess_shell(
+    async def connect_read_pipe[ProtocolT: BaseProtocol](
+        self, protocol_factory: Callable[[], ProtocolT], pipe: Any
+    ) -> (ReadTransport, ProtocolT)
+    async def connect_write_pipe[ProtocolT: BaseProtocol](
+        self, protocol_factory: Callable[[], ProtocolT], pipe: Any
+    ) -> (WriteTransport, ProtocolT)
+    async def subprocess_shell[ProtocolT: BaseProtocol](
         self,
-        protocol_factory: Callable[[], _ProtocolT],
+        protocol_factory: Callable[[], ProtocolT],
         cmd: bytes | str,
         *,
         stdin: int | IO[Any] | None = -1,
@@ -674,10 +671,10 @@ class BaseEventLoop(AbstractEventLoop):
         errors: None = None,
         text: Literal[False] | None = None,
         **kwargs: Any,
-    ) -> (SubprocessTransport, _ProtocolT)
-    async def subprocess_exec(
+    ) -> (SubprocessTransport, ProtocolT)
+    async def subprocess_exec[ProtocolT: BaseProtocol](
         self,
-        protocol_factory: Callable[[], _ProtocolT],
+        protocol_factory: Callable[[], ProtocolT],
         program: Any,
         *args: Any,
         stdin: int | IO[Any] | None = -1,
@@ -690,10 +687,10 @@ class BaseEventLoop(AbstractEventLoop):
         errors: None = None,
         text: Literal[False] | None = None,
         **kwargs: Any,
-    ) -> (SubprocessTransport, _ProtocolT)
-    def add_reader(self, fd: FileDescriptorLike, callback: Callable[[Unpack[_Ts]], Any], *args: *_Ts) -> None
+    ) -> (SubprocessTransport, ProtocolT)
+    def add_reader[*Ts](self, fd: FileDescriptorLike, callback: Callable[[Unpack[Ts]], Any], *args: *Ts) -> None
     def remove_reader(self, fd: FileDescriptorLike) -> bool
-    def add_writer(self, fd: FileDescriptorLike, callback: Callable[[Unpack[_Ts]], Any], *args: *_Ts) -> None
+    def add_writer[*Ts](self, fd: FileDescriptorLike, callback: Callable[[Unpack[Ts]], Any], *args: *Ts) -> None
     def remove_writer(self, fd: FileDescriptorLike) -> bool
     # The sock_* methods (and probably some others) are not actually implemented on
     # BaseEventLoop, only on subclasses. We list them here for now for convenience.
@@ -707,7 +704,7 @@ class BaseEventLoop(AbstractEventLoop):
         async def sock_recvfrom_into(self, sock: socket, buf: WriteableBuffer, nbytes: int = 0) -> (int, _RetAddress)
         async def sock_sendto(self, sock: socket, data: ReadableBuffer, address: _Address) -> int
     # Signal handling.
-    def add_signal_handler(self, sig: int, callback: Callable[[Unpack[_Ts]], Any], *args: *_Ts) -> None
+    def add_signal_handler[*Ts](self, sig: int, callback: Callable[[Unpack[Ts]], Any], *args: *Ts) -> None
     def remove_signal_handler(self, sig: int) -> bool
     # Error handlers.
     def set_exception_handler(self, handler: _ExceptionHandler | None) -> None:

@@ -71,7 +71,6 @@ __all__ = [
 if sys.version_info < (3, 15):
     __all__ += ["VERSION"]
 
-_T = TypeVar("_T")
 _FileRead: TypeAlias = FileDescriptorOrPath | SupportsRead[bytes] | SupportsRead[str]
 _FileWriteC14N: TypeAlias = FileDescriptorOrPath | SupportsWrite[bytes]
 _FileWrite: TypeAlias = _FileWriteC14N | SupportsWrite[str]
@@ -129,12 +128,10 @@ def canonicalize(
 # functions defined in this module.
 _ElementCallable: TypeAlias = Callable[..., Element[_ElementCallable]]
 
-_Tag = TypeVar("_Tag", default=str, bound=str | _ElementCallable)
-_OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 
 @disjoint_base
-class Element(Generic[_Tag]):
-    tag: _Tag
+class Element[in out Tag: str | _ElementCallable = str]:
+    tag: Tag
     """A string identifying what kind of data this element represents"""
 
     attrib: dict[str, str]
@@ -146,7 +143,7 @@ class Element(Generic[_Tag]):
     tail: str | None
     """A string of text directly after the end tag, or None"""
 
-    def __init__(self, tag: _Tag, attrib: dict[str, str] = {}, **extra: str) -> None
+    def __init__(self, tag: Tag, attrib: dict[str, str] = {}, **extra: str) -> None
     def append(self, subelement: Element[Any], /) -> None
     def clear(self) -> None
     def extend(self, elements: Iterable[Element[Any]], /) -> None
@@ -154,10 +151,10 @@ class Element(Generic[_Tag]):
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]
 
     def findtext(self, path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None
-    def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str
+    def findtext[Element](self, path: str, default: Element, namespaces: dict[str, str] | None = None) -> Element | str
 
     def get(self, key: str, default: None = None) -> str | None
-    def get(self, key: str, default: _T) -> str | _T
+    def get[Element](self, key: str, default: Element) -> str | Element
 
     def insert(self, index: int, subelement: Element[Any], /) -> None
     def items(self) -> ItemsView[str, str]
@@ -169,10 +166,10 @@ class Element(Generic[_Tag]):
     def itertext(self) -> Generator[str]
     def keys(self) -> dict_keys[str, str]
     # makeelement returns the type of self in Python impl, but not in C impl
-    def makeelement(self, tag: _OtherTag, attrib: dict[str, str], /) -> Element[_OtherTag]
+    def makeelement[OtherTag: str | _ElementCallable = str](self, tag: OtherTag, attrib: dict[str, str], /) -> Element[OtherTag]
     def remove(self, subelement: Element[Any], /) -> None
     def set(self, key: str, value: str, /) -> None
-    def __copy__(self) -> Element[_Tag]  # returns the type of self in Python impl, but not in C impl
+    def __copy__(self) -> Element[Tag]  # returns the type of self in Python impl, but not in C impl
     def __deepcopy__(self, memo: Any, /) -> Element  # Only exists in C impl
     def __delitem__(self, key: SupportsIndex | slice, /) -> None:
         """Delete self[key]."""
@@ -243,9 +240,8 @@ class QName:
     def __eq__(self, other: object) -> bool
     def __hash__(self) -> int
 
-_Root = TypeVar("_Root", Element, Element | None, default=Element | None)
 
-class ElementTree(Generic[_Root]):
+class ElementTree[in out Root: constraints (Element, Element | None) = Element | None]:
     """An XML element hierarchy.
 
     This class also provides support for serialization to and from
@@ -258,7 +254,7 @@ class ElementTree(Generic[_Root]):
     """
 
     def __init__(self, element: Element[Any] | None = None, file: _FileRead | None = None) -> None
-    def getroot(self) -> _Root:
+    def getroot(self) -> Root:
         """Return root element of this tree."""
 
     def _setroot(self, element: Element[Any]) -> None:
@@ -314,7 +310,7 @@ class ElementTree(Generic[_Root]):
         Return the first matching element, or None if no element was found.
 
         """
-    def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str
+    def findtext[Element](self, path: str, default: Element, namespaces: dict[str, str] | None = None) -> Element | str
 
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]:
         """Find all matching subelements by tag name or path.
@@ -504,12 +500,11 @@ def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTre
 #  * comment, pi: Element[_ElementCallable]
 #  * start-ns: tuple[str, str] (prefix, uri)
 #  * end-ns: None
-_EventT_co = TypeVar("_EventT_co", bound=Element[str] | Element[_ElementCallable] | tuple[str, str] | None, covariant=True)
 _EventType: TypeAlias = Literal["start", "end", "comment", "pi", "start-ns", "end-ns"]
 
 # This class is defined inside the body of iterparse.
 @type_check_only
-class _IterParseIterator(Iterator[tuple[_EventType, _EventT_co]], Protocol[_EventT_co]):
+class _IterParseIterator[out EventT: Element[str] | Element[_ElementCallable] | tuple[str, str] | None](Iterator[tuple[_EventType, EventT]], Protocol):
     if sys.version_info >= (3, 13):
         def close(self) -> None
     if sys.version_info >= (3, 11):
@@ -540,8 +535,8 @@ def iterparse(source: _FileRead, events: Iterable[_EventType], parser: XMLParser
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
 
-class XMLPullParser(Generic[_EventT_co]):
-    def __init__(self, events: Iterable[_EventType] | None = None, *, _parser: XMLParser[_EventT_co] | None = None) -> None
+class XMLPullParser[out EventT: Element[str] | Element[_ElementCallable] | tuple[str, str] | None]:
+    def __init__(self, events: Iterable[_EventType] | None = None, *, _parser: XMLParser[EventT] | None = None) -> None
     def feed(self, data: str | ReadableBuffer) -> None:
         """Feed encoded data to parser."""
 
@@ -552,7 +547,7 @@ class XMLPullParser(Generic[_EventT_co]):
         read_events() to consume elements from XMLPullParser.
         """
 
-    def read_events(self) -> Iterator[_EventQueue | (_EventType, _EventT_co)]:
+    def read_events(self) -> Iterator[_EventQueue | (_EventType, EventT)]:
         """Return an iterator over currently available (event, elem) pairs.
 
         Events are consumed from the internal event queue as they are
@@ -681,20 +676,19 @@ class C14NWriterTarget:
 @type_check_only
 class _Target(Protocol)
 
-_E = TypeVar("_E", default=Element)
 
 # This is generic because the return type of close() depends on the target.
 # The default target is TreeBuilder, which returns Element.
 # C14NWriterTarget does not implement a close method, so using it results
 # in a type of XMLParser[None].
 @disjoint_base
-class XMLParser(Generic[_E]):
+class XMLParser[in out E = Element]:
     parser: XMLParserType
     target: _Target
     # TODO: what is entity used for???
     entity: dict[str, str]
     version: str
     def __init__(self, *, target: _Target | None = None, encoding: str | None = None) -> None
-    def close(self) -> _E
+    def close(self) -> E
     def feed(self, data: str | ReadableBuffer, /) -> None
     def flush(self) -> None

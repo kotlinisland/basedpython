@@ -311,11 +311,9 @@ else:
         VirtualEvent = "35"
         Visibility = "15"
 
-_W = TypeVar("_W", bound=Misc)
 # Events considered covariant because you should never assign to event.widget.
-_W_co = TypeVar("_W_co", covariant=True, bound=Misc, default=Misc)
 
-class Event(Generic[_W_co]):
+class Event[out W: Misc = Misc]:
     """Container for the properties of an event.
 
     Instances of this type are generated if one of the following events occurs:
@@ -375,7 +373,7 @@ class Event(Generic[_W_co]):
     keysym: str
     keysym_num: int
     type: EventType
-    widget: _W_co
+    widget: W
     delta: int
     if sys.version_info >= (3, 15):
         detail: str
@@ -581,8 +579,6 @@ getdouble = float
 def getboolean(s) -> bool:
     """Convert Tcl object to True or False."""
 
-_Ts = TypeVarTuple("_Ts")
-_P = ParamSpec("_P")
 
 @type_check_only
 class _GridIndexInfo(TypedDict, total=False):
@@ -729,7 +725,7 @@ class Misc:
     if sys.version_info >= (3, 14):
         # .after() can be called without the "func" argument, but it is basically never what you want.
         # It behaves like time.sleep() and freezes the GUI app.
-        def after(self, ms: int | Literal["idle"], func: Callable[_P, object], *args: _P.args, **kwargs: _P.kwargs) -> str:
+        def after[**P](self, ms: int | Literal["idle"], func: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> str:
             """Call function once after given time.
 
             MS specifies the time in milliseconds. FUNC gives the
@@ -738,7 +734,7 @@ class Misc:
             identifier to cancel scheduling with after_cancel.
             """
         # after_idle is essentially partialmethod(after, "idle")
-        def after_idle(self, func: Callable[_P, object], *args: _P.args, **kwargs: _P.kwargs) -> str:
+        def after_idle[**P](self, func: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> str:
             """Call FUNC once if the Tcl main loop has no event to
             process.
 
@@ -748,7 +744,7 @@ class Misc:
     else:
         # .after() can be called without the "func" argument, but it is basically never what you want.
         # It behaves like time.sleep() and freezes the GUI app.
-        def after(self, ms: int | Literal["idle"], func: Callable[[Unpack[_Ts]], object], *args: *_Ts) -> str:
+        def after[*Ts](self, ms: int | Literal["idle"], func: Callable[[Unpack[Ts]], object], *args: *Ts) -> str:
             """Call function once after given time.
 
             MS specifies the time in milliseconds. FUNC gives the
@@ -757,7 +753,7 @@ class Misc:
             identifier to cancel scheduling with after_cancel.
             """
         # after_idle is essentially partialmethod(after, "idle")
-        def after_idle(self, func: Callable[[Unpack[_Ts]], object], *args: *_Ts) -> str:
+        def after_idle[*Ts](self, func: Callable[[Unpack[Ts]], object], *args: *Ts) -> str:
             """Call FUNC once if the Tcl main loop has no event to
             process.
 
@@ -2464,10 +2460,10 @@ class Widget(BaseWidget, Pack, Place, Grid):
     # Allow bind callbacks to take e.g. Event[Label] instead of Event[Misc].
     # Tk and Toplevel get notified for their child widgets' events, but other
     # widgets don't.
-    def bind(
-        self: _W,
+    def bind[W: Misc](
+        self: W,
         sequence: str | None = None,
-        func: Callable[[Event[_W]], object] | None = None,
+        func: Callable[[Event[W]], object] | None = None,
         add: Literal["", "+"] | bool | None = None,
     ) -> str:
         """Bind to this widget at event SEQUENCE a call to function FUNC.

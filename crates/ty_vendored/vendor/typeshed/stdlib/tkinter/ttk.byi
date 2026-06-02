@@ -79,8 +79,6 @@ _Statespec: TypeAlias = tuple[Unpack[tuple[str, ...]], Any]
 _ImageStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], tkinter._Image | str]
 _VsapiStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], int]
 
-_P = ParamSpec("_P")
-_T = TypeVar("_T")
 
 @type_check_only
 class _Layout(TypedDict, total=False):
@@ -346,9 +344,9 @@ class Widget(tkinter.Widget):
         then it will be invoked with *args, **kw if the widget state
         matches statespec. statespec is expected to be a sequence.
         """
-    def instate(
-        self, statespec: Sequence[str], callback: Callable[_P, _T], *args: _P.args, **kw: _P.kwargs
-    ) -> Literal[False] | _T
+    def instate[**P, Element](
+        self, statespec: Sequence[str], callback: Callable[P, Element], *args: P.args, **kw: P.kwargs
+    ) -> Literal[False] | Element
 
     def state(self, statespec: Sequence[str] | None = None) -> (*: str):
         """Modify or inquire widget state.

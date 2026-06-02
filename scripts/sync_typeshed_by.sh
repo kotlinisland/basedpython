@@ -7,15 +7,15 @@
 #
 # pipeline:
 #   1. reverse-transpile each `.pyi` → `.byi` in-place, delete `.pyi`
-#   2. apply rust ast patches (`by_typeshed_patch`)
-#   3. buff --fix --unsafe-fixes for PEP 695 type-parameter migration
+#   2. apply rust ast patches (`by_typeshed_patch`): semantic patches plus the
+#      legacy-TypeVar → pep 695 conversion (explicit variance + nice names)
 #
 # verification happens via `cargo nextest run` after this script — the
 # basedpython parser is exercised through ty's mdtest suite and the
 # `typeshed_versions_consistent_with_vendored_stubs` integration test
 #
 # usage:
-#   scripts/sync_typeshed_by.sh [--skip-patches] [--skip-fixes]
+#   scripts/sync_typeshed_by.sh [--skip-patches]
 
 set -euo pipefail
 
@@ -23,11 +23,9 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 TYPESHED="$REPO_ROOT/crates/ty_vendored/vendor/typeshed/stdlib"
 
 SKIP_PATCHES=0
-SKIP_FIXES=0
 for arg in "$@"; do
     case "$arg" in
         --skip-patches) SKIP_PATCHES=1 ;;
-        --skip-fixes)   SKIP_FIXES=1 ;;
         *) echo "unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
@@ -39,11 +37,10 @@ fi
 
 cd "$REPO_ROOT"
 
-echo "==> building by + buff + by_typeshed_patch"
-cargo build --bin by --bin buff --bin by_typeshed_patch
+echo "==> building by + by_typeshed_patch"
+cargo build --bin by --bin by_typeshed_patch
 
 BY="$REPO_ROOT/target/debug/by"
-BUFF="$REPO_ROOT/target/debug/buff"
 PATCH="$REPO_ROOT/target/debug/by_typeshed_patch"
 
 echo "==> phase 1: reverse-transpile .pyi -> .byi"
@@ -61,17 +58,8 @@ if [[ "$pyi_count" -eq 0 ]]; then
 fi
 
 if [[ "$SKIP_PATCHES" -eq 0 ]]; then
-    echo "==> phase 2: ast patches"
+    echo "==> phase 2: ast patches + pep 695 conversion"
     "$PATCH" "$TYPESHED"
-fi
-
-if [[ "$SKIP_FIXES" -eq 0 ]]; then
-    echo "==> phase 3: buff --fix --unsafe-fixes (PEP 695 migration)"
-    "$BUFF" check \
-        --select UP046,UP047,UP040 \
-        --fix --unsafe-fixes \
-        --no-respect-gitignore \
-        "$TYPESHED" || true
 fi
 
 echo "==> done. review diff with: git diff -- $TYPESHED"

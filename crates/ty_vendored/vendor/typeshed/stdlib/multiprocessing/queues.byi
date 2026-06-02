@@ -4,25 +4,24 @@ from typing import Any, Generic, NewType, TypeVar
 
 __all__ = ["Queue", "SimpleQueue", "JoinableQueue"]
 
-_T = TypeVar("_T")
 
 _QueueState = NewType("_QueueState", object)
 _JoinableQueueState = NewType("_JoinableQueueState", object)
 _SimpleQueueState = NewType("_SimpleQueueState", object)
 
-class Queue(Generic[_T]):
+class Queue[in out Element]:
     # FIXME: `ctx` is a circular dependency and it's not actually optional.
     # It's marked as such to be able to use the generic Queue in __init__.pyi.
     def __init__(self, maxsize: int = 0, *, ctx: Any = ...) -> None
     def __getstate__(self) -> _QueueState
     def __setstate__(self, state: _QueueState) -> None
-    def put(self, obj: _T, block: bool = True, timeout: float | None = None) -> None
-    def get(self, block: bool = True, timeout: float | None = None) -> _T
+    def put(self, obj: Element, block: bool = True, timeout: float | None = None) -> None
+    def get(self, block: bool = True, timeout: float | None = None) -> Element
     def qsize(self) -> int
     def empty(self) -> bool
     def full(self) -> bool
-    def get_nowait(self) -> _T
-    def put_nowait(self, obj: _T) -> None
+    def get_nowait(self) -> Element
+    def put_nowait(self, obj: Element) -> None
     def close(self) -> None
     def join_thread(self) -> None
     def cancel_join_thread(self) -> None
@@ -33,20 +32,20 @@ class Queue(Generic[_T]):
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
 
-class JoinableQueue(Queue[_T]):
+class JoinableQueue[in out Element](Queue[Element]):
     def __getstate__(self) -> _JoinableQueueState  # type: ignore[override]
     def __setstate__(self, state: _JoinableQueueState) -> None  # type: ignore[override]
     def task_done(self) -> None
     def join(self) -> None
 
-class SimpleQueue(Generic[_T]):
+class SimpleQueue[in out Element]:
     def __init__(self, *, ctx: Any = ...) -> None
     def close(self) -> None
     def empty(self) -> bool
     def __getstate__(self) -> _SimpleQueueState
     def __setstate__(self, state: _SimpleQueueState) -> None
-    def get(self) -> _T
-    def put(self, obj: _T) -> None
+    def get(self) -> Element
+    def put(self, obj: Element) -> None
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 

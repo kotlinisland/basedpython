@@ -173,11 +173,7 @@ if sys.version_info >= (3, 11):
     if sys.version_info >= (3, 14):
         __all__ += ["CO_HAS_DOCSTRING", "CO_METHOD", "ispackage"]
 
-_P = ParamSpec("_P")
 _T = TypeVar("_T")
-_F = TypeVar("_F", bound=Callable[..., Any])
-_T_contra = TypeVar("_T_contra", contravariant=True)
-_V_contra = TypeVar("_V_contra", contravariant=True)
 
 #
 # Types and members
@@ -218,15 +214,15 @@ _GetMembersPredicateTypeIs: TypeAlias = Callable[[Any], TypeIs[_T]]
 _GetMembersPredicate: TypeAlias = Callable[[Any], bool]
 _GetMembersReturn: TypeAlias = list[tuple[str, _T]]
 
-def getmembers(object: object, predicate: _GetMembersPredicateTypeGuard[_T]) -> _GetMembersReturn[_T]:
+def getmembers[Element](object: object, predicate: _GetMembersPredicateTypeGuard[Element]) -> _GetMembersReturn[Element]:
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate.
     """
-def getmembers(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]
+def getmembers[Element](object: object, predicate: _GetMembersPredicateTypeIs[Element]) -> _GetMembersReturn[Element]
 def getmembers(object: object, predicate: _GetMembersPredicate | None = None) -> _GetMembersReturn[Any]
 
 if sys.version_info >= (3, 11):
-    def getmembers_static(object: object, predicate: _GetMembersPredicateTypeGuard[_T]) -> _GetMembersReturn[_T]:
+    def getmembers_static[Element](object: object, predicate: _GetMembersPredicateTypeGuard[Element]) -> _GetMembersReturn[Element]:
         """Return all members of an object as (name, value) pairs sorted by name
         without triggering dynamic lookup via the descriptor protocol,
         __getattr__ or __getattribute__. Optionally, only return members that
@@ -238,7 +234,7 @@ if sys.version_info >= (3, 11):
            that raise AttributeError). It can also return descriptor objects
            instead of instance members in some cases.
         """
-    def getmembers_static(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]
+    def getmembers_static[Element](object: object, predicate: _GetMembersPredicateTypeIs[Element]) -> _GetMembersReturn[Element]
     def getmembers_static(object: object, predicate: _GetMembersPredicate | None = None) -> _GetMembersReturn[Any]
 
 def getmodulename(path: StrPath) -> str | None:
@@ -277,7 +273,7 @@ def isfunction(object: object) -> object is FunctionType:
     """
 
 if sys.version_info >= (3, 12):
-    def markcoroutinefunction(func: _F) -> _F:
+    def markcoroutinefunction[F: Callable[..., Any]](func: F) -> F:
         """
         Decorator to ensure callable is recognised as a coroutine function.
         """
@@ -288,7 +284,7 @@ def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
     Generator function objects provide the same attributes as functions.
     See help(isfunction) for a list of attributes.
     """
-def isgeneratorfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, GeneratorType[Any, Any, Any]]]
+def isgeneratorfunction[**P](obj: Callable[P, Any]) -> TypeGuard[Callable[P, GeneratorType[Any, Any, Any]]]
 def isgeneratorfunction(obj: object) -> TypeGuard[Callable[..., GeneratorType[Any, Any, Any]]]
 
 def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
@@ -297,8 +293,8 @@ def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     Coroutine functions are normally defined with "async def" syntax, but may
     be marked via markcoroutinefunction.
     """
-def iscoroutinefunction(obj: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, _T]]]
-def iscoroutinefunction(obj: Callable[_P, object]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, Any]]]
+def iscoroutinefunction[**P, Element](obj: Callable[P, Awaitable[Element]]) -> TypeGuard[Callable[P, CoroutineType[Any, Any, Element]]]
+def iscoroutinefunction[**P](obj: Callable[P, object]) -> TypeGuard[Callable[P, CoroutineType[Any, Any, Any]]]
 def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., CoroutineType[Any, Any, Any]]]
 
 def isgenerator(object: object) -> object is GeneratorType[Any, Any, Any]:
@@ -332,16 +328,16 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
     Asynchronous generator functions are defined with "async def"
     syntax and have "yield" expressions in their body.
     """
-def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]
+def isasyncgenfunction[**P](obj: Callable[P, Any]) -> TypeGuard[Callable[P, AsyncGeneratorType[Any, Any]]]
 def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]
 
 @type_check_only
-class _SupportsSet(Protocol[_T_contra, _V_contra]):
-    def __set__(self, instance: _T_contra, value: _V_contra, /) -> None
+class _SupportsSet[in Input, in V](Protocol):
+    def __set__(self, instance: Input, value: V, /) -> None
 
 @type_check_only
-class _SupportsDelete(Protocol[_T_contra]):
-    def __delete__(self, instance: _T_contra, /) -> None
+class _SupportsDelete[in Input](Protocol):
+    def __delete__(self, instance: Input, /) -> None
 
 def isasyncgen(object: object) -> object is AsyncGeneratorType[Any, Any]:
     """Return true if the object is an asynchronous generator."""
@@ -1066,7 +1062,7 @@ def getmro(cls: type) -> (*: type):
     """Return tuple of base classes (including cls) in method resolution order."""
 
 @deprecated("Deprecated since Python 3.5. Use `Signature.bind` and `Signature.bind_partial` instead.")
-def getcallargs(func: Callable[_P, Any], /, *args: _P.args, **kwds: _P.kwargs) -> dict[str, Any]:
+def getcallargs[**P](func: Callable[P, Any], /, *args: P.args, **kwds: P.kwargs) -> dict[str, Any]:
     """Get the mapping of arguments to values.
 
     A dict is returned, with keys the function argument names (including the

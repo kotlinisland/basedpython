@@ -11,7 +11,6 @@ from types import TracebackType
 from typing import Any, Final, NoReturn, final
 from typing_extensions import TypeVarTuple, Unpack, deprecated, disjoint_base
 
-_Ts = TypeVarTuple("_Ts")
 
 error = RuntimeError
 
@@ -233,7 +232,7 @@ else:
             but it needn't be locked by the same thread that unlocks it.
             """
 
-def start_new_thread(function: Callable[[Unpack[_Ts]], object], args: (Unpack[_Ts],), /) -> int:
+def start_new_thread[*Ts](function: Callable[[Unpack[Ts]], object], args: (Unpack[Ts],), /) -> int:
     """Start a new thread and return its identifier.
 
     The thread will call the function with positional arguments from the
@@ -246,7 +245,7 @@ def start_new_thread(function: Callable[[Unpack[_Ts]], object], args: (Unpack[_T
 def start_new_thread(function: Callable[..., object], args: (*: Any), kwargs: dict[str, Any], /) -> int
 
 @deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
-def start_new(function: Callable[[Unpack[_Ts]], object], args: (Unpack[_Ts],), /) -> int:  # undocumented
+def start_new[*Ts](function: Callable[[Unpack[Ts]], object], args: (Unpack[Ts],), /) -> int:  # undocumented
     """An obsolete synonym of start_new_thread()."""
 @deprecated("Obsolete synonym. Use `start_new_thread()` instead.")
 def start_new(function: Callable[..., object], args: (*: Any), kwargs: dict[str, Any], /) -> int  # undocumented

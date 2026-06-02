@@ -8,12 +8,11 @@ from types import FrameType, GenericAlias
 from typing import Any, Literal, TextIO, TypeAlias, TypeVar
 from typing_extensions import Self, disjoint_base
 
-_T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 _TaskYieldType: TypeAlias = Future[object] | None
 
 @disjoint_base
-class Future(Awaitable[_T]):
+class Future[in out Element](Awaitable[Element]):
     """This class is *almost* compatible with concurrent.futures.Future.
 
     Differences:
@@ -74,7 +73,7 @@ class Future(Awaitable[_T]):
         future was cancelled.
         """
 
-    def result(self) -> _T:
+    def result(self) -> Element:
         """Return the result this future represents.
 
         If the future has been cancelled, raises CancelledError.  If the
@@ -97,7 +96,7 @@ class Future(Awaitable[_T]):
         Returns the number of callbacks removed.
         """
 
-    def set_result(self, result: _T, /) -> None:
+    def set_result(self, result: Element, /) -> None:
         """Mark the future done and set its result.
 
         If the future is already done when this method is called, raises
@@ -111,10 +110,10 @@ class Future(Awaitable[_T]):
         InvalidStateError.
         """
 
-    def __iter__(self) -> Generator[Any, None, _T]:
+    def __iter__(self) -> Generator[Any, None, Element]:
         """Implement iter(self)."""
 
-    def __await__(self) -> Generator[Any, None, _T]:
+    def __await__(self) -> Generator[Any, None, Element]:
         """Return an iterator to be used in await expression."""
 
     @property
@@ -132,13 +131,13 @@ else:
 # since the only reason why `asyncio.Future` is invariant is the `set_result()` method,
 # and `asyncio.Task.set_result()` always raises.
 @disjoint_base
-class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
+class Task[out Element](Future[Element]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
     """A coroutine wrapped in a Future."""
 
     if sys.version_info >= (3, 12):
         def __init__(
             self,
-            coro: _TaskCompatibleCoro[_T_co],
+            coro: _TaskCompatibleCoro[Element],
             *,
             loop: AbstractEventLoop | None = None,
             name: str | None = None,
@@ -148,7 +147,7 @@ class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportIn
     elif sys.version_info >= (3, 11):
         def __init__(
             self,
-            coro: _TaskCompatibleCoro[_T_co],
+            coro: _TaskCompatibleCoro[Element],
             *,
             loop: AbstractEventLoop | None = None,
             name: str | None = None,
@@ -156,13 +155,13 @@ class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportIn
         ) -> None
     else:
         def __init__(
-            self, coro: _TaskCompatibleCoro[_T_co], *, loop: AbstractEventLoop | None = None, name: str | None = None
+            self, coro: _TaskCompatibleCoro[Element], *, loop: AbstractEventLoop | None = None, name: str | None = None
         ) -> None
 
     if sys.version_info >= (3, 12):
-        def get_coro(self) -> _TaskCompatibleCoro[_T_co] | None
+        def get_coro(self) -> _TaskCompatibleCoro[Element] | None
     else:
-        def get_coro(self) -> _TaskCompatibleCoro[_T_co]
+        def get_coro(self) -> _TaskCompatibleCoro[Element]
 
     def get_name(self) -> str
     def set_name(self, value: object, /) -> None

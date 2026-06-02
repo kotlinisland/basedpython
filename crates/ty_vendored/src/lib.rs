@@ -45,7 +45,10 @@ mod tests {
             .read_to_string(&mut functools_module_stub_source)
             .unwrap();
 
-        assert!(functools_module_stub_source.contains("def update_wrapper("));
+        // `def update_wrapper` rather than `def update_wrapper(`: the
+        // basedpython typeshed converts it to a pep 695 generic function, so a
+        // type-parameter list `[...]` follows the name
+        assert!(functools_module_stub_source.contains("def update_wrapper"));
     }
 
     #[test]

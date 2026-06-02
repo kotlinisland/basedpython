@@ -116,7 +116,6 @@ if sys.version_info >= (3, 12):
 if sys.version_info < (3, 13):
     __all__ += ["__doc__", "__version__"]
 
-_T = TypeVar("_T")
 
 class Dialect:
     """Describe a CSV dialect.
@@ -146,9 +145,9 @@ class excel_tab(excel):
 class unix_dialect(Dialect):
     """Describe the usual properties of Unix-generated CSV files."""
 
-class DictReader(Generic[_T]):
-    fieldnames: Sequence[_T] | None
-    restkey: _T | None
+class DictReader[in out Element]:
+    fieldnames: Sequence[Element] | None
+    restkey: Element | None
     restval: str | Any | None
     reader: Reader
     dialect: _DialectLike
@@ -157,8 +156,8 @@ class DictReader(Generic[_T]):
     def __init__(
         self,
         f: Iterable[str],
-        fieldnames: Sequence[_T],
-        restkey: _T | None = None,
+        fieldnames: Sequence[Element],
+        restkey: Element | None = None,
         restval: str | Any | None = None,
         dialect: _DialectLike = "excel",
         *,
@@ -190,7 +189,7 @@ class DictReader(Generic[_T]):
     ) -> None
 
     def __iter__(self) -> Self
-    def __next__(self) -> dict[_T | Any, str | Any]
+    def __next__(self) -> dict[Element | Any, str | Any]
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
@@ -198,15 +197,15 @@ class DictReader(Generic[_T]):
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
 
-class DictWriter(Generic[_T]):
-    fieldnames: Collection[_T]
+class DictWriter[in out Element]:
+    fieldnames: Collection[Element]
     restval: Any | None
     extrasaction: Literal["raise", "ignore"]
     writer: Writer
     def __init__(
         self,
         f: SupportsWrite[str],
-        fieldnames: Collection[_T],
+        fieldnames: Collection[Element],
         restval: Any | None = "",
         extrasaction: Literal["raise", "ignore"] = "raise",
         dialect: _DialectLike = "excel",
@@ -221,8 +220,8 @@ class DictWriter(Generic[_T]):
         strict: bool = False,
     ) -> None
     def writeheader(self) -> Any
-    def writerow(self, rowdict: Mapping[_T, Any]) -> Any
-    def writerows(self, rowdicts: Iterable[Mapping[_T, Any]]) -> None
+    def writerow(self, rowdict: Mapping[Element, Any]) -> Any
+    def writerows(self, rowdicts: Iterable[Mapping[Element, Any]]) -> None
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type

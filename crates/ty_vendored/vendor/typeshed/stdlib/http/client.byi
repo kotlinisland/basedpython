@@ -103,7 +103,6 @@ __all__ = [
 ]
 
 _DataType: TypeAlias = SupportsRead[bytes] | Iterable[ReadableBuffer] | ReadableBuffer
-_T = TypeVar("_T")
 _HeaderValue: TypeAlias = ReadableBuffer | str | int
 
 HTTP_PORT: Final = 80
@@ -250,7 +249,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         If the headers are unknown, raises http.client.ResponseNotReady.
 
         """
-    def getheader(self, name: str, default: _T) -> str | _T
+    def getheader[Element](self, name: str, default: Element) -> str | Element
 
     def getheaders(self) -> list[(str, str)]:
         """Return list of (header, value) tuples."""

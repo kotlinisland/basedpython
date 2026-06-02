@@ -10,8 +10,6 @@ from types import GenericAlias
 from typing import Any, ClassVar, Final, Generic, Literal, SupportsIndex, TypeAlias, TypeVar, final, type_check_only
 from typing_extensions import Self
 
-_T = TypeVar("_T")
-_CT = TypeVar("_CT", bound=_CData)
 
 FUNCFLAG_CDECL: Final = 0x1
 FUNCFLAG_PYTHONAPI: Final = 0x4
@@ -85,8 +83,8 @@ if sys.version_info >= (3, 13):
         # By default mypy complains about the following two methods, because strictly speaking cls
         # might not be a Type[_CT]. However this doesn't happen because this is only a
         # metaclass for subclasses of _CData.
-        def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
     _CTypeBaseType = _CType_Type
 
@@ -119,19 +117,19 @@ class _PyCSimpleType(_CTypeBaseType):
     def in_dll(self: type[_typeshed.Self], dll: CDLL, name: str, /) -> _typeshed.Self
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
-        def __mul__(self: type[_CT], value: int, /) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(self: type[_CT], value: int, /) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](self: type[CT], value: int, /) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](self: type[CT], value: int, /) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
-class _SimpleCData(_CData, Generic[_T], metaclass=_PyCSimpleType):
+class _SimpleCData[in out Element](_CData, metaclass=_PyCSimpleType):
     """XXX to be provided"""
 
-    value: _T
+    value: Element
     """current value"""
 
     # The TypeVar can be unsolved here,
     # but we can't use overloads without creating many, many mypy false-positive errors
-    def __init__(self, value: _T = ...) -> None  # pyright: ignore[reportInvalidTypeVarUse]
-    def __ctypes_from_outparam__(self, /) -> _T  # type: ignore[override]
+    def __init__(self, value: Element = ...) -> None  # pyright: ignore[reportInvalidTypeVarUse]
+    def __ctypes_from_outparam__(self, /) -> Element  # type: ignore[override]
 
 @type_check_only
 class _CanCastTo(_CData)
@@ -150,18 +148,18 @@ class _PyCPointerType(_CTypeBaseType):
     def set_type(self, type: _CTypeBaseType, /) -> None
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
-        def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
-class _Pointer(_PointerLike, _CData, Generic[_CT], metaclass=_PyCPointerType):
+class _Pointer[in out CT: _CData](_PointerLike, _CData, metaclass=_PyCPointerType):
     """XXX to be provided"""
 
-    _type_: type[_CT]
-    contents: _CT
+    _type_: type[CT]
+    contents: CT
     """the object this pointer points to (read-write)"""
 
     def __init__(self) -> None
-    def __init__(self, arg: _CT) -> None
+    def __init__(self, arg: CT) -> None
 
     def __getitem__(self, key: int, /) -> Any:
         """Return self[key]."""
@@ -180,9 +178,9 @@ if sys.version_info < (3, 14):
         Pointer types are cached and reused internally,
         so calling this function repeatedly is cheap.
         """
-    def POINTER(type: type[_CT], /) -> type[_Pointer[_CT]]
+    def POINTER[CT: _CData](type: type[CT], /) -> type[_Pointer[CT]]
 
-    def pointer(obj: _CT, /) -> _Pointer[_CT]:
+    def pointer[CT: _CData](obj: CT, /) -> _Pointer[CT]:
         """Create a new pointer instance, pointing to 'obj'.
 
         The returned object is of the type POINTER(type(obj)). Note that if you
@@ -219,8 +217,8 @@ class _PyCFuncPtrType(_CTypeBaseType):
     def in_dll(self: type[_typeshed.Self], dll: CDLL, name: str, /) -> _typeshed.Self
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
-        def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
 class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
     """Function Pointer"""
@@ -249,11 +247,9 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
 
-_GetT = TypeVar("_GetT")
-_SetT = TypeVar("_SetT")
 
 if sys.version_info >= (3, 14):
-    final class CField(Generic[_CT, _GetT, _SetT]):
+    final class CField[in out CT: _CData, in out GetT, in out SetT]:
         """Structure/Union member"""
 
         offset: int
@@ -265,7 +261,7 @@ if sys.version_info >= (3, 14):
         name: str
         """name of this field"""
 
-        type: builtins.type[_CT]
+        type: builtins.type[CT]
         """type of this field"""
 
         byte_offset: int
@@ -288,9 +284,9 @@ if sys.version_info >= (3, 14):
 
         def __get__(self, instance: None, owner: builtins.type[Any] | None = None, /) -> Self:
             """Return an attribute of instance, which is of type owner."""
-        def __get__(self, instance: Any, owner: builtins.type[Any] | None = None, /) -> _GetT
+        def __get__(self, instance: Any, owner: builtins.type[Any] | None = None, /) -> GetT
 
-        def __set__(self, instance: Any, value: _SetT, /) -> None:
+        def __set__(self, instance: Any, value: SetT, /) -> None:
             """Set an attribute of instance to value."""
 
     _CField = CField
@@ -298,14 +294,14 @@ if sys.version_info >= (3, 14):
 else:
     @final
     @type_check_only
-    class _CField(Generic[_CT, _GetT, _SetT]):
+    class _CField[in out CT: _CData, in out GetT, in out SetT]:
         offset: int
         size: int
 
         def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self
-        def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT
+        def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> GetT
 
-        def __set__(self, instance: Any, value: _SetT, /) -> None
+        def __set__(self, instance: Any, value: SetT, /) -> None
 
 # This class is not exposed. It calls itself _ctypes.UnionType.
 @type_check_only
@@ -321,8 +317,8 @@ class _UnionType(_CTypeBaseType):
     def __getattr__(self, name: str) -> _CField[Any, Any, Any]
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
-        def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
 class Union(_CData, metaclass=_UnionType):
     """Union base class"""
@@ -351,8 +347,8 @@ class _PyCStructType(_CTypeBaseType):
     def __getattr__(self, name: str) -> _CField[Any, Any, Any]
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
-        def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
 class Structure(_CData, metaclass=_PyCStructType):
     """Structure base class"""
@@ -381,10 +377,10 @@ class _PyCArrayType(_CTypeBaseType):
     def in_dll(self: type[_typeshed.Self], dll: CDLL, name: str, /) -> _typeshed.Self
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
-        def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
-        def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __mul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
+        def __rmul__[CT: _CData](cls: type[CT], other: int) -> type[Array[CT]]  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
-class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
+class Array[in out CT: _CData](_CData, metaclass=_PyCArrayType):
     """Abstract base class for arrays.
 
     The recommended way to create concrete array types is by multiplying any
@@ -400,9 +396,9 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
     def _length_(self, value: int) -> None: ...
 
     @property
-    abstract def _type_(self) -> type[_CT]: ...
+    abstract def _type_(self) -> type[CT]: ...
     @_type_.setter
-    def _type_(self, value: type[_CT]) -> None: ...
+    def _type_(self, value: type[CT]) -> None: ...
 
     # Note: only available if _CT == c_char
     @property
@@ -460,8 +456,8 @@ def sizeof(obj_or_type: _CData | _CDataType | type[_CData | _CDataType], /) -> i
     """Return the size in bytes of a C instance."""
 
 def PyObj_FromPtr(address: int, /) -> Any
-def Py_DECREF(o: _T, /) -> _T
-def Py_INCREF(o: _T, /) -> _T
+def Py_DECREF[Element](o: Element, /) -> Element
+def Py_INCREF[Element](o: Element, /) -> Element
 def buffer_info(o: _CData | _CDataType | type[_CData | _CDataType], /) -> (str, int, (*: int)):
     """Return buffer interface information"""
 

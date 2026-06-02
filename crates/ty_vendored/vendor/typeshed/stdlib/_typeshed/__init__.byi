@@ -10,14 +10,6 @@ from types import FrameType, NoneType as NoneType, TracebackType
 from typing import Any, AnyStr, ClassVar, Final, Generic, Literal, Protocol, SupportsFloat, SupportsIndex, SupportsInt, TypeAlias, TypeVar
 from typing_extensions import Buffer, LiteralString, Self as _Self
 
-_KT = TypeVar("_KT")
-_KT_co = TypeVar("_KT_co", covariant=True)
-_KT_contra = TypeVar("_KT_contra", contravariant=True)
-_VT = TypeVar("_VT")
-_VT_co = TypeVar("_VT_co", covariant=True)
-_T = TypeVar("_T")
-_T_co = TypeVar("_T_co", covariant=True)
-_T_contra = TypeVar("_T_contra", contravariant=True)
 
 # Alternative to `typing_extensions.Self`, exclusively for use with `__new__`
 # in metaclasses:
@@ -59,31 +51,31 @@ sentinel: Any  # stable
 
 # stable
 class IdentityFunction(Protocol):
-    def __call__(self, x: _T, /) -> _T
+    def __call__[Element](self, x: Element, /) -> Element
 
 # stable
-class SupportsNext(Protocol[_T_co]):
-    def __next__(self) -> _T_co
+class SupportsNext[out Element](Protocol):
+    def __next__(self) -> Element
 
 # stable
-class SupportsAnext(Protocol[_T_co]):
-    def __anext__(self) -> Awaitable[_T_co]
+class SupportsAnext[out Element](Protocol):
+    def __anext__(self) -> Awaitable[Element]
 
 class SupportsBool(Protocol):
     def __bool__(self) -> bool
 
 # Comparison protocols
-class SupportsDunderLT(Protocol[_T_contra]):
-    def __lt__(self, other: _T_contra, /) -> SupportsBool
+class SupportsDunderLT[in Input](Protocol):
+    def __lt__(self, other: Input, /) -> SupportsBool
 
-class SupportsDunderGT(Protocol[_T_contra]):
-    def __gt__(self, other: _T_contra, /) -> SupportsBool
+class SupportsDunderGT[in Input](Protocol):
+    def __gt__(self, other: Input, /) -> SupportsBool
 
-class SupportsDunderLE(Protocol[_T_contra]):
-    def __le__(self, other: _T_contra, /) -> SupportsBool
+class SupportsDunderLE[in Input](Protocol):
+    def __le__(self, other: Input, /) -> SupportsBool
 
-class SupportsDunderGE(Protocol[_T_contra]):
-    def __ge__(self, other: _T_contra, /) -> SupportsBool
+class SupportsDunderGE[in Input](Protocol):
+    def __ge__(self, other: Input, /) -> SupportsBool
 
 class SupportsAllComparisons(
     SupportsDunderLT[Any], SupportsDunderGT[Any], SupportsDunderLE[Any], SupportsDunderGE[Any], Protocol
@@ -94,52 +86,52 @@ SupportsRichComparisonT = TypeVar("SupportsRichComparisonT", bound=SupportsRichC
 
 # Dunder protocols
 
-class SupportsAdd(Protocol[_T_contra, _T_co]):
-    def __add__(self, x: _T_contra, /) -> _T_co
+class SupportsAdd[in Input, out Element](Protocol):
+    def __add__(self, x: Input, /) -> Element
 
-class SupportsRAdd(Protocol[_T_contra, _T_co]):
-    def __radd__(self, x: _T_contra, /) -> _T_co
+class SupportsRAdd[in Input, out Element](Protocol):
+    def __radd__(self, x: Input, /) -> Element
 
-class SupportsSub(Protocol[_T_contra, _T_co]):
-    def __sub__(self, x: _T_contra, /) -> _T_co
+class SupportsSub[in Input, out Element](Protocol):
+    def __sub__(self, x: Input, /) -> Element
 
-class SupportsRSub(Protocol[_T_contra, _T_co]):
-    def __rsub__(self, x: _T_contra, /) -> _T_co
+class SupportsRSub[in Input, out Element](Protocol):
+    def __rsub__(self, x: Input, /) -> Element
 
-class SupportsMul(Protocol[_T_contra, _T_co]):
-    def __mul__(self, x: _T_contra, /) -> _T_co
+class SupportsMul[in Input, out Element](Protocol):
+    def __mul__(self, x: Input, /) -> Element
 
-class SupportsRMul(Protocol[_T_contra, _T_co]):
-    def __rmul__(self, x: _T_contra, /) -> _T_co
+class SupportsRMul[in Input, out Element](Protocol):
+    def __rmul__(self, x: Input, /) -> Element
 
-class SupportsMod(Protocol[_T_contra, _T_co]):
-    def __mod__(self, other: _T_contra, /) -> _T_co
+class SupportsMod[in Input, out Element](Protocol):
+    def __mod__(self, other: Input, /) -> Element
 
-class SupportsRMod(Protocol[_T_contra, _T_co]):
-    def __rmod__(self, other: _T_contra, /) -> _T_co
+class SupportsRMod[in Input, out Element](Protocol):
+    def __rmod__(self, other: Input, /) -> Element
 
-class SupportsDivMod(Protocol[_T_contra, _T_co]):
-    def __divmod__(self, other: _T_contra, /) -> _T_co
+class SupportsDivMod[in Input, out Element](Protocol):
+    def __divmod__(self, other: Input, /) -> Element
 
-class SupportsRDivMod(Protocol[_T_contra, _T_co]):
-    def __rdivmod__(self, other: _T_contra, /) -> _T_co
+class SupportsRDivMod[in Input, out Element](Protocol):
+    def __rdivmod__(self, other: Input, /) -> Element
 
 # This protocol is generic over the iterator type, while Iterable is
 # generic over the type that is iterated over.
-class SupportsIter(Protocol[_T_co]):
-    def __iter__(self) -> _T_co
+class SupportsIter[out Element](Protocol):
+    def __iter__(self) -> Element
 
 # This protocol is generic over the iterator type, while AsyncIterable is
 # generic over the type that is iterated over.
-class SupportsAiter(Protocol[_T_co]):
-    def __aiter__(self) -> _T_co
+class SupportsAiter[out Element](Protocol):
+    def __aiter__(self) -> Element
 
 class SupportsLen(Protocol):
     def __len__(self) -> int
 
-class SupportsLenAndGetItem(Protocol[_T_co]):
+class SupportsLenAndGetItem[out Element](Protocol):
     def __len__(self) -> int
-    def __getitem__(self, k: int, /) -> _T_co
+    def __getitem__(self, k: int, /) -> Element
 
 class SupportsTrunc(Protocol):
     def __trunc__(self) -> int
@@ -147,29 +139,29 @@ class SupportsTrunc(Protocol):
 # Mapping-like protocols
 
 # stable
-class SupportsItems(Protocol[_KT_co, _VT_co]):
-    def items(self) -> AbstractSet[(_KT_co, _VT_co)]
+class SupportsItems[out Key, out Value](Protocol):
+    def items(self) -> AbstractSet[(Key, Value)]
 
 # stable
-class SupportsKeysAndGetItem(Protocol[_KT, _VT_co]):
-    def keys(self) -> Iterable[_KT]
-    def __getitem__(self, key: _KT, /) -> _VT_co
+class SupportsKeysAndGetItem[in out Key, out Value](Protocol):
+    def keys(self) -> Iterable[Key]
+    def __getitem__(self, key: Key, /) -> Value
 
 # stable
-class SupportsGetItem(Protocol[_KT_contra, _VT_co]):
-    def __getitem__(self, key: _KT_contra, /) -> _VT_co
+class SupportsGetItem[in KT, out Value](Protocol):
+    def __getitem__(self, key: KT, /) -> Value
 
 # stable
-class SupportsContainsAndGetItem(Protocol[_KT_contra, _VT_co]):
+class SupportsContainsAndGetItem[in KT, out Value](Protocol):
     def __contains__(self, x: Any, /) -> bool
-    def __getitem__(self, key: _KT_contra, /) -> _VT_co
+    def __getitem__(self, key: KT, /) -> Value
 
 # stable
-class SupportsItemAccess(Protocol[_KT_contra, _VT]):
+class SupportsItemAccess[in KT, in out Value](Protocol):
     def __contains__(self, x: Any, /) -> bool
-    def __getitem__(self, key: _KT_contra, /) -> _VT
-    def __setitem__(self, key: _KT_contra, value: _VT, /) -> None
-    def __delitem__(self, key: _KT_contra, /) -> None
+    def __getitem__(self, key: KT, /) -> Value
+    def __setitem__(self, key: KT, value: Value, /) -> None
+    def __delitem__(self, key: KT, /) -> None
 
 StrPath: TypeAlias = str | PathLike[str]  # stable
 BytesPath: TypeAlias = bytes | PathLike[bytes]  # stable
@@ -252,34 +244,34 @@ FileDescriptorLike: TypeAlias = int | HasFileno  # stable
 FileDescriptorOrPath: TypeAlias = int | StrOrBytesPath
 
 # stable
-class SupportsRead(Protocol[_T_co]):
-    def read(self, length: int = ..., /) -> _T_co
+class SupportsRead[out Element](Protocol):
+    def read(self, length: int = ..., /) -> Element
 
 # stable
-class SupportsReadline(Protocol[_T_co]):
-    def readline(self, length: int = ..., /) -> _T_co
+class SupportsReadline[out Element](Protocol):
+    def readline(self, length: int = ..., /) -> Element
 
 # stable
-class SupportsNoArgReadline(Protocol[_T_co]):
-    def readline(self) -> _T_co
+class SupportsNoArgReadline[out Element](Protocol):
+    def readline(self) -> Element
 
 # stable
-class SupportsWrite(Protocol[_T_contra]):
-    def write(self, s: _T_contra, /) -> object
+class SupportsWrite[in Input](Protocol):
+    def write(self, s: Input, /) -> object
 
 # stable
 class SupportsFlush(Protocol):
     def flush(self) -> object
 
 # Suitable for dictionary view objects
-class Viewable(Protocol[_T_co]):
+class Viewable[out Element](Protocol):
     def __len__(self) -> int
-    def __iter__(self) -> Iterator[_T_co]
+    def __iter__(self) -> Iterator[Element]
 
-class SupportsGetItemViewable(Protocol[_KT, _VT_co]):
+class SupportsGetItemViewable[in out Key, out Value](Protocol):
     def __len__(self) -> int
-    def __iter__(self) -> Iterator[_KT]
-    def __getitem__(self, key: _KT, /) -> _VT_co
+    def __iter__(self) -> Iterator[Key]
+    def __getitem__(self, key: Key, /) -> Value
 
 # Unfortunately PEP 688 does not allow us to distinguish read-only
 # from writable buffers. We use these aliases for readability for now.
@@ -313,7 +305,7 @@ OptExcInfo: TypeAlias = ExcInfo | tuple[None, None, None]
 # In typeshed, `structseq` is only ever used as a mixin in combination with a fixed-length `Tuple`
 # See discussion at #6546 & #6560
 # `structseq` classes are unsubclassable, so are all decorated with `@final`.
-class structseq(Generic[_T_co]):
+class structseq[out Element]:
     n_fields: Final[int]
     n_unnamed_fields: Final[int]
     n_sequence_fields: Final[int]
@@ -323,7 +315,7 @@ class structseq(Generic[_T_co]):
     # The second parameter will accept a dict of any kind without raising an exception,
     # but only has any meaning if you supply it a dict where the keys are strings.
     # https://github.com/python/typeshed/pull/6560#discussion_r767149830
-    def __new__(cls, sequence: Iterable[_T_co], dict: dict[str, Any] = ...) -> _Self
+    def __new__(cls, sequence: Iterable[Element], dict: dict[str, Any] = ...) -> _Self
     if sys.version_info >= (3, 13):
         def __replace__(self, **kwargs: Any) -> _Self
 

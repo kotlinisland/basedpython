@@ -37,20 +37,6 @@ from typing import Any, Generic, Literal, SupportsComplex, SupportsFloat, Suppor
 from typing_extensions import Self, disjoint_base
 
 _T = TypeVar("_T")
-_S = TypeVar("_S")
-_N = TypeVar("_N", int, float, SupportsFloat, SupportsInt, SupportsIndex, SupportsComplex)
-_T_co = TypeVar("_T_co", covariant=True)
-_S_co = TypeVar("_S_co", covariant=True)
-_T1 = TypeVar("_T1")
-_T2 = TypeVar("_T2")
-_T3 = TypeVar("_T3")
-_T4 = TypeVar("_T4")
-_T5 = TypeVar("_T5")
-_T6 = TypeVar("_T6")
-_T7 = TypeVar("_T7")
-_T8 = TypeVar("_T8")
-_T9 = TypeVar("_T9")
-_T10 = TypeVar("_T10")
 
 _Step: TypeAlias = SupportsFloat | SupportsInt | SupportsIndex | SupportsComplex
 
@@ -59,7 +45,7 @@ _Predicate: TypeAlias = Callable[[_T], object]
 # Technically count can take anything that implements a number protocol and has an add method
 # but we can't enforce the add method
 @disjoint_base
-class count(Generic[_N]):
+class count[in out N: constraints (int, float, SupportsFloat, SupportsInt, SupportsIndex, SupportsComplex)]:
     """Return a count object whose .__next__() method returns consecutive values.
 
     Equivalent to:
@@ -71,37 +57,37 @@ class count(Generic[_N]):
     """
 
     def __new__(cls) -> count[int]
-    def __new__(cls, start: _N, step: _Step = 1) -> count[_N]
-    def __new__(cls, *, step: _N) -> count[_N]
+    def __new__(cls, start: N, step: _Step = 1) -> count[N]
+    def __new__(cls, *, step: N) -> count[N]
 
-    def __next__(self) -> _N:
+    def __next__(self) -> N:
         """Implement next(self)."""
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
 @disjoint_base
-class cycle(Generic[_T]):
+class cycle[in out Element]:
     """Return elements from the iterable until it is exhausted. Then repeat the sequence indefinitely."""
 
-    def __new__(cls, iterable: Iterable[_T], /) -> Self
-    def __next__(self) -> _T:
+    def __new__(cls, iterable: Iterable[Element], /) -> Self
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
 @disjoint_base
-class repeat(Generic[_T]):
+class repeat[in out Element]:
     """repeat(object [,times]) -> create an iterator which returns the object
     for the specified number of times.  If not specified, returns the object
     endlessly.
     """
 
-    def __new__(cls, object: _T) -> Self
-    def __new__(cls, object: _T, times: int) -> Self
+    def __new__(cls, object: Element) -> Self
+    def __new__(cls, object: Element, times: int) -> Self
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
     def __iter__(self) -> Self:
@@ -111,83 +97,83 @@ class repeat(Generic[_T]):
         """Private method returning an estimate of len(list(it))."""
 
 @disjoint_base
-class accumulate(Generic[_T]):
+class accumulate[in out Element]:
     """Return series of accumulated sums (or other binary function results)."""
 
-    def __new__(cls, iterable: Iterable[_T], func: None = None, *, initial: _T | None = None) -> Self
-    def __new__(cls, iterable: Iterable[_S], func: Callable[[_T, _S], _T], *, initial: _T | None = None) -> Self
+    def __new__(cls, iterable: Iterable[Element], func: None = None, *, initial: Element | None = None) -> Self
+    def __new__[Other](cls, iterable: Iterable[Other], func: Callable[[Element, Other], Element], *, initial: Element | None = None) -> Self
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class chain(Generic[_T]):
+class chain[in out Element]:
     """Return a chain object whose .__next__() method returns elements from the
     first iterable until it is exhausted, then elements from the next
     iterable, until all of the iterables are exhausted.
     """
 
-    def __new__(cls, *iterables: Iterable[_T]) -> Self
-    def __next__(self) -> _T:
+    def __new__(cls, *iterables: Iterable[Element]) -> Self
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    class def from_iterable(cls: type[Any], iterable: Iterable[Iterable[_S]], /) -> chain[_S]:
+    class def from_iterable[Other](cls: type[Any], iterable: Iterable[Iterable[Other]], /) -> chain[Other]:
         """Alternative chain() constructor taking a single iterable argument that evaluates lazily."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
 @disjoint_base
-class compress(Generic[_T]):
+class compress[in out Element]:
     """Return data elements corresponding to true selector elements.
 
     Forms a shorter iterator from selected data elements using the selectors to
     choose the data elements.
     """
 
-    def __new__(cls, data: Iterable[_T], selectors: Iterable[Any]) -> Self
+    def __new__(cls, data: Iterable[Element], selectors: Iterable[Any]) -> Self
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class dropwhile(Generic[_T]):
+class dropwhile[in out Element]:
     """Drop items from the iterable while predicate(item) is true.
 
     Afterwards, return every element until the iterable is exhausted.
     """
 
-    def __new__(cls, predicate: _Predicate[_T], iterable: Iterable[_T], /) -> Self
+    def __new__(cls, predicate: _Predicate[Element], iterable: Iterable[Element], /) -> Self
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class filterfalse(Generic[_T]):
+class filterfalse[in out Element]:
     """Return those items of iterable for which function(item) is false.
 
     If function is None, return the items that are false.
     """
 
-    def __new__(cls, function: _Predicate[_T] | None, iterable: Iterable[_T], /) -> Self
+    def __new__(cls, function: _Predicate[Element] | None, iterable: Iterable[Element], /) -> Self
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class groupby(Generic[_T_co, _S_co]):
+class groupby[out Element, out S]:
     """make an iterator that returns consecutive keys and groups from the iterable
 
     iterable
@@ -198,17 +184,17 @@ class groupby(Generic[_T_co, _S_co]):
       is used for grouping.
     """
 
-    def __new__(cls, iterable: Iterable[_T1], key: None = None) -> groupby[_T1, _T1]
-    def __new__(cls, iterable: Iterable[_T1], key: Callable[[_T1], _T2]) -> groupby[_T2, _T1]
+    def __new__[T1](cls, iterable: Iterable[T1], key: None = None) -> groupby[T1, T1]
+    def __new__[T1, T2](cls, iterable: Iterable[T1], key: Callable[[T1], T2]) -> groupby[T2, T1]
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> (_T_co, Iterator[_S_co]):
+    def __next__(self) -> (Element, Iterator[S]):
         """Implement next(self)."""
 
 @disjoint_base
-class islice(Generic[_T]):
+class islice[in out Element]:
     """islice(iterable, stop) --> islice object
     islice(iterable, start, stop[, step]) --> islice object
 
@@ -220,42 +206,42 @@ class islice(Generic[_T]):
     but returns an iterator.
     """
 
-    def __new__(cls, iterable: Iterable[_T], stop: int | None, /) -> Self
-    def __new__(cls, iterable: Iterable[_T], start: int | None, stop: int | None, step: int | None = 1, /) -> Self
+    def __new__(cls, iterable: Iterable[Element], stop: int | None, /) -> Self
+    def __new__(cls, iterable: Iterable[Element], start: int | None, stop: int | None, step: int | None = 1, /) -> Self
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class starmap(Generic[_T_co]):
+class starmap[out Element]:
     """Return an iterator whose values are returned from the function evaluated with an argument tuple taken from the given sequence."""
 
-    def __new__(cls, function: Callable[..., _T], iterable: Iterable[Iterable[Any]], /) -> starmap[_T]
+    def __new__[T](cls, function: Callable[..., T], iterable: Iterable[Iterable[Any]], /) -> starmap[T]
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class takewhile(Generic[_T]):
+class takewhile[in out Element]:
     """Return successive entries from an iterable as long as the predicate evaluates to true for each entry."""
 
-    def __new__(cls, predicate: _Predicate[_T], iterable: Iterable[_T], /) -> Self
+    def __new__(cls, predicate: _Predicate[Element], iterable: Iterable[Element], /) -> Self
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
-def tee(iterable: Iterable[_T], n: int = 2, /) -> (*: Iterator[_T]):
+def tee[Element](iterable: Iterable[Element], n: int = 2, /) -> (*: Iterator[Element]):
     """Returns a tuple of n independent iterators."""
 
 @disjoint_base
-class zip_longest(Generic[_T_co]):
+class zip_longest[out Element]:
     """Return a zip_longest object whose .__next__() method returns a tuple where
     the i-th element comes from the i-th iterable argument.  The .__next__()
     method continues until the longest iterable in the argument sequence
@@ -265,74 +251,74 @@ class zip_longest(Generic[_T_co]):
     """
 
     # one iterable (fillvalue doesn't matter)
-    def __new__(cls, iter1: Iterable[_T1], /, *, fillvalue: object = None) -> zip_longest[(_T1,)]
+    def __new__[T1](cls, iter1: Iterable[T1], /, *, fillvalue: object = None) -> zip_longest[(T1,)]
     # two iterables
-    def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /) -> zip_longest[(_T1 | MaybeNone, _T2 | MaybeNone)]
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /, *, fillvalue: _T
-    ) -> zip_longest[(_T1 | _T, _T2 | _T)]
+    def __new__[T1, T2](cls, iter1: Iterable[T1], iter2: Iterable[T2], /) -> zip_longest[(T1 | MaybeNone, T2 | MaybeNone)]
+    def __new__[T1, T2, T](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], /, *, fillvalue: T
+    ) -> zip_longest[(T1 | T, T2 | T)]
     # three iterables
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /
-    ) -> zip_longest[(_T1 | MaybeNone, _T2 | MaybeNone, _T3 | MaybeNone)]
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /, *, fillvalue: _T
-    ) -> zip_longest[(_T1 | _T, _T2 | _T, _T3 | _T)]
+    def __new__[T1, T2, T3](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], /
+    ) -> zip_longest[(T1 | MaybeNone, T2 | MaybeNone, T3 | MaybeNone)]
+    def __new__[T1, T2, T3, T](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], /, *, fillvalue: T
+    ) -> zip_longest[(T1 | T, T2 | T, T3 | T)]
     # four iterables
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], /
-    ) -> zip_longest[(_T1 | MaybeNone, _T2 | MaybeNone, _T3 | MaybeNone, _T4 | MaybeNone)]
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], /, *, fillvalue: _T
-    ) -> zip_longest[(_T1 | _T, _T2 | _T, _T3 | _T, _T4 | _T)]
+    def __new__[T1, T2, T3, T4](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], iter4: Iterable[T4], /
+    ) -> zip_longest[(T1 | MaybeNone, T2 | MaybeNone, T3 | MaybeNone, T4 | MaybeNone)]
+    def __new__[T1, T2, T3, T4, T](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], iter4: Iterable[T4], /, *, fillvalue: T
+    ) -> zip_longest[(T1 | T, T2 | T, T3 | T, T4 | T)]
     # five iterables
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], iter5: Iterable[_T5], /
-    ) -> zip_longest[(_T1 | MaybeNone, _T2 | MaybeNone, _T3 | MaybeNone, _T4 | MaybeNone, _T5 | MaybeNone)]
-    def __new__(
+    def __new__[T1, T2, T3, T4, T5](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], iter4: Iterable[T4], iter5: Iterable[T5], /
+    ) -> zip_longest[(T1 | MaybeNone, T2 | MaybeNone, T3 | MaybeNone, T4 | MaybeNone, T5 | MaybeNone)]
+    def __new__[T1, T2, T3, T4, T5, T](
         cls,
-        iter1: Iterable[_T1],
-        iter2: Iterable[_T2],
-        iter3: Iterable[_T3],
-        iter4: Iterable[_T4],
-        iter5: Iterable[_T5],
+        iter1: Iterable[T1],
+        iter2: Iterable[T2],
+        iter3: Iterable[T3],
+        iter4: Iterable[T4],
+        iter5: Iterable[T5],
         /,
         *,
-        fillvalue: _T,
-    ) -> zip_longest[(_T1 | _T, _T2 | _T, _T3 | _T, _T4 | _T, _T5 | _T)]
+        fillvalue: T,
+    ) -> zip_longest[(T1 | T, T2 | T, T3 | T, T4 | T, T5 | T)]
     # six or more iterables
-    def __new__(
+    def __new__[T](
         cls,
-        iter1: Iterable[_T],
-        iter2: Iterable[_T],
-        iter3: Iterable[_T],
-        iter4: Iterable[_T],
-        iter5: Iterable[_T],
-        iter6: Iterable[_T],
+        iter1: Iterable[T],
+        iter2: Iterable[T],
+        iter3: Iterable[T],
+        iter4: Iterable[T],
+        iter5: Iterable[T],
+        iter6: Iterable[T],
         /,
-        *iterables: Iterable[_T],
-    ) -> zip_longest[(*: _T | MaybeNone)]
-    def __new__(
+        *iterables: Iterable[T],
+    ) -> zip_longest[(*: T | MaybeNone)]
+    def __new__[T](
         cls,
-        iter1: Iterable[_T],
-        iter2: Iterable[_T],
-        iter3: Iterable[_T],
-        iter4: Iterable[_T],
-        iter5: Iterable[_T],
-        iter6: Iterable[_T],
+        iter1: Iterable[T],
+        iter2: Iterable[T],
+        iter3: Iterable[T],
+        iter4: Iterable[T],
+        iter5: Iterable[T],
+        iter6: Iterable[T],
         /,
-        *iterables: Iterable[_T],
-        fillvalue: _T,
-    ) -> zip_longest[(*: _T)]
+        *iterables: Iterable[T],
+        fillvalue: T,
+    ) -> zip_longest[(*: T)]
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class product(Generic[_T_co]):
+class product[out Element]:
     """Cartesian product of input iterables.  Equivalent to nested for-loops.
 
     For example, product(A, B) returns the same as:  ((x,y) for x in A for y in B).
@@ -348,157 +334,157 @@ class product(Generic[_T_co]):
     product((0,1), (0,1), (0,1)) --> (0,0,0) (0,0,1) (0,1,0) (0,1,1) (1,0,0) ...
     """
 
-    def __new__(cls, iter1: Iterable[_T1], /) -> product[(_T1,)]
-    def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /) -> product[(_T1, _T2)]
-    def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /) -> product[(_T1, _T2, _T3)]
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], /
-    ) -> product[(_T1, _T2, _T3, _T4)]
-    def __new__(
-        cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], iter5: Iterable[_T5], /
-    ) -> product[(_T1, _T2, _T3, _T4, _T5)]
-    def __new__(
+    def __new__[T1](cls, iter1: Iterable[T1], /) -> product[(T1,)]
+    def __new__[T1, T2](cls, iter1: Iterable[T1], iter2: Iterable[T2], /) -> product[(T1, T2)]
+    def __new__[T1, T2, T3](cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], /) -> product[(T1, T2, T3)]
+    def __new__[T1, T2, T3, T4](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], iter4: Iterable[T4], /
+    ) -> product[(T1, T2, T3, T4)]
+    def __new__[T1, T2, T3, T4, T5](
+        cls, iter1: Iterable[T1], iter2: Iterable[T2], iter3: Iterable[T3], iter4: Iterable[T4], iter5: Iterable[T5], /
+    ) -> product[(T1, T2, T3, T4, T5)]
+    def __new__[T1, T2, T3, T4, T5, T6](
         cls,
-        iter1: Iterable[_T1],
-        iter2: Iterable[_T2],
-        iter3: Iterable[_T3],
-        iter4: Iterable[_T4],
-        iter5: Iterable[_T5],
-        iter6: Iterable[_T6],
+        iter1: Iterable[T1],
+        iter2: Iterable[T2],
+        iter3: Iterable[T3],
+        iter4: Iterable[T4],
+        iter5: Iterable[T5],
+        iter6: Iterable[T6],
         /,
-    ) -> product[(_T1, _T2, _T3, _T4, _T5, _T6)]
-    def __new__(
+    ) -> product[(T1, T2, T3, T4, T5, T6)]
+    def __new__[T1, T2, T3, T4, T5, T6, T7](
         cls,
-        iter1: Iterable[_T1],
-        iter2: Iterable[_T2],
-        iter3: Iterable[_T3],
-        iter4: Iterable[_T4],
-        iter5: Iterable[_T5],
-        iter6: Iterable[_T6],
-        iter7: Iterable[_T7],
+        iter1: Iterable[T1],
+        iter2: Iterable[T2],
+        iter3: Iterable[T3],
+        iter4: Iterable[T4],
+        iter5: Iterable[T5],
+        iter6: Iterable[T6],
+        iter7: Iterable[T7],
         /,
-    ) -> product[(_T1, _T2, _T3, _T4, _T5, _T6, _T7)]
-    def __new__(
+    ) -> product[(T1, T2, T3, T4, T5, T6, T7)]
+    def __new__[T1, T2, T3, T4, T5, T6, T7, T8](
         cls,
-        iter1: Iterable[_T1],
-        iter2: Iterable[_T2],
-        iter3: Iterable[_T3],
-        iter4: Iterable[_T4],
-        iter5: Iterable[_T5],
-        iter6: Iterable[_T6],
-        iter7: Iterable[_T7],
-        iter8: Iterable[_T8],
+        iter1: Iterable[T1],
+        iter2: Iterable[T2],
+        iter3: Iterable[T3],
+        iter4: Iterable[T4],
+        iter5: Iterable[T5],
+        iter6: Iterable[T6],
+        iter7: Iterable[T7],
+        iter8: Iterable[T8],
         /,
-    ) -> product[(_T1, _T2, _T3, _T4, _T5, _T6, _T7, _T8)]
-    def __new__(
+    ) -> product[(T1, T2, T3, T4, T5, T6, T7, T8)]
+    def __new__[T1, T2, T3, T4, T5, T6, T7, T8, T9](
         cls,
-        iter1: Iterable[_T1],
-        iter2: Iterable[_T2],
-        iter3: Iterable[_T3],
-        iter4: Iterable[_T4],
-        iter5: Iterable[_T5],
-        iter6: Iterable[_T6],
-        iter7: Iterable[_T7],
-        iter8: Iterable[_T8],
-        iter9: Iterable[_T9],
+        iter1: Iterable[T1],
+        iter2: Iterable[T2],
+        iter3: Iterable[T3],
+        iter4: Iterable[T4],
+        iter5: Iterable[T5],
+        iter6: Iterable[T6],
+        iter7: Iterable[T7],
+        iter8: Iterable[T8],
+        iter9: Iterable[T9],
         /,
-    ) -> product[(_T1, _T2, _T3, _T4, _T5, _T6, _T7, _T8, _T9)]
-    def __new__(
+    ) -> product[(T1, T2, T3, T4, T5, T6, T7, T8, T9)]
+    def __new__[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](
         cls,
-        iter1: Iterable[_T1],
-        iter2: Iterable[_T2],
-        iter3: Iterable[_T3],
-        iter4: Iterable[_T4],
-        iter5: Iterable[_T5],
-        iter6: Iterable[_T6],
-        iter7: Iterable[_T7],
-        iter8: Iterable[_T8],
-        iter9: Iterable[_T9],
-        iter10: Iterable[_T10],
+        iter1: Iterable[T1],
+        iter2: Iterable[T2],
+        iter3: Iterable[T3],
+        iter4: Iterable[T4],
+        iter5: Iterable[T5],
+        iter6: Iterable[T6],
+        iter7: Iterable[T7],
+        iter8: Iterable[T8],
+        iter9: Iterable[T9],
+        iter10: Iterable[T10],
         /,
-    ) -> product[(_T1, _T2, _T3, _T4, _T5, _T6, _T7, _T8, _T9, _T10)]
-    def __new__(cls, *iterables: Iterable[_T1], repeat: int = 1) -> product[(*: _T1)]
+    ) -> product[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)]
+    def __new__[T1](cls, *iterables: Iterable[T1], repeat: int = 1) -> product[(*: T1)]
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class permutations(Generic[_T_co]):
+class permutations[out Element]:
     """Return successive r-length permutations of elements in the iterable.
 
     permutations(range(3), 2) --> (0,1), (0,2), (1,0), (1,2), (2,0), (2,1)
     """
 
-    def __new__(cls, iterable: Iterable[_T], r: Literal[2]) -> permutations[(_T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[3]) -> permutations[(_T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[4]) -> permutations[(_T, _T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[5]) -> permutations[(_T, _T, _T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: int | None = None) -> permutations[(*: _T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[2]) -> permutations[(T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[3]) -> permutations[(T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[4]) -> permutations[(T, T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[5]) -> permutations[(T, T, T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: int | None = None) -> permutations[(*: T)]
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class combinations(Generic[_T_co]):
+class combinations[out Element]:
     """Return successive r-length combinations of elements in the iterable.
 
     combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)
     """
 
-    def __new__(cls, iterable: Iterable[_T], r: Literal[2]) -> combinations[(_T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[3]) -> combinations[(_T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[4]) -> combinations[(_T, _T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[5]) -> combinations[(_T, _T, _T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: int) -> combinations[(*: _T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[2]) -> combinations[(T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[3]) -> combinations[(T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[4]) -> combinations[(T, T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[5]) -> combinations[(T, T, T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: int) -> combinations[(*: T)]
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class combinations_with_replacement(Generic[_T_co]):
+class combinations_with_replacement[out Element]:
     """Return successive r-length combinations of elements in the iterable allowing individual elements to have successive repeats.
 
     combinations_with_replacement('ABC', 2) --> ('A','A'), ('A','B'), ('A','C'), ('B','B'), ('B','C'), ('C','C')
     """
 
-    def __new__(cls, iterable: Iterable[_T], r: Literal[2]) -> combinations_with_replacement[(_T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[3]) -> combinations_with_replacement[(_T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[4]) -> combinations_with_replacement[(_T, _T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: Literal[5]) -> combinations_with_replacement[(_T, _T, _T, _T, _T)]
-    def __new__(cls, iterable: Iterable[_T], r: int) -> combinations_with_replacement[(*: _T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[2]) -> combinations_with_replacement[(T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[3]) -> combinations_with_replacement[(T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[4]) -> combinations_with_replacement[(T, T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: Literal[5]) -> combinations_with_replacement[(T, T, T, T, T)]
+    def __new__[T](cls, iterable: Iterable[T], r: int) -> combinations_with_replacement[(*: T)]
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 @disjoint_base
-class pairwise(Generic[_T_co]):
+class pairwise[out Element]:
     """Return an iterator of overlapping pairs taken from the input iterator.
 
     s -> (s0,s1), (s1,s2), (s2, s3), ...
     """
 
-    def __new__(cls, iterable: Iterable[_T], /) -> pairwise[(_T, _T)]
+    def __new__[T](cls, iterable: Iterable[T], /) -> pairwise[(T, T)]
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T_co:
+    def __next__(self) -> Element:
         """Implement next(self)."""
 
 if sys.version_info >= (3, 12):
     @disjoint_base
-    class batched(Generic[_T_co]):
+    class batched[out Element]:
         """Batch data into tuples of length n. The last batch may be shorter than n.
 
         Loops over the input iterable and accumulates data into tuples
@@ -518,21 +504,21 @@ if sys.version_info >= (3, 12):
         """
 
         if sys.version_info >= (3, 13):
-            def __new__(cls, iterable: Iterable[_T], n: Literal[1], *, strict: Literal[True]) -> batched[(_T,)]
-            def __new__(cls, iterable: Iterable[_T], n: Literal[2], *, strict: Literal[True]) -> batched[(_T, _T)]
-            def __new__(cls, iterable: Iterable[_T], n: Literal[3], *, strict: Literal[True]) -> batched[(_T, _T, _T)]
-            def __new__(
-                cls, iterable: Iterable[_T], n: Literal[4], *, strict: Literal[True]
-            ) -> batched[(_T, _T, _T, _T)]
-            def __new__(
-                cls, iterable: Iterable[_T], n: Literal[5], *, strict: Literal[True]
-            ) -> batched[(_T, _T, _T, _T, _T)]
-            def __new__(cls, iterable: Iterable[_T], n: int, *, strict: bool = False) -> batched[(*: _T)]
+            def __new__[T](cls, iterable: Iterable[T], n: Literal[1], *, strict: Literal[True]) -> batched[(T,)]
+            def __new__[T](cls, iterable: Iterable[T], n: Literal[2], *, strict: Literal[True]) -> batched[(T, T)]
+            def __new__[T](cls, iterable: Iterable[T], n: Literal[3], *, strict: Literal[True]) -> batched[(T, T, T)]
+            def __new__[T](
+                cls, iterable: Iterable[T], n: Literal[4], *, strict: Literal[True]
+            ) -> batched[(T, T, T, T)]
+            def __new__[T](
+                cls, iterable: Iterable[T], n: Literal[5], *, strict: Literal[True]
+            ) -> batched[(T, T, T, T, T)]
+            def __new__[T](cls, iterable: Iterable[T], n: int, *, strict: bool = False) -> batched[(*: T)]
         else:
-            def __new__(cls, iterable: Iterable[_T], n: int) -> batched[(*: _T)]
+            def __new__[T](cls, iterable: Iterable[T], n: int) -> batched[(*: T)]
 
         def __iter__(self) -> Self:
             """Implement iter(self)."""
 
-        def __next__(self) -> _T_co:
+        def __next__(self) -> Element:
             """Implement next(self)."""

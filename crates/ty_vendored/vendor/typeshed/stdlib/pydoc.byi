@@ -48,7 +48,6 @@ from typing_extensions import deprecated
 
 __all__ = ["help"]
 
-_T = TypeVar("_T")
 
 __author__: Final[str]
 __date__: Final[str]
@@ -197,7 +196,7 @@ class HTMLDoc(Doc):
         ) -> str:
             """Format a section with a heading."""
 
-        def multicolumn(self, list: list[_T], format: Callable[[_T], str]) -> str:
+        def multicolumn[Element](self, list: list[Element], format: Callable[[Element], str]) -> str:
             """Format a list of items into a multi-column list."""
     else:
         def heading(self, title: str, fgcol: str, bgcol: str, extras: str = "") -> str:
@@ -216,7 +215,7 @@ class HTMLDoc(Doc):
         ) -> str:
             """Format a section with a heading."""
 
-        def multicolumn(self, list: list[_T], format: Callable[[_T], str], cols: int = 4) -> str:
+        def multicolumn[Element](self, list: list[Element], format: Callable[[Element], str], cols: int = 4) -> str:
             """Format a list of items into a multi-column list."""
 
     def bigsection(self, title: str, *args: Any) -> str:

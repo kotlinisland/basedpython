@@ -11,7 +11,6 @@ from weakref import ref
 
 from ._base import BrokenExecutor, Executor, Future
 
-_Ts = TypeVarTuple("_Ts")
 
 _threads_queues: Mapping[Any, Any]
 _shutdown: bool
@@ -19,30 +18,26 @@ _global_shutdown_lock: Lock
 
 def _python_exit() -> None
 
-_S = TypeVar("_S")
 
 _Task: TypeAlias = tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]
 
-_C = TypeVar("_C", bound=Callable[..., object])
-_KT = TypeVar("_KT", bound=str)
-_VT = TypeVar("_VT")
 
 @type_check_only
 class _ResolveTaskFunc(Protocol):
-    def __call__(
-        self, func: _C, args: (Unpack[_Ts],), kwargs: dict[_KT, _VT]
-    ) -> (_C, (Unpack[_Ts],), dict[_KT, _VT])
+    def __call__[C: Callable[..., object], *Ts, Key: str, Value](
+        self, func: C, args: (Unpack[Ts],), kwargs: dict[Key, Value]
+    ) -> (C, (Unpack[Ts],), dict[Key, Value])
 
 if sys.version_info >= (3, 14):
     class WorkerContext:
-        class def prepare(
-            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: (Unpack[_Ts],)
+        class def prepare[*Ts](
+            cls, initializer: Callable[[Unpack[Ts]], object], initargs: (Unpack[Ts],)
         ) -> (Callable[[], Self], _ResolveTaskFunc)
         class def prepare(
             cls, initializer: Callable[[], object], initargs: tuple[()]
         ) -> (Callable[[], Self], _ResolveTaskFunc)
 
-        def __init__(self, initializer: Callable[[Unpack[_Ts]], object], initargs: (Unpack[_Ts],)) -> None
+        def __init__[*Ts](self, initializer: Callable[[Unpack[Ts]], object], initargs: (Unpack[Ts],)) -> None
         def __init__(self, initializer: Callable[[], object], initargs: tuple[()]) -> None
 
         def initialize(self) -> None
@@ -50,7 +45,7 @@ if sys.version_info >= (3, 14):
         def run(self, task: _Task) -> None
 
 if sys.version_info >= (3, 14):
-    class _WorkItem(Generic[_S]):
+    class _WorkItem[in out Other]:
         future: Future[Any]
         task: _Task
         def __init__(self, future: Future[Any], task: _Task) -> None
@@ -64,12 +59,12 @@ if sys.version_info >= (3, 14):
     def _worker(executor_reference: ref[Any], ctx: WorkerContext, work_queue: queue.SimpleQueue[Any]) -> None
 
 else:
-    class _WorkItem(Generic[_S]):
-        future: Future[_S]
-        fn: Callable[..., _S]
+    class _WorkItem[in out Other]:
+        future: Future[Other]
+        fn: Callable[..., Other]
         args: Iterable[Any]
         kwargs: Mapping[str, Any]
-        def __init__(self, future: Future[_S], fn: Callable[..., _S], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None
+        def __init__(self, future: Future[Other], fn: Callable[..., Other], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None
         def run(self) -> None
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
@@ -77,11 +72,11 @@ else:
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
 
-    def _worker(
+    def _worker[*Ts](
         executor_reference: ref[Any],
         work_queue: queue.SimpleQueue[Any],
-        initializer: Callable[[Unpack[_Ts]], object],
-        initargs: (Unpack[_Ts],),
+        initializer: Callable[[Unpack[Ts]], object],
+        initargs: (Unpack[Ts],),
     ) -> None
 
 class BrokenThreadPool(BrokenExecutor):
@@ -112,8 +107,8 @@ class ThreadPoolExecutor(Executor):
         class def prepare_context(
             cls, initializer: Callable[[], object], initargs: tuple[()]
         ) -> (Callable[[], WorkerContext], _ResolveTaskFunc)
-        class def prepare_context(
-            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: (Unpack[_Ts],)
+        class def prepare_context[*Ts](
+            cls, initializer: Callable[[Unpack[Ts]], object], initargs: (Unpack[Ts],)
         ) -> (Callable[[], WorkerContext], _ResolveTaskFunc)
 
     def __init__(
@@ -133,20 +128,20 @@ class ThreadPoolExecutor(Executor):
             initargs: A tuple of arguments to pass to the initializer.
             ctxkwargs: Additional arguments to cls.prepare_context().
         """
-    def __init__(
+    def __init__[*Ts](
         self,
         max_workers: int | None = None,
         thread_name_prefix: str = "",
         *,
-        initializer: Callable[[Unpack[_Ts]], object],
-        initargs: (Unpack[_Ts],),
+        initializer: Callable[[Unpack[Ts]], object],
+        initargs: (Unpack[Ts],),
     ) -> None
-    def __init__(
+    def __init__[*Ts](
         self,
         max_workers: int | None,
         thread_name_prefix: str,
-        initializer: Callable[[Unpack[_Ts]], object],
-        initargs: (Unpack[_Ts],),
+        initializer: Callable[[Unpack[Ts]], object],
+        initargs: (Unpack[Ts],),
     ) -> None
 
     def _adjust_thread_count(self) -> None

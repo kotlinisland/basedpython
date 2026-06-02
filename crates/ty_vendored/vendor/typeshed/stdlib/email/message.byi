@@ -12,14 +12,9 @@ from typing_extensions import Self
 
 __all__ = ["Message", "EmailMessage"]
 
-_T = TypeVar("_T")
 # Type returned by Policy.header_fetch_parse, often str or Header.
-_HeaderT_co = TypeVar("_HeaderT_co", covariant=True, default=str)
-_HeaderParamT_contra = TypeVar("_HeaderParamT_contra", contravariant=True, default=str)
 # Represents headers constructed by HeaderRegistry. Those are sub-classes
 # of BaseHeader and another header type.
-_HeaderRegistryT_co = TypeVar("_HeaderRegistryT_co", covariant=True, default=Any)
-_HeaderRegistryParamT_contra = TypeVar("_HeaderRegistryParamT_contra", contravariant=True, default=Any)
 
 _PayloadType: TypeAlias = Message | str
 _EncodedPayloadType: TypeAlias = Message | bytes
@@ -34,7 +29,7 @@ class _SupportsEncodeToPayload(Protocol):
 class _SupportsDecodeToPayload(Protocol):
     def decode(self, encoding: str, errors: str, /) -> _PayloadType | _MultipartPayloadType
 
-class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
+class Message[out HeaderT = str, in HeaderParamT = str]:
     """Basic message object.
 
     A message object is defined as something that has a bunch of RFC 5322
@@ -139,7 +134,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
     # This is important for protocols using __getitem__, like SupportsKeysAndGetItem
     # Morally, the return type should be `AnyOf[_HeaderType, None]`,
     # so using "the Any trick" instead.
-    def __getitem__(self, name: str) -> _HeaderT_co | MaybeNone:
+    def __getitem__(self, name: str) -> HeaderT | MaybeNone:
         """Get a header value.
 
         Return None if the header is missing instead of raising an exception.
@@ -149,7 +144,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         the values matching a header field name.
         """
 
-    def __setitem__(self, name: str, val: _HeaderParamT_contra) -> None:
+    def __setitem__(self, name: str, val: HeaderParamT) -> None:
         """Set the value of a header.
 
         Note: this does not overwrite an existing header with the same field
@@ -171,7 +166,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         list.
         """
 
-    def values(self) -> list[_HeaderT_co]:
+    def values(self) -> list[HeaderT]:
         """Return a list of all the message's header values.
 
         These will be sorted in the order they appeared in the original
@@ -180,7 +175,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         list.
         """
 
-    def items(self) -> list[(str, _HeaderT_co)]:
+    def items(self) -> list[(str, HeaderT)]:
         """Get all the message's header fields and values.
 
         These will be sorted in the order they appeared in the original
@@ -189,15 +184,15 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         list.
         """
 
-    def get(self, name: str, failobj: None = None) -> _HeaderT_co | None:
+    def get(self, name: str, failobj: None = None) -> HeaderT | None:
         """Get a header value.
 
         Like __getitem__() but return failobj instead of None when the field
         is missing.
         """
-    def get(self, name: str, failobj: _T) -> _HeaderT_co | _T
+    def get[Element](self, name: str, failobj: Element) -> HeaderT | Element
 
-    def get_all(self, name: str, failobj: None = None) -> list[_HeaderT_co] | None:
+    def get_all(self, name: str, failobj: None = None) -> list[HeaderT] | None:
         """Return a list of all the values for the named field.
 
         These will be sorted in the order they appeared in the original
@@ -206,7 +201,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
         If no such fields exist, failobj is returned (defaults to None).
         """
-    def get_all(self, name: str, failobj: _T) -> list[_HeaderT_co] | _T
+    def get_all[Element](self, name: str, failobj: Element) -> list[HeaderT] | Element
 
     def add_header(self, _name: str, _value: str, **_params: _ParamsType) -> None:
         """Extended header setting.
@@ -229,7 +224,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
                        filename='Fußballer.ppt'))
         """
 
-    def replace_header(self, _name: str, _value: _HeaderParamT_contra) -> None:
+    def replace_header(self, _name: str, _value: HeaderParamT) -> None:
         """Replace a header.
 
         Replace the first matching header found in the message, retaining
@@ -296,7 +291,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         header.  Optional header is the header to search instead of
         Content-Type.  If unquote is True, the value is unquoted.
         """
-    def get_params(self, failobj: _T, header: str = "content-type", unquote: bool = True) -> list[(str, str)] | _T
+    def get_params[Element](self, failobj: Element, header: str = "content-type", unquote: bool = True) -> list[(str, str)] | Element
 
     def get_param(
         self, param: str, failobj: None = None, header: str = "content-type", unquote: bool = True
@@ -323,7 +318,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
             param = email.utils.collapse_rfc2231_value(rawparam)
 
         """
-    def get_param(self, param: str, failobj: _T, header: str = "content-type", unquote: bool = True) -> _ParamType | _T
+    def get_param[Element](self, param: str, failobj: Element, header: str = "content-type", unquote: bool = True) -> _ParamType | Element
 
     def del_param(self, param: str, header: str = "content-type", requote: bool = True) -> None:
         """Remove the given parameter completely from the Content-Type header.
@@ -358,7 +353,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         the 'filename' parameter, this method falls back to looking for the
         'name' parameter.
         """
-    def get_filename(self, failobj: _T) -> str | _T
+    def get_filename[Element](self, failobj: Element) -> str | Element
 
     def get_boundary(self, failobj: None = None) -> str | None:
         """Return the boundary associated with the payload if present.
@@ -366,7 +361,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         The boundary is extracted from the Content-Type header's 'boundary'
         parameter, and it is unquoted.
         """
-    def get_boundary(self, failobj: _T) -> str | _T
+    def get_boundary[Element](self, failobj: Element) -> str | Element
 
     def set_boundary(self, boundary: str) -> None:
         """Set the boundary parameter in Content-Type to 'boundary'.
@@ -386,7 +381,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         Content-Type header, or if that header has no charset parameter,
         failobj is returned.
         """
-    def get_content_charset(self, failobj: _T) -> str | _T
+    def get_content_charset[Element](self, failobj: Element) -> str | Element
 
     def get_charsets(self, failobj: None = None) -> list[str | None]:
         """Return a list containing the charset(s) used in this message.
@@ -404,7 +399,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         one for the container message (i.e. self), so that a non-multipart
         message will still return a list of length 1.
         """
-    def get_charsets(self, failobj: _T) -> list[str | _T]
+    def get_charsets[Element](self, failobj: Element) -> list[str | Element]
 
     def walk(self) -> Generator[Self]:
         """Walk over the message tree, yielding each subpart.
@@ -474,23 +469,23 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         to the empty string.  Both charset and language should be strings.
         """
     # The following two methods are undocumented, but a source code comment states that they are public API
-    def set_raw(self, name: str, value: _HeaderParamT_contra) -> None:
+    def set_raw(self, name: str, value: HeaderParamT) -> None:
         """Store name and value in the model without modification.
 
         This is an "internal" API, intended only for use by a parser.
         """
 
-    def raw_items(self) -> Iterator[(str, _HeaderT_co)]:
+    def raw_items(self) -> Iterator[(str, HeaderT)]:
         """Return the (name, value) header pairs without modification.
 
         This is an "internal" API, intended only for use by a generator.
         """
 
-class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
+class MIMEPart[out HeaderRegistryT = Any, in HeaderRegistryParamT = Any](Message[HeaderRegistryT, HeaderRegistryParamT]):
     def __init__(self, policy: Policy[Any] | None = None) -> None
     def get_body(
         self, preferencelist: Sequence[str] = ("related", "html", "plain")
-    ) -> MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra] | None:
+    ) -> MIMEPart[HeaderRegistryT, HeaderRegistryParamT] | None:
         """Return best candidate mime part for display as 'body' of message.
 
         Do a depth first search, starting with self, looking for the first part
@@ -523,7 +518,7 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
         non-multipart.
         """
 
-    def iter_parts(self) -> Iterator[MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]]:
+    def iter_parts(self) -> Iterator[MIMEPart[HeaderRegistryT, HeaderRegistryParamT]]:
         """Return an iterator over all immediate subparts of a multipart.
 
         Return an empty iterator for a non-multipart.
@@ -553,4 +548,4 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
 
     def is_attachment(self) -> bool
 
-class EmailMessage(MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra])
+class EmailMessage[out HeaderRegistryT = Any, in HeaderRegistryParamT = Any](MIMEPart[HeaderRegistryT, HeaderRegistryParamT])

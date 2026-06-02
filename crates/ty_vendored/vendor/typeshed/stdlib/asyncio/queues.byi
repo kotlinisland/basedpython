@@ -18,13 +18,12 @@ if sys.version_info >= (3, 13):
 else:
     __all__ = ("Queue", "PriorityQueue", "LifoQueue", "QueueFull", "QueueEmpty")
 
-_T = TypeVar("_T")
 
 if sys.version_info >= (3, 13):
     class QueueShutDown(Exception):
         """Raised when putting on to or getting from a shut-down Queue."""
 
-class Queue(_LoopBoundMixin, Generic[_T]):
+class Queue[in out Element](_LoopBoundMixin):
     """A queue, useful for coordinating producer and consumer coroutines.
 
     If maxsize is less than or equal to zero, the queue size is infinite. If it
@@ -38,8 +37,8 @@ class Queue(_LoopBoundMixin, Generic[_T]):
 
     def __init__(self, maxsize: int = 0) -> None
     def _init(self, maxsize: int) -> None
-    def _get(self) -> _T
-    def _put(self, item: _T) -> None
+    def _get(self) -> Element
+    def _put(self, item: Element) -> None
     def _format(self) -> str
     def qsize(self) -> int:
         """Number of items in the queue."""
@@ -58,7 +57,7 @@ class Queue(_LoopBoundMixin, Generic[_T]):
         then full() is never True.
         """
 
-    async def put(self, item: _T) -> None:
+    async def put(self, item: Element) -> None:
         """Put an item into the queue.
 
         Put an item into the queue. If the queue is full, wait until a free
@@ -67,7 +66,7 @@ class Queue(_LoopBoundMixin, Generic[_T]):
         Raises QueueShutDown if the queue has been shut down.
         """
 
-    def put_nowait(self, item: _T) -> None:
+    def put_nowait(self, item: Element) -> None:
         """Put an item into the queue without blocking.
 
         If no free slot is immediately available, raise QueueFull.
@@ -75,7 +74,7 @@ class Queue(_LoopBoundMixin, Generic[_T]):
         Raises QueueShutDown if the queue has been shut down.
         """
 
-    async def get(self) -> _T:
+    async def get(self) -> Element:
         """Remove and return an item from the queue.
 
         If queue is empty, wait until an item is available.
@@ -84,7 +83,7 @@ class Queue(_LoopBoundMixin, Generic[_T]):
         if the queue has been shut down immediately.
         """
 
-    def get_nowait(self) -> _T:
+    def get_nowait(self) -> Element:
         """Remove and return an item from the queue.
 
         Return an item if one is immediately available, else raise QueueEmpty.
@@ -142,5 +141,5 @@ class PriorityQueue(Queue[SupportsRichComparisonT]):
     Entries are typically tuples of the form: (priority number, data).
     """
 
-class LifoQueue(Queue[_T]):
+class LifoQueue[in out Element](Queue[Element]):
     """A subclass of Queue that retrieves most recently added entries first."""

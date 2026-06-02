@@ -15,7 +15,6 @@ from typing import Final, Literal, TypeAlias, TypeVar, final
 ucd_3_2_0: UCD
 unidata_version: Final[str]
 
-_T = TypeVar("_T")
 
 _NormalizationForm: TypeAlias = Literal["NFC", "NFD", "NFKC", "NFKD"]
 
@@ -41,7 +40,7 @@ def decimal(chr: str, /) -> int:
     If no such value is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-def decimal(chr: str, default: _T, /) -> int | _T
+def decimal[Element](chr: str, default: Element, /) -> int | Element
 
 def decomposition(chr: str, /) -> str:
     """Returns the character decomposition mapping assigned to the character chr as string.
@@ -56,7 +55,7 @@ def digit(chr: str, /) -> int:
     If no such value is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-def digit(chr: str, default: _T, /) -> int | _T
+def digit[Element](chr: str, default: Element, /) -> int | Element
 
 _EastAsianWidth: TypeAlias = Literal["F", "H", "W", "Na", "A", "N"]
 
@@ -98,7 +97,7 @@ def name(chr: str, /) -> str:
     If no name is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-def name(chr: str, default: _T, /) -> str | _T
+def name[Element](chr: str, default: Element, /) -> str | Element
 
 def normalize(form: _NormalizationForm, unistr: str, /) -> str:
     """Return the normal form 'form' for the Unicode string unistr.
@@ -113,7 +112,7 @@ def numeric(chr: str, /) -> float:
     If no such value is defined, default is returned, or, if not given,
     ValueError is raised.
     """
-def numeric(chr: str, default: _T, /) -> float | _T
+def numeric[Element](chr: str, default: Element, /) -> float | Element
 
 final class UCD:
     # The methods below are constructed from the same array in C
@@ -141,7 +140,7 @@ final class UCD:
         If no such value is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-    def decimal(self, chr: str, default: _T, /) -> int | _T
+    def decimal[Element](self, chr: str, default: Element, /) -> int | Element
 
     def decomposition(self, chr: str, /) -> str:
         """Returns the character decomposition mapping assigned to the character chr as string.
@@ -156,7 +155,7 @@ final class UCD:
         If no such value is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-    def digit(self, chr: str, default: _T, /) -> int | _T
+    def digit[Element](self, chr: str, default: Element, /) -> int | Element
 
     def east_asian_width(self, chr: str, /) -> _EastAsianWidth:
         """Returns the east asian width assigned to the character chr as string."""
@@ -187,7 +186,7 @@ final class UCD:
         If no name is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-    def name(self, chr: str, default: _T, /) -> str | _T
+    def name[Element](self, chr: str, default: Element, /) -> str | Element
 
     def normalize(self, form: _NormalizationForm, unistr: str, /) -> str:
         """Return the normal form 'form' for the Unicode string unistr.
@@ -202,4 +201,4 @@ final class UCD:
         If no such value is defined, default is returned, or, if not given,
         ValueError is raised.
         """
-    def numeric(self, chr: str, default: _T, /) -> float | _T
+    def numeric[Element](self, chr: str, default: Element, /) -> float | Element

@@ -71,10 +71,6 @@ scheme_chars: Final[str]
 if sys.version_info < (3, 11):
     MAX_CACHE_SIZE: Final[int]
 
-_ResultStrT = TypeVar("_ResultStrT", str, bytes)
-_ResultComponentT = TypeVar("_ResultComponentT", str, bytes, str | None, bytes | None)
-_StrComponentT = TypeVar("_StrComponentT", str, str | None, default=str)
-_BytesComponentT = TypeVar("_BytesComponentT", bytes, bytes | None, default=bytes)
 
 class _ResultMixinStr:
     """Standard approach to encoding parsed results from str to bytes"""
@@ -115,14 +111,14 @@ class _NetlocResultMixinBytes(_NetlocResultMixinBase[bytes], _ResultMixinBytes):
 # Need to duplicate the whole class because mypy rejects version-specific
 # branches in namedtuple bodies.
 if sys.version_info >= (3, 15):
-    class _DefragResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
-        url: _ResultStrT
-        fragment: _ResultComponentT
+    class _DefragResultBase[in out ResultStrT: constraints (str, bytes), in out ResultComponentT: constraints (str, bytes, str | None, bytes | None)](NamedTuple):
+        url: ResultStrT
+        fragment: ResultComponentT
         # Ignore needed due to mypy#21453.
-        def geturl(self) -> _ResultStrT  # type: ignore[misc]
+        def geturl(self) -> ResultStrT  # type: ignore[misc]
 
 else:
-    class _DefragResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
+    class _DefragResultBase[in out ResultStrT: constraints (str, bytes), in out ResultComponentT: constraints (str, bytes, str | None, bytes | None)](NamedTuple):
         """
         DefragResult(url, fragment)
 
@@ -130,21 +126,21 @@ else:
         identifier as a separate argument.
         """
 
-        url: _ResultStrT
-        fragment: _ResultComponentT
+        url: ResultStrT
+        fragment: ResultComponentT
 
 if sys.version_info >= (3, 15):
-    class _SplitResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
-        scheme: _ResultComponentT
-        netloc: _ResultComponentT
-        path: _ResultStrT
-        query: _ResultComponentT
-        fragment: _ResultComponentT
+    class _SplitResultBase[in out ResultStrT: constraints (str, bytes), in out ResultComponentT: constraints (str, bytes, str | None, bytes | None)](NamedTuple):
+        scheme: ResultComponentT
+        netloc: ResultComponentT
+        path: ResultStrT
+        query: ResultComponentT
+        fragment: ResultComponentT
         # Ignore needed due to mypy#21453.
-        def geturl(self) -> _ResultStrT  # type: ignore[misc]
+        def geturl(self) -> ResultStrT  # type: ignore[misc]
 
 else:
-    class _SplitResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
+    class _SplitResultBase[in out ResultStrT: constraints (str, bytes), in out ResultComponentT: constraints (str, bytes, str | None, bytes | None)](NamedTuple):
         """
         SplitResult(scheme, netloc, path, query, fragment)
 
@@ -152,47 +148,47 @@ else:
         ParseResult, but does not split params.
         """
 
-        scheme: _ResultComponentT
-        netloc: _ResultComponentT
-        path: _ResultStrT
-        query: _ResultComponentT
-        fragment: _ResultComponentT
+        scheme: ResultComponentT
+        netloc: ResultComponentT
+        path: ResultStrT
+        query: ResultComponentT
+        fragment: ResultComponentT
 
 if sys.version_info >= (3, 15):
-    class _ParseResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
-        scheme: _ResultComponentT
-        netloc: _ResultComponentT
-        path: _ResultStrT
-        params: _ResultComponentT
-        query: _ResultComponentT
-        fragment: _ResultComponentT
+    class _ParseResultBase[in out ResultStrT: constraints (str, bytes), in out ResultComponentT: constraints (str, bytes, str | None, bytes | None)](NamedTuple):
+        scheme: ResultComponentT
+        netloc: ResultComponentT
+        path: ResultStrT
+        params: ResultComponentT
+        query: ResultComponentT
+        fragment: ResultComponentT
         # Ignore needed due to mypy#21453.
-        def geturl(self) -> _ResultStrT  # type: ignore[misc]
+        def geturl(self) -> ResultStrT  # type: ignore[misc]
 
 else:
-    class _ParseResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
+    class _ParseResultBase[in out ResultStrT: constraints (str, bytes), in out ResultComponentT: constraints (str, bytes, str | None, bytes | None)](NamedTuple):
         """
         ParseResult(scheme, netloc, path, params, query, fragment)
 
         A 6-tuple that contains components of a parsed URL.
         """
 
-        scheme: _ResultComponentT
-        netloc: _ResultComponentT
-        path: _ResultStrT
-        params: _ResultComponentT
-        query: _ResultComponentT
-        fragment: _ResultComponentT
+        scheme: ResultComponentT
+        netloc: ResultComponentT
+        path: ResultStrT
+        params: ResultComponentT
+        query: ResultComponentT
+        fragment: ResultComponentT
 
 if sys.version_info >= (3, 15):
     # Structured result objects for string data
-    class DefragResult(_DefragResultBase[str, _StrComponentT], _ResultMixinStr, Generic[_StrComponentT])
-    class SplitResult(_SplitResultBase[str, _StrComponentT], _NetlocResultMixinStr, Generic[_StrComponentT])
-    class ParseResult(_ParseResultBase[str, _StrComponentT], _NetlocResultMixinStr, Generic[_StrComponentT])
+    class DefragResult[in out StrComponentT: constraints (str, str | None) = str](_DefragResultBase[str, StrComponentT], _ResultMixinStr)
+    class SplitResult[in out StrComponentT: constraints (str, str | None) = str](_SplitResultBase[str, StrComponentT], _NetlocResultMixinStr)
+    class ParseResult[in out StrComponentT: constraints (str, str | None) = str](_ParseResultBase[str, StrComponentT], _NetlocResultMixinStr)
     # Structured result objects for bytes data
-    class DefragResultBytes(_DefragResultBase[bytes, _BytesComponentT], _ResultMixinBytes, Generic[_BytesComponentT])
-    class SplitResultBytes(_SplitResultBase[bytes, _BytesComponentT], _NetlocResultMixinBytes, Generic[_BytesComponentT])
-    class ParseResultBytes(_ParseResultBase[bytes, _BytesComponentT], _NetlocResultMixinBytes, Generic[_BytesComponentT])
+    class DefragResultBytes[in out BytesComponentT: constraints (bytes, bytes | None) = bytes](_DefragResultBase[bytes, BytesComponentT], _ResultMixinBytes)
+    class SplitResultBytes[in out BytesComponentT: constraints (bytes, bytes | None) = bytes](_SplitResultBase[bytes, BytesComponentT], _NetlocResultMixinBytes)
+    class ParseResultBytes[in out BytesComponentT: constraints (bytes, bytes | None) = bytes](_ParseResultBase[bytes, BytesComponentT], _NetlocResultMixinBytes)
 
 else:
     # Structured result objects for string data

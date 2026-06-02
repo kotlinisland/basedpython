@@ -38,16 +38,13 @@ class BrokenExecutor(RuntimeError):
     Raised when a executor has become non-functional after a severe failure.
     """
 
-_T = TypeVar("_T")
-_T_co = TypeVar("_T_co", covariant=True)
-_P = ParamSpec("_P")
 
-class Future(Generic[_T]):
+class Future[in out Element]:
     """Represents the result of an asynchronous computation."""
 
     _condition: threading.Condition
     _state: str
-    _result: _T | None
+    _result: Element | None
     _exception: BaseException | None
     _waiters: list[_Waiter]
     def cancel(self) -> bool:
@@ -66,7 +63,7 @@ class Future(Generic[_T]):
     def done(self) -> bool:
         """Return True if the future was cancelled or finished executing."""
 
-    def add_done_callback(self, fn: Callable[[Future[_T]], object]) -> None:
+    def add_done_callback(self, fn: Callable[[Future[Element]], object]) -> None:
         """Attaches a callable that will be called when the future finishes.
 
         Args:
@@ -78,7 +75,7 @@ class Future(Generic[_T]):
                 callables are called in the order that they were added.
         """
 
-    def result(self, timeout: float | None = None) -> _T:
+    def result(self, timeout: float | None = None) -> Element:
         """Return the result of the call that the future represents.
 
         Args:
@@ -119,7 +116,7 @@ class Future(Generic[_T]):
                 or set_exception() was called.
         """
 
-    def set_result(self, result: _T) -> None:
+    def set_result(self, result: Element) -> None:
         """Sets the return value of work associated with the future.
 
         Should only be used by Executor implementations and unit tests.
@@ -158,7 +155,7 @@ class Future(Generic[_T]):
 class Executor:
     """This is an abstract base class for concrete asynchronous executors."""
 
-    def submit(self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs) -> Future[_T]:
+    def submit[**P, Element](self, fn: Callable[P, Element], /, *args: P.args, **kwargs: P.kwargs) -> Future[Element]:
         """Submits a callable to be executed with the given arguments.
 
         Schedules the callable to be executed as fn(*args, **kwargs) and returns
@@ -168,14 +165,14 @@ class Executor:
             A Future representing the given call.
         """
     if sys.version_info >= (3, 14):
-        def map(
+        def map[Element](
             self,
-            fn: Callable[..., _T],
+            fn: Callable[..., Element],
             *iterables: Iterable[Any],
             timeout: float | None = None,
             chunksize: int = 1,
             buffersize: int | None = None,
-        ) -> Iterator[_T]:
+        ) -> Iterator[Element]:
             """Returns an iterator equivalent to map(fn, iter).
 
             Args:
@@ -203,9 +200,9 @@ class Executor:
                 Exception: If fn(*args) raises for any values.
             """
     else:
-        def map(
-            self, fn: Callable[..., _T], *iterables: Iterable[Any], timeout: float | None = None, chunksize: int = 1
-        ) -> Iterator[_T]:
+        def map[Element](
+            self, fn: Callable[..., Element], *iterables: Iterable[Any], timeout: float | None = None, chunksize: int = 1
+        ) -> Iterator[Element]:
             """Returns an iterator equivalent to map(fn, iter).
 
             Args:
@@ -249,7 +246,7 @@ class Executor:
     ) -> bool | None
 
 @type_check_only
-class _AsCompletedFuture(Protocol[_T_co]):
+class _AsCompletedFuture[out Element](Protocol):
     # as_completed only mutates non-generic aspects of passed Futures and does not do any nominal
     # checks. Therefore, we can use a Protocol here to allow as_completed to act covariantly.
     # See the tests for concurrent.futures
@@ -257,9 +254,9 @@ class _AsCompletedFuture(Protocol[_T_co]):
     _state: str
     _waiters: list[_Waiter]
     # Not used by as_completed, but needed to propagate the generic type
-    def result(self, timeout: float | None = None) -> _T_co
+    def result(self, timeout: float | None = None) -> Element
 
-def as_completed(fs: Iterable[_AsCompletedFuture[_T]], timeout: float | None = None) -> Iterator[Future[_T]]:
+def as_completed[Element](fs: Iterable[_AsCompletedFuture[Element]], timeout: float | None = None) -> Iterator[Future[Element]]:
     """An iterator over the given futures that yields each as it completes.
 
     Args:
@@ -278,13 +275,13 @@ def as_completed(fs: Iterable[_AsCompletedFuture[_T]], timeout: float | None = N
             before the given timeout.
     """
 
-class DoneAndNotDoneFutures(NamedTuple, Generic[_T]):
+class DoneAndNotDoneFutures[in out Element](NamedTuple):
     """DoneAndNotDoneFutures(done, not_done)"""
 
-    done: set[Future[_T]]
-    not_done: set[Future[_T]]
+    done: set[Future[Element]]
+    not_done: set[Future[Element]]
 
-def wait(fs: Iterable[Future[_T]], timeout: float | None = None, return_when: str = "ALL_COMPLETED") -> DoneAndNotDoneFutures[_T]:
+def wait[Element](fs: Iterable[Future[Element]], timeout: float | None = None, return_when: str = "ALL_COMPLETED") -> DoneAndNotDoneFutures[Element]:
     """Wait for the futures in the given sequence to complete.
 
     Args:

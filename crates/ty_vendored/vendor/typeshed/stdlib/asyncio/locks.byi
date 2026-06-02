@@ -18,7 +18,6 @@ if sys.version_info >= (3, 11):
 else:
     __all__ = ("Lock", "Event", "Condition", "Semaphore", "BoundedSemaphore")
 
-_T = TypeVar("_T")
 
 class _ContextManagerMixin:
     async def __aenter__(self) -> None
@@ -167,7 +166,7 @@ class Condition(_ContextManagerMixin, _LoopBoundMixin):
         re-check the state and be prepared to wait() again.
         """
 
-    async def wait_for(self, predicate: Callable[[], _T]) -> _T:
+    async def wait_for[Element](self, predicate: Callable[[], Element]) -> Element:
         """Wait until a predicate becomes true.
 
         The predicate should be a callable whose result will be

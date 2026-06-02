@@ -267,7 +267,6 @@ _Section: TypeAlias = Mapping[str, str]
 _Parser: TypeAlias = MutableMapping[str, _Section]
 _ConverterCallback: TypeAlias = Callable[[str], Any]
 _ConvertersMap: TypeAlias = dict[str, _ConverterCallback]
-_T = TypeVar("_T")
 
 DEFAULTSECT: Final = "DEFAULT"
 MAX_INTERPOLATION_DEPTH: Final = 10
@@ -503,30 +502,30 @@ class RawConfigParser(_Parser):
     # These get* methods are partially applied (with the same names) in
     # SectionProxy; the stubs should be kept updated together
     def getint(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> int
-    def getint(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
-    ) -> int | _T
+    def getint[Element](
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: Element
+    ) -> int | Element
 
     def getfloat(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> float
-    def getfloat(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
-    ) -> float | _T
+    def getfloat[Element](
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: Element
+    ) -> float | Element
 
     def getboolean(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> bool
-    def getboolean(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
-    ) -> bool | _T
+    def getboolean[Element](
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: Element
+    ) -> bool | Element
 
-    def _get_conv(
+    def _get_conv[Element](
         self,
         section: _SectionName,
         option: str,
-        conv: Callable[[str], _T],
+        conv: Callable[[str], Element],
         *,
         raw: bool = False,
         vars: _Section | None = None,
-        fallback: _T = ...,
-    ) -> _T
+        fallback: Element = ...,
+    ) -> Element
 
     # This is incompatible with MutableMapping so we ignore the type
     def get(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> str | MaybeNone:
@@ -544,9 +543,9 @@ class RawConfigParser(_Parser):
 
         The section DEFAULT is special.
         """
-    def get(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
-    ) -> str | _T | MaybeNone
+    def get[Element](
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: Element
+    ) -> str | Element | MaybeNone
 
     def items(self, *, raw: bool = False, vars: _Section | None = None) -> ItemsView[str, SectionProxy]:
         """Return a list of (name, value) tuples for each option in a section.
@@ -603,9 +602,9 @@ class ConfigParser(RawConfigParser):
 
         The section DEFAULT is special.
         """
-    def get(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
-    ) -> str | _T
+    def get[Element](
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: Element
+    ) -> str | Element
 
 if sys.version_info < (3, 12):
     @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `ConfigParser` instead.")
@@ -646,27 +645,27 @@ class SectionProxy(MutableMapping[str, str]):
         is not found.
 
         """
-    def get(
+    def get[Element](
         self,
         option: str,
-        fallback: _T,
+        fallback: Element,
         *,
         raw: bool = False,
         vars: _Section | None = None,
         _impl: Any | None = None,
         **kwargs: Any,  # passed to the underlying parser's get() method
-    ) -> str | _T
+    ) -> str | Element
 
     # These are partially-applied version of the methods with the same names in
     # RawConfigParser; the stubs should be kept updated together
     def getint(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> int | None
-    def getint(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> int | _T
+    def getint[Element](self, option: str, fallback: Element = ..., *, raw: bool = False, vars: _Section | None = None) -> int | Element
 
     def getfloat(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> float | None
-    def getfloat(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> float | _T
+    def getfloat[Element](self, option: str, fallback: Element = ..., *, raw: bool = False, vars: _Section | None = None) -> float | Element
 
     def getboolean(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> bool | None
-    def getboolean(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> bool | _T
+    def getboolean[Element](self, option: str, fallback: Element = ..., *, raw: bool = False, vars: _Section | None = None) -> bool | Element
 
     # SectionProxy can have arbitrary attributes when custom converters are used
     def __getattr__(self, key: str) -> Callable[..., Any]

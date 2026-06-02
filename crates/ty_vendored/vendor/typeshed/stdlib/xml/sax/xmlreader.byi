@@ -223,10 +223,9 @@ class InputSource:
     def getCharacterStream(self) -> _SupportsReadClose[str] | None:
         """Get the character stream for this input source."""
 
-_AttrKey = TypeVar("_AttrKey", default=str)
 
-class AttributesImpl(Generic[_AttrKey]):
-    def __init__(self, attrs: Mapping[_AttrKey, str]) -> None:
+class AttributesImpl[in out AttrKey = str]:
+    def __init__(self, attrs: Mapping[AttrKey, str]) -> None:
         """Non-NS-aware implementation.
 
         attrs should be of the form {name : value}.
@@ -234,22 +233,22 @@ class AttributesImpl(Generic[_AttrKey]):
 
     def getLength(self) -> int
     def getType(self, name: str) -> str
-    def getValue(self, name: _AttrKey) -> str
+    def getValue(self, name: AttrKey) -> str
     def getValueByQName(self, name: str) -> str
-    def getNameByQName(self, name: str) -> _AttrKey
-    def getQNameByName(self, name: _AttrKey) -> str
-    def getNames(self) -> list[_AttrKey]
+    def getNameByQName(self, name: str) -> AttrKey
+    def getQNameByName(self, name: AttrKey) -> str
+    def getNames(self) -> list[AttrKey]
     def getQNames(self) -> list[str]
     def __len__(self) -> int
-    def __getitem__(self, name: _AttrKey) -> str
-    def keys(self) -> list[_AttrKey]
-    def __contains__(self, name: _AttrKey) -> bool
+    def __getitem__(self, name: AttrKey) -> str
+    def keys(self) -> list[AttrKey]
+    def __contains__(self, name: AttrKey) -> bool
 
-    def get(self, name: _AttrKey, alternative: None = None) -> str | None
-    def get(self, name: _AttrKey, alternative: str) -> str
+    def get(self, name: AttrKey, alternative: None = None) -> str | None
+    def get(self, name: AttrKey, alternative: str) -> str
 
     def copy(self) -> Self
-    def items(self) -> list[(_AttrKey, str)]
+    def items(self) -> list[(AttrKey, str)]
     def values(self) -> list[str]
 
 _NSName: TypeAlias = tuple[str | None, str]

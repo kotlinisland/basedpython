@@ -12,17 +12,15 @@ from typing_extensions import Self
 
 __all__ = ["Policy", "Compat32", "compat32"]
 
-_MessageT = TypeVar("_MessageT", bound=Message[Any, Any], default=Message[str, str])
-_MessageT_co = TypeVar("_MessageT_co", covariant=True, bound=Message[Any, Any], default=Message[str, str])
 
 @type_check_only
-class _MessageFactory(Protocol[_MessageT]):
-    def __call__(self, policy: Policy[_MessageT]) -> _MessageT
+class _MessageFactory[in out MessageT: Message[Any, Any] = Message[str, str]](Protocol):
+    def __call__(self, policy: Policy[MessageT]) -> MessageT
 
 # Policy below is the only known direct subclass of _PolicyBase. We therefore
 # assume that the __init__ arguments and attributes of _PolicyBase are
 # the same as those of Policy.
-class _PolicyBase(Generic[_MessageT_co]):
+class _PolicyBase[out MessageT: Message[Any, Any] = Message[str, str]]:
     """Policy Object basic framework.
 
     This class is useless unless subclassed.  A subclass should define
@@ -49,7 +47,7 @@ class _PolicyBase(Generic[_MessageT_co]):
     cte_type: str
     raise_on_defect: bool
     mangle_from_: bool
-    message_factory: _MessageFactory[_MessageT_co] | None
+    message_factory: _MessageFactory[MessageT] | None
     # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
     verify_generated_headers: bool
 
@@ -61,7 +59,7 @@ class _PolicyBase(Generic[_MessageT_co]):
         cte_type: str = "8bit",
         raise_on_defect: bool = False,
         mangle_from_: bool = ...,  # default depends on sub-class
-        message_factory: _MessageFactory[_MessageT_co] | None = None,
+        message_factory: _MessageFactory[MessageT] | None = None,
         # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
         verify_generated_headers: bool = True,
     ) -> None:
@@ -79,7 +77,7 @@ class _PolicyBase(Generic[_MessageT_co]):
         cte_type: str = ...,
         raise_on_defect: bool = ...,
         mangle_from_: bool = ...,
-        message_factory: _MessageFactory[_MessageT_co] | None = ...,
+        message_factory: _MessageFactory[MessageT] | None = ...,
         # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
         verify_generated_headers: bool = ...,
     ) -> Self:
@@ -97,7 +95,7 @@ class _PolicyBase(Generic[_MessageT_co]):
 
         """
 
-class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
+class Policy[out MessageT: Message[Any, Any] = Message[str, str]](_PolicyBase[MessageT], metaclass=ABCMeta):
     """Controls for how messages are interpreted and formatted.
 
     Most of the classes and many of the methods in the email package accept
@@ -241,7 +239,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
         """
 
-class Compat32(Policy[_MessageT_co]):
+class Compat32[out MessageT: Message[Any, Any] = Message[str, str]](Policy[MessageT]):
     """Controls for how messages are interpreted and formatted.
 
     Most of the classes and many of the methods in the email package accept

@@ -4681,14 +4681,14 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT
+                __getitem__ :: bound method <class 'Answer'>.__getitem__[EnumMemberT](name: str) -> EnumMemberT
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: bound method <class 'Answer'>.__init_subclass__() -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT]
+                __iter__ :: bound method <class 'Answer'>.__iter__[EnumMemberT]() -> Iterator[EnumMemberT]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
@@ -4702,7 +4702,7 @@ Answer.<CURSOR>
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT]
+                __reversed__ :: bound method <class 'Answer'>.__reversed__[EnumMemberT]() -> Iterator[EnumMemberT]
                 __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
@@ -4750,7 +4750,7 @@ quux.<CURSOR>
         index :: bound method Quux.index(value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
         x :: int
         y :: str
-        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], [_T](value: tuple[_T, ...], /) -> tuple[int | str | _T, ...]]
+        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], [T](value: tuple[T, ...], /) -> tuple[int | str | T, ...]]
         __annotations__ :: dict[str, Any]
         __class__ :: type[Quux]
         __class_getitem__ :: bound method type[Quux].__class_getitem__(item: Any, /) -> GenericAlias

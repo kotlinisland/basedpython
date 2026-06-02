@@ -155,7 +155,6 @@ if sys.version_info >= (3, 11):
 if sys.version_info >= (3, 13):
     __all__ += ["PatternError"]
 
-_T = TypeVar("_T")
 
 # The implementation defines this in re._constants (version_info >= 3, 11) or
 # sre_constants. Typeshed has it here because its __module__ attribute is set to "re".
@@ -234,7 +233,7 @@ final class Match(Generic[AnyStr]):
         default
           Is used for groups that did not participate in the match.
         """
-    def groups(self, default: _T) -> (*: AnyStr | _T)
+    def groups[Element](self, default: Element) -> (*: AnyStr | Element)
 
     # Each value in groupdict()'s return dict is either "AnyStr" or
     # "AnyStr | None", depending on the pattern.
@@ -244,7 +243,7 @@ final class Match(Generic[AnyStr]):
         default
           Is used for groups that did not participate in the match.
         """
-    def groupdict(self, default: _T) -> dict[str, AnyStr | _T]
+    def groupdict[Element](self, default: Element) -> dict[str, AnyStr | Element]
 
     def start(self, group: int | str = 0, /) -> int:
         """Return index of the start of the substring matched by group."""

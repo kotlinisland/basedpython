@@ -12,10 +12,8 @@ __all__ = ["Client", "Listener", "Pipe", "wait"]
 _Address: TypeAlias = str | tuple[str, int]
 
 # Defaulting to Any to avoid forcing generics on a lot of pre-existing code
-_SendT_contra = TypeVar("_SendT_contra", contravariant=True, default=Any)
-_RecvT_co = TypeVar("_RecvT_co", covariant=True, default=Any)
 
-class _ConnectionBase(Generic[_SendT_contra, _RecvT_co]):
+class _ConnectionBase[in Sent = Any, out RecvT = Any]:
     def __init__(self, handle: SupportsIndex, readable: bool = True, writable: bool = True) -> None
     @property
     def closed(self) -> bool:  # undocumented
@@ -38,7 +36,7 @@ class _ConnectionBase(Generic[_SendT_contra, _RecvT_co]):
     def send_bytes(self, buf: ReadableBuffer, offset: int = 0, size: int | None = None) -> None:
         """Send the bytes data from a bytes-like object"""
 
-    def send(self, obj: _SendT_contra) -> None:
+    def send(self, obj: Sent) -> None:
         """Send a (picklable) object"""
 
     def recv_bytes(self, maxlength: int | None = None) -> bytes:
@@ -52,7 +50,7 @@ class _ConnectionBase(Generic[_SendT_contra, _RecvT_co]):
         Return the number of bytes read.
         """
 
-    def recv(self) -> _RecvT_co:
+    def recv(self) -> RecvT:
         """Receive a (picklable) object"""
 
     def poll(self, timeout: float | None = 0.0) -> bool:
@@ -64,14 +62,14 @@ class _ConnectionBase(Generic[_SendT_contra, _RecvT_co]):
     ) -> None
     def __del__(self) -> None
 
-class Connection(_ConnectionBase[_SendT_contra, _RecvT_co]):
+class Connection[in Sent = Any, out RecvT = Any](_ConnectionBase[Sent, RecvT]):
     """
     Connection class based on an arbitrary file descriptor (Unix only), or
     a socket handle (Windows).
     """
 
 if sys.platform == "win32":
-    class PipeConnection(_ConnectionBase[_SendT_contra, _RecvT_co]):
+    class PipeConnection[in Sent = Any, out RecvT = Any](_ConnectionBase[Sent, RecvT]):
         """
         Connection class based on a Windows named pipe.
         Overlapped I/O is used, so the handles must have been created
@@ -118,9 +116,9 @@ else:
     def deliver_challenge(connection: Connection[Any, Any], authkey: bytes) -> None
 
 def answer_challenge(connection: Connection[Any, Any], authkey: bytes) -> None
-def wait(
-    object_list: Iterable[Connection[_SendT_contra, _RecvT_co] | socket.socket | int], timeout: float | None = None
-) -> list[Connection[_SendT_contra, _RecvT_co] | socket.socket | int]:
+def wait[Sent = Any, RecvT = Any](
+    object_list: Iterable[Connection[Sent, RecvT] | socket.socket | int], timeout: float | None = None
+) -> list[Connection[Sent, RecvT] | socket.socket | int]:
     """
     Wait till an object in object_list is ready/readable.
 

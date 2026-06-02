@@ -5,45 +5,43 @@ from typing_extensions import Self
 
 __all__ = ["WeakSet"]
 
-_S = TypeVar("_S")
-_T = TypeVar("_T")
 
-class WeakSet(MutableSet[_T]):
+class WeakSet[in out Element](MutableSet[Element]):
     def __init__(self, data: None = None) -> None
-    def __init__(self, data: Iterable[_T]) -> None
+    def __init__(self, data: Iterable[Element]) -> None
 
-    def add(self, item: _T) -> None
-    def discard(self, item: _T) -> None
+    def add(self, item: Element) -> None
+    def discard(self, item: Element) -> None
     def copy(self) -> Self
-    def remove(self, item: _T) -> None
-    def update(self, other: Iterable[_T]) -> None
+    def remove(self, item: Element) -> None
+    def update(self, other: Iterable[Element]) -> None
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __contains__(self, item: object) -> bool
     def __len__(self) -> int
-    def __iter__(self) -> Iterator[_T]
-    def __ior__(self, other: Iterable[_T]) -> Self  # type: ignore[override,misc]
-    def difference(self, other: Iterable[_T]) -> Self
+    def __iter__(self) -> Iterator[Element]
+    def __ior__(self, other: Iterable[Element]) -> Self  # type: ignore[override,misc]
+    def difference(self, other: Iterable[Element]) -> Self
     def __sub__(self, other: Iterable[Any]) -> Self
     def difference_update(self, other: Iterable[Any]) -> None
     def __isub__(self, other: Iterable[Any]) -> Self
-    def intersection(self, other: Iterable[_T]) -> Self
+    def intersection(self, other: Iterable[Element]) -> Self
     def __and__(self, other: Iterable[Any]) -> Self
     def intersection_update(self, other: Iterable[Any]) -> None
     def __iand__(self, other: Iterable[Any]) -> Self
-    def issubset(self, other: Iterable[_T]) -> bool
-    def __le__(self, other: Iterable[_T]) -> bool
-    def __lt__(self, other: Iterable[_T]) -> bool
-    def issuperset(self, other: Iterable[_T]) -> bool
-    def __ge__(self, other: Iterable[_T]) -> bool
-    def __gt__(self, other: Iterable[_T]) -> bool
+    def issubset(self, other: Iterable[Element]) -> bool
+    def __le__(self, other: Iterable[Element]) -> bool
+    def __lt__(self, other: Iterable[Element]) -> bool
+    def issuperset(self, other: Iterable[Element]) -> bool
+    def __ge__(self, other: Iterable[Element]) -> bool
+    def __gt__(self, other: Iterable[Element]) -> bool
     def __eq__(self, other: object) -> bool
-    def symmetric_difference(self, other: Iterable[_S]) -> WeakSet[_S | _T]
-    def __xor__(self, other: Iterable[_S]) -> WeakSet[_S | _T]
-    def symmetric_difference_update(self, other: Iterable[_T]) -> None
-    def __ixor__(self, other: Iterable[_T]) -> Self  # type: ignore[override,misc]
-    def union(self, other: Iterable[_S]) -> WeakSet[_S | _T]
-    def __or__(self, other: Iterable[_S]) -> WeakSet[_S | _T]
-    def isdisjoint(self, other: Iterable[_T]) -> bool
+    def symmetric_difference[Other](self, other: Iterable[Other]) -> WeakSet[Other | Element]
+    def __xor__[Other](self, other: Iterable[Other]) -> WeakSet[Other | Element]
+    def symmetric_difference_update(self, other: Iterable[Element]) -> None
+    def __ixor__(self, other: Iterable[Element]) -> Self  # type: ignore[override,misc]
+    def union[Other](self, other: Iterable[Other]) -> WeakSet[Other | Element]
+    def __or__[Other](self, other: Iterable[Other]) -> WeakSet[Other | Element]
+    def isdisjoint(self, other: Iterable[Element]) -> bool
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 

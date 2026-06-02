@@ -9,6 +9,5 @@ from typing import TypeVar
 if sys.version_info >= (3, 11):
     from importlib.readers import *
 
-    _T = TypeVar("_T")
 
-    def remove_duplicates(items: Iterable[_T]) -> Iterator[_T]
+    def remove_duplicates[Element](items: Iterable[Element]) -> Iterator[Element]

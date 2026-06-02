@@ -542,9 +542,6 @@ if sys.platform != "win32" or sys.version_info >= (3, 11):
 # This unnecessary alias is to work around various errors
 path = _path
 
-_T = TypeVar("_T")
-_T1 = TypeVar("_T1")
-_T2 = TypeVar("_T2")
 
 # ----- os variables -----
 
@@ -779,14 +776,14 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
     def get(self, key: AnyStr, default: None = None) -> AnyStr | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
     def get(self, key: AnyStr, default: AnyStr) -> AnyStr
-    def get(self, key: AnyStr, default: _T) -> AnyStr | _T
+    def get[Element](self, key: AnyStr, default: Element) -> AnyStr | Element
 
     def pop(self, key: AnyStr) -> AnyStr:
         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
         If key is not found, d is returned if given, otherwise KeyError is raised.
         """
     def pop(self, key: AnyStr, default: AnyStr) -> AnyStr
-    def pop(self, key: AnyStr, default: _T) -> AnyStr | _T
+    def pop[Element](self, key: AnyStr, default: Element) -> AnyStr | Element
 
     def setdefault(self, key: AnyStr, value: AnyStr) -> AnyStr
     def copy(self) -> dict[AnyStr, AnyStr]
@@ -795,8 +792,8 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
     def __setitem__(self, key: AnyStr, value: AnyStr) -> None
     def __iter__(self) -> Iterator[AnyStr]
     def __len__(self) -> int
-    def __or__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]
-    def __ror__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]
+    def __or__[T1, T2](self, other: Mapping[T1, T2]) -> dict[AnyStr | T1, AnyStr | T2]
+    def __ror__[T1, T2](self, other: Mapping[T1, T2]) -> dict[AnyStr | T1, AnyStr | T2]
 
     # We use @overload instead of a Union for reasons similar to those given for
     # overloading MutableMapping.update in stdlib/typing.pyi
@@ -1288,7 +1285,7 @@ def getenv(key: str) -> str | None:
     The optional second argument can specify an alternate default.
     key, default and the result are str.
     """
-def getenv(key: str, default: _T) -> str | _T
+def getenv[Element](key: str, default: Element) -> str | Element
 
 if sys.platform != "win32":
     def getenvb(key: bytes) -> bytes | None:
@@ -1296,7 +1293,7 @@ if sys.platform != "win32":
         The optional second argument can specify an alternate default.
         key, default and the result are bytes.
         """
-    def getenvb(key: bytes, default: _T) -> bytes | _T
+    def getenvb[Element](key: bytes, default: Element) -> bytes | Element
 
     def putenv(name: StrOrBytesPath, value: StrOrBytesPath, /) -> None:
         """Change or add an environment variable."""
@@ -3139,7 +3136,7 @@ if sys.platform != "win32":
 if sys.platform == "win32":
     class _AddedDllDirectory:
         path: str | None
-        def __init__(self, path: str | None, cookie: _T, remove_dll_directory: Callable[[_T], object]) -> None
+        def __init__[Element](self, path: str | None, cookie: Element, remove_dll_directory: Callable[[Element], object]) -> None
         def close(self) -> None
         def __enter__(self) -> Self
         def __exit__(self, *args: Unused) -> None

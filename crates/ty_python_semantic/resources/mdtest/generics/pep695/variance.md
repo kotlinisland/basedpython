@@ -1088,30 +1088,26 @@ basedpython allows annotating variance directly on the type parameter with `out 
 
 ### class
 
-```py
+```by
 from ty_extensions import is_subtype_of, static_assert
 
-class A: ...
-class B(A): ...
+class A
+class B(A)
 
-# `out T` forces covariance even on an empty body (which would otherwise be bivariant)
-class Covariant[out T]:
-    pass
+# `out T` is explicit covariance
+class Covariant[out T]
 
 static_assert(is_subtype_of(Covariant[B], Covariant[A]))
 static_assert(not is_subtype_of(Covariant[A], Covariant[B]))
 
-# `in T` forces contravariance
-class Contravariant[in T]:
-    pass
+# `in T` is explicit contravariance
+class Contravariant[in T]
 
 static_assert(not is_subtype_of(Contravariant[B], Contravariant[A]))
 static_assert(is_subtype_of(Contravariant[A], Contravariant[B]))
 
-# `in out T` is explicit invariance (basedpython has no bivariant spelling); it forces invariance
-# even on an empty body (which would otherwise be inferred bivariant)
-class Invariant[in out T]:
-    pass
+# `in out T` is explicit invariance
+class Invariant[in out T]
 
 static_assert(not is_subtype_of(Invariant[B], Invariant[A]))
 static_assert(not is_subtype_of(Invariant[A], Invariant[B]))
@@ -1122,11 +1118,11 @@ static_assert(not is_subtype_of(Invariant[A], Invariant[B]))
 `out T` / `in T` syntax is accepted on type alias statements. the explicit variance applies to the
 typevar, consistent with the body.
 
-```py
+```by
 from ty_extensions import is_subtype_of, static_assert
 
-class A: ...
-class B(A): ...
+class A
+class B(A)
 
 class Producer[T]:
     def get(self) -> T:

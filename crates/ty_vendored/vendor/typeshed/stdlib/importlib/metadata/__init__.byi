@@ -12,9 +12,6 @@ from re import Pattern
 from typing import Any, ClassVar, Generic, NamedTuple, TypeAlias, TypeVar, type_check_only
 from typing_extensions import Self, deprecated, disjoint_base
 
-_T = TypeVar("_T")
-_KT = TypeVar("_KT")
-_VT = TypeVar("_VT")
 
 __all__ = [
     "Distribution",
@@ -269,7 +266,7 @@ if sys.version_info >= (3, 12):
             """
 
 else:
-    class DeprecatedList(list[_T]):
+    class DeprecatedList[in out Element](list[Element]):
         """
         Allow an otherwise immutable object to implement mutability
         for compatibility.
@@ -347,7 +344,7 @@ else:
             """
 
 if sys.version_info < (3, 12):
-    class Deprecated(Generic[_KT, _VT]):
+    class Deprecated[in out Key, in out Value]:
         """
         Compatibility add-in for mapping to indicate that
         mapping behavior is deprecated.
@@ -370,16 +367,16 @@ if sys.version_info < (3, 12):
         1
         """
 
-        def __getitem__(self, name: _KT) -> _VT
+        def __getitem__(self, name: Key) -> Value
 
-        def get(self, name: _KT, default: None = None) -> _VT | None
-        def get(self, name: _KT, default: _VT) -> _VT
-        def get(self, name: _KT, default: _T) -> _VT | _T
+        def get(self, name: Key, default: None = None) -> Value | None
+        def get(self, name: Key, default: Value) -> Value
+        def get[Element](self, name: Key, default: Element) -> Value | Element
 
-        def __iter__(self) -> Iterator[_KT]
+        def __iter__(self) -> Iterator[Key]
         def __contains__(self, *args: object) -> bool
-        def keys(self) -> dict_keys[_KT, _VT]
-        def values(self) -> dict_values[_KT, _VT]
+        def keys(self) -> dict_keys[Key, Value]
+        def values(self) -> dict_values[Key, Value]
 
     @deprecated("Deprecated since Python 3.10; removed in Python 3.12. Use `select` instead.")
     class SelectableGroups(Deprecated[str, EntryPoints], dict[str, EntryPoints]):  # use as dict is deprecated since 3.10

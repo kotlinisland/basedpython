@@ -9,17 +9,16 @@ from typing import Any, Literal, TypeVar
 
 __all__ = ["NodeList", "EmptyNodeList", "StringTypes", "defproperty"]
 
-_T = TypeVar("_T")
 
 StringTypes: (type[str],)
 
-class NodeList(list[_T]):
+class NodeList[in out Element](list[Element]):
     __slots__ = ()
     @property
     def length(self) -> int:
         """The number of nodes in the NodeList."""
 
-    def item(self, index: int) -> _T | None
+    def item(self, index: int) -> Element | None
 
 class EmptyNodeList(tuple[()]):
     __slots__ = ()
@@ -28,7 +27,7 @@ class EmptyNodeList(tuple[()]):
         """The number of nodes in the NodeList."""
 
     def item(self, index: int) -> None
-    def __add__(self, other: Iterable[_T]) -> NodeList[_T]  # type: ignore[override]
-    def __radd__(self, other: Iterable[_T]) -> NodeList[_T]
+    def __add__[Element](self, other: Iterable[Element]) -> NodeList[Element]  # type: ignore[override]
+    def __radd__[Element](self, other: Iterable[Element]) -> NodeList[Element]
 
 def defproperty(klass: type[Any], name: str, doc: str) -> None

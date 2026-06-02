@@ -1,6 +1,17 @@
-//! binary entry: walks the basedpython typeshed and applies every registered
-//! patch. invoked by `scripts/sync_typeshed_by.sh` after reverse-transpile
-//! and before `ruff --fix`
+//! binary entry: walks the basedpython typeshed and rewrites each `.byi`
+//! stub. invoked by `scripts/sync_typeshed_by.sh` after reverse-transpile
+//!
+//! each file is rewritten in two passes:
+//!
+//! 1. the registered semantic [`Patch`]es (e.g. mapping key covariance), which
+//!    operate on the legacy `TypeVar` + `Generic[...]` form
+//! 1. the pep 695 conversion ([`by_typeshed_patch::pep695`]), which turns
+//!    legacy generic classes into pep 695 headers with explicit variance and
+//!    nice names
+//!
+//! the passes run sequentially with a re-parse in between: a patch may rewrite
+//! a typevar reference (covariance) that the conversion then renames, so the
+//! conversion must see the patched source
 //!
 //! usage:
 //!   `by_typeshed_patch` `<typeshed-stdlib-dir>`
@@ -16,7 +27,7 @@ use ruff_python_ast::PySourceType;
 use ruff_python_parser::parse_unchecked_source;
 use walkdir::WalkDir;
 
-use by_typeshed_patch::{Patch, all_patches, apply_edits};
+use by_typeshed_patch::{Patch, all_patches, apply_edits, pep695};
 
 fn main() -> ExitCode {
     match run() {
@@ -64,21 +75,38 @@ fn run() -> Result<()> {
 }
 
 fn apply_patches_to_file(path: &Path, rel: &Path, patches: &[Box<dyn Patch>]) -> Result<bool> {
-    let source = fs::read_to_string(path).with_context(|| format!("{}", path.display()))?;
+    let original = fs::read_to_string(path).with_context(|| format!("{}", path.display()))?;
+
+    // pass 1: registered semantic patches over the legacy form
+    //
     // soft errors retained on `parsed.errors()`; we don't gate on them — the
     // basedpython parser accepts patterns (decorator + modifier chain) that
     // the standalone parser still flags. real parse failures are caught by
     // `cargo nextest run` downstream
-    let parsed = parse_unchecked_source(&source, PySourceType::BasedPythonStub);
-
+    let parsed = parse_unchecked_source(&original, PySourceType::BasedPythonStub);
     let mut edits = Vec::new();
     for patch in patches {
-        edits.extend(patch.rewrite(rel, &parsed, &source));
+        edits.extend(patch.rewrite(rel, &parsed, &original));
     }
-    if edits.is_empty() {
+    let patched = if edits.is_empty() {
+        original.clone()
+    } else {
+        apply_edits(&original, edits)
+    };
+
+    // pass 2: pep 695 conversion over the patched source (re-parsed so it sees
+    // any typevar references the patches rewrote)
+    let reparsed = parse_unchecked_source(&patched, PySourceType::BasedPythonStub);
+    let conversion = pep695::convert_module(&reparsed, &patched);
+    let final_source = if conversion.is_empty() {
+        patched
+    } else {
+        apply_edits(&patched, conversion)
+    };
+
+    if final_source == original {
         return Ok(false);
     }
-    let new_source = apply_edits(&source, edits);
-    fs::write(path, new_source).with_context(|| format!("{}", path.display()))?;
+    fs::write(path, &final_source).with_context(|| format!("{}", path.display()))?;
     Ok(true)
 }

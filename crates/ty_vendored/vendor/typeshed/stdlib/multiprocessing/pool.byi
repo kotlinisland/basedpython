@@ -6,14 +6,12 @@ from typing_extensions import Self
 
 __all__ = ["Pool", "ThreadPool"]
 
-_S = TypeVar("_S")
-_T = TypeVar("_T")
 
-class ApplyResult(Generic[_T]):
+class ApplyResult[in out Element]:
     def __init__(
-        self, pool: Pool, callback: Callable[[_T], object] | None, error_callback: Callable[[BaseException], object] | None
+        self, pool: Pool, callback: Callable[[Element], object] | None, error_callback: Callable[[BaseException], object] | None
     ) -> None
-    def get(self, timeout: float | None = None) -> _T
+    def get(self, timeout: float | None = None) -> Element
     def wait(self, timeout: float | None = None) -> None
     def ready(self) -> bool
     def successful(self) -> bool
@@ -26,23 +24,23 @@ class ApplyResult(Generic[_T]):
 # alias created during issue #17805
 AsyncResult = ApplyResult
 
-class MapResult(ApplyResult[list[_T]]):
+class MapResult[in out Element](ApplyResult[list[Element]]):
     def __init__(
         self,
         pool: Pool,
         chunksize: int,
         length: int,
-        callback: Callable[[list[_T]], object] | None,
+        callback: Callable[[list[Element]], object] | None,
         error_callback: Callable[[BaseException], object] | None,
     ) -> None
 
-class IMapIterator(Generic[_T]):
+class IMapIterator[in out Element]:
     def __init__(self, pool: Pool) -> None
     def __iter__(self) -> Self
-    def next(self, timeout: float | None = None) -> _T
-    def __next__(self, timeout: float | None = None) -> _T
+    def next(self, timeout: float | None = None) -> Element
+    def __next__(self, timeout: float | None = None) -> Element
 
-class IMapUnorderedIterator(IMapIterator[_T])
+class IMapUnorderedIterator[in out Element](IMapIterator[Element])
 
 class Pool:
     """
@@ -58,67 +56,67 @@ class Pool:
         context: Any | None = None,
     ) -> None
     static def Process(ctx: DefaultContext, *args: Any, **kwds: Any) -> Process: ...
-    def apply(self, func: Callable[..., _T], args: Iterable[Any] = (), kwds: Mapping[str, Any] = {}) -> _T:
+    def apply[Element](self, func: Callable[..., Element], args: Iterable[Any] = (), kwds: Mapping[str, Any] = {}) -> Element:
         """
         Equivalent of `func(*args, **kwds)`.
         Pool must be running.
         """
 
-    def apply_async(
+    def apply_async[Element](
         self,
-        func: Callable[..., _T],
+        func: Callable[..., Element],
         args: Iterable[Any] = (),
         kwds: Mapping[str, Any] = {},
-        callback: Callable[[_T], object] | None = None,
+        callback: Callable[[Element], object] | None = None,
         error_callback: Callable[[BaseException], object] | None = None,
-    ) -> AsyncResult[_T]:
+    ) -> AsyncResult[Element]:
         """
         Asynchronous version of `apply()` method.
         """
 
-    def map(self, func: Callable[[_S], _T], iterable: Iterable[_S], chunksize: int | None = None) -> list[_T]:
+    def map[Other, Element](self, func: Callable[[Other], Element], iterable: Iterable[Other], chunksize: int | None = None) -> list[Element]:
         """
         Apply `func` to each element in `iterable`, collecting the results
         in a list that is returned.
         """
 
-    def map_async(
+    def map_async[Other, Element](
         self,
-        func: Callable[[_S], _T],
-        iterable: Iterable[_S],
+        func: Callable[[Other], Element],
+        iterable: Iterable[Other],
         chunksize: int | None = None,
-        callback: Callable[[list[_T]], object] | None = None,
+        callback: Callable[[list[Element]], object] | None = None,
         error_callback: Callable[[BaseException], object] | None = None,
-    ) -> MapResult[_T]:
+    ) -> MapResult[Element]:
         """
         Asynchronous version of `map()` method.
         """
 
-    def imap(self, func: Callable[[_S], _T], iterable: Iterable[_S], chunksize: int | None = 1) -> IMapIterator[_T]:
+    def imap[Other, Element](self, func: Callable[[Other], Element], iterable: Iterable[Other], chunksize: int | None = 1) -> IMapIterator[Element]:
         """
         Equivalent of `map()` -- can be MUCH slower than `Pool.map()`.
         """
 
-    def imap_unordered(self, func: Callable[[_S], _T], iterable: Iterable[_S], chunksize: int | None = 1) -> IMapIterator[_T]:
+    def imap_unordered[Other, Element](self, func: Callable[[Other], Element], iterable: Iterable[Other], chunksize: int | None = 1) -> IMapIterator[Element]:
         """
         Like `imap()` method but ordering of results is arbitrary.
         """
 
-    def starmap(self, func: Callable[..., _T], iterable: Iterable[Iterable[Any]], chunksize: int | None = None) -> list[_T]:
+    def starmap[Element](self, func: Callable[..., Element], iterable: Iterable[Iterable[Any]], chunksize: int | None = None) -> list[Element]:
         """
         Like `map()` method but the elements of the `iterable` are expected to
         be iterables as well and will be unpacked as arguments. Hence
         `func` and (a, b) becomes func(a, b).
         """
 
-    def starmap_async(
+    def starmap_async[Element](
         self,
-        func: Callable[..., _T],
+        func: Callable[..., Element],
         iterable: Iterable[Iterable[Any]],
         chunksize: int | None = None,
-        callback: Callable[[list[_T]], object] | None = None,
+        callback: Callable[[list[Element]], object] | None = None,
         error_callback: Callable[[BaseException], object] | None = None,
-    ) -> AsyncResult[list[_T]]:
+    ) -> AsyncResult[list[Element]]:
         """
         Asynchronous version of `starmap()` method.
         """

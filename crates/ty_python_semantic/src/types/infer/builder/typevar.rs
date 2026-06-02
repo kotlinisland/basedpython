@@ -108,7 +108,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let explicit_variance = variance.map(|v| match v {
             ast::Variance::Covariant => TypeVarVariance::Covariant,
             ast::Variance::Contravariant => TypeVarVariance::Contravariant,
-            ast::Variance::Bivariant => TypeVarVariance::Bivariant,
+            ast::Variance::Invariant => TypeVarVariance::Invariant,
         });
         let kind = if is_parameters_bound {
             TypeVarKind::Pep695ParamSpec

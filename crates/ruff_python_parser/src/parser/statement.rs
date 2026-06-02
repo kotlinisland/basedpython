@@ -4595,7 +4595,7 @@ impl<'src> Parser<'src> {
             let variance = if self.eat(TokenKind::In) {
                 if self.at(TokenKind::Name) && self.src_text(self.current_token_range()) == "out" {
                     self.bump(TokenKind::Name);
-                    Some(Variance::Bivariant)
+                    Some(Variance::Invariant)
                 } else {
                     Some(Variance::Contravariant)
                 }

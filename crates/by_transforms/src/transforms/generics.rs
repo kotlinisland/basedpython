@@ -299,12 +299,10 @@ impl<'src> GenericPolyfill<'src> {
                         Some(ruff_python_ast::Variance::Contravariant) => {
                             extra_args.push("contravariant=True".to_owned());
                         }
-                        Some(ruff_python_ast::Variance::Bivariant) => {
-                            // python's `typing.TypeVar` rejects
-                            // `covariant=True, contravariant=True`. emit no
-                            // variance — runtime treats it as invariant; the
-                            // static checker reads bivariance from the `.by`
-                            // source independently
+                        Some(ruff_python_ast::Variance::Invariant) => {
+                            // `in out` is explicit invariance. legacy
+                            // `TypeVar(...)` with no variance args is already
+                            // invariant, so emit nothing
                         }
                         None => {}
                     }

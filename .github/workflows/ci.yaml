@@ -559,11 +559,14 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: Build Ruff binary
+      - name: Build buff binary
         env:
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_DEV_DEBUG: line-tables-only
-        run: cargo build --bin ruff
+        # basedpython renames the `ruff` binary to `buff`. `--bin=ruff` below is
+        # the py-fuzzer's tool-mode selector (an enum), not a binary name, so it
+        # stays `ruff`
+        run: cargo build --bin buff
       - name: Fuzz
         run: |
           (
@@ -572,7 +575,7 @@ jobs:
             --project=./python/py-fuzzer \
             --locked \
             fuzz \
-            --test-executable=target/debug/ruff \
+            --test-executable=target/debug/buff \
             --bin=ruff \
             0-500
           )
@@ -625,7 +628,9 @@ jobs:
         needs.determine_changes.outputs.linter == 'true' ||
         needs.determine_changes.outputs.formatter == 'true'
       )
-    timeout-minutes: 20
+    # max (6h): the fork runs on slow `ubuntu-latest`, not astral's depot
+    # runners, so the 70-project ecosystem check overruns a tighter budget
+    timeout-minutes: 360
     env:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
@@ -653,9 +658,10 @@ jobs:
           save-if: false
 
       - name: Build baseline version
+        # basedpython renames the `ruff` binary to `buff`
         run: |
-          cargo build --bin ruff
-          mv target/debug/ruff target/debug/ruff-baseline
+          cargo build --bin buff
+          mv target/debug/buff target/debug/buff-baseline
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -663,7 +669,7 @@ jobs:
           clean: false
 
       - name: Build comparison version
-        run: cargo build --bin ruff
+        run: cargo build --bin buff
 
       - name: Install ruff-ecosystem
         run: |
@@ -675,7 +681,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
+          ruff-ecosystem check ./target/debug/buff-baseline ./target/debug/buff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
 
           cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
@@ -688,7 +694,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
+          ruff-ecosystem check ./target/debug/buff-baseline ./target/debug/buff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
 
           cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
@@ -701,7 +707,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
+          ruff-ecosystem format ./target/debug/buff-baseline ./target/debug/buff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
 
           cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
@@ -714,7 +720,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
+          ruff-ecosystem format ./target/debug/buff-baseline ./target/debug/buff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
           cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
@@ -767,17 +773,20 @@ jobs:
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
         run: |
+          # basedpython renames the `ty` binary to `by`. `--bin=ty` passed to
+          # the py-fuzzer below is its tool-mode selector (an enum), not a
+          # binary name, so it stays `ty`
           echo "new commit"
           git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-          cargo build --profile=profiling --bin=ty
-          mv target/profiling/ty ty-new
+          cargo build --profile=profiling --bin=by
+          mv target/profiling/by ty-new
 
           MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
           git checkout -b old_commit "$MERGE_BASE"
           echo "old commit (merge base)"
           git rev-list --format=%s --max-count=1 old_commit
-          cargo build --profile=profiling --bin=ty
-          mv target/profiling/ty ty-old
+          cargo build --profile=profiling --bin=by
+          mv target/profiling/by ty-old
 
           (
             uv run \

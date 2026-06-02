@@ -48,7 +48,8 @@ jobs:
   build-ty:
     name: Build ty
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # max (6h): the fork's slow `ubuntu-latest` runner overruns the depot-tuned budget
+    timeout-minutes: 360
     outputs:
       timestamp: ${{ steps.build.outputs.timestamp }}
       merge-base: ${{ steps.build.outputs.merge-base }}
@@ -81,12 +82,14 @@ jobs:
           echo "PR commit: ${GITHUB_SHA}"
 
           git checkout "${MERGE_BASE}"
+          # basedpython's `ty` package builds a binary named `by`, not `ty`
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ty-base
+          cp target/profiling/by ty-base
 
           git checkout "${GITHUB_SHA}"
+          # basedpython's `ty` package builds a binary named `by`, not `ty`
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ty-pr
+          cp target/profiling/by ty-pr
 
           # Extract project lists and config for the shard jobs
           git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > projects_old.txt
@@ -113,7 +116,8 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    # max (6h): the fork's slow `ubuntu-latest` runner overruns the depot-tuned budget
+    timeout-minutes: 360
     steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -167,7 +171,8 @@ jobs:
     name: Generate diagnostic diff report
     needs: [analyze-shards]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # max (6h): the fork's slow `ubuntu-latest` runner overruns the depot-tuned budget
+    timeout-minutes: 360
     steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0

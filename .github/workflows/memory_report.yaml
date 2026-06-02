@@ -80,15 +80,15 @@ jobs:
 
             echo "new commit"
             git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-            cargo build --bin ty --profile profiling
-            mv target/profiling/ty ty-new
+            cargo build --bin by --profile profiling
+            mv target/profiling/by ty-new
 
             MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
             git checkout -b old_commit "$MERGE_BASE"
             echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit
-            cargo build --bin ty --profile profiling
-            mv target/profiling/ty ty-old
+            cargo build --bin by --profile profiling
+            mv target/profiling/by ty-old
           )
 
           (

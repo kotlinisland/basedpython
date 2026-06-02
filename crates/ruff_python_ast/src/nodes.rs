@@ -371,13 +371,14 @@ impl Deref for InterpolatedStringLiteralElement {
     }
 }
 
-/// variance annotation on a type parameter: `out T`, `in T`, `in out T`
+/// variance annotation on a type parameter: `out T`, `in T`, `in out T`.
+/// basedpython has no bivariant spelling — `in out` is explicit invariance
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Variance {
     Covariant,
     Contravariant,
-    Bivariant,
+    Invariant,
 }
 
 /// Transforms a value prior to formatting it.

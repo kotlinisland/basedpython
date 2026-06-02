@@ -1108,12 +1108,13 @@ class Contravariant[in T]:
 static_assert(not is_subtype_of(Contravariant[B], Contravariant[A]))
 static_assert(is_subtype_of(Contravariant[A], Contravariant[B]))
 
-# `in out T` forces bivariance
-class Bivariant[in out T]:
+# `in out T` is explicit invariance (basedpython has no bivariant spelling); it forces invariance
+# even on an empty body (which would otherwise be inferred bivariant)
+class Invariant[in out T]:
     pass
 
-static_assert(is_subtype_of(Bivariant[B], Bivariant[A]))
-static_assert(is_subtype_of(Bivariant[A], Bivariant[B]))
+static_assert(not is_subtype_of(Invariant[B], Invariant[A]))
+static_assert(not is_subtype_of(Invariant[A], Invariant[B]))
 ```
 
 ### type alias

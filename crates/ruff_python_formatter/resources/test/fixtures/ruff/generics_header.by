@@ -12,3 +12,12 @@ def identity[T](x: T) -> T:
 
 
 class Constrained[T: (int, str)]: ...
+
+
+# variance keywords: `out` covariant, `in` contravariant, `in out` invariant
+class Variant[out Key, in Sent, in out Value]:
+    key: Key
+    value: Value
+
+
+class BoundedVariant[out T: int = bool]: ...

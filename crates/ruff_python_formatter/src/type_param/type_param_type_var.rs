@@ -22,7 +22,7 @@ impl FormatNodeRule<TypeParamTypeVar> for FormatTypeParamTypeVar {
             match variance {
                 Some(Variance::Covariant) => write!(f, [token("out"), space()])?,
                 Some(Variance::Contravariant) => write!(f, [token("in"), space()])?,
-                Some(Variance::Bivariant) => {
+                Some(Variance::Invariant) => {
                     write!(f, [token("in"), space(), token("out"), space()])?;
                 }
                 None => {}

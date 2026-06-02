@@ -16,7 +16,6 @@ from typing import IO, Literal, TypeVar
 from typing_extensions import Self
 from zipfile import ZipFile
 
-_ZF = TypeVar("_ZF", bound=ZipFile)
 
 if sys.version_info >= (3, 12):
     __all__ = ["Path"]
@@ -55,7 +54,7 @@ if sys.version_info >= (3, 12):
         class def make(cls, source: StrPath | IO[bytes]) -> Self
 
         if sys.version_info >= (3, 13):
-            class def inject(cls, zf: _ZF) -> _ZF:
+            class def inject[ZF: ZipFile](cls, zf: ZF) -> ZF:
                 """
                 Given a writable zip file zf, inject directory entries for
                 any directories implied by the presence of children.

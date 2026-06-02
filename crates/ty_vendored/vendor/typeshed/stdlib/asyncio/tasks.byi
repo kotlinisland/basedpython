@@ -69,13 +69,6 @@ else:
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
-_T1 = TypeVar("_T1")
-_T2 = TypeVar("_T2")
-_T3 = TypeVar("_T3")
-_T4 = TypeVar("_T4")
-_T5 = TypeVar("_T5")
-_T6 = TypeVar("_T6")
-_FT = TypeVar("_FT", bound=Future[Any])
 if sys.version_info >= (3, 12):
     _FutureLike: TypeAlias = Future[_T] | Awaitable[_T]
 else:
@@ -89,9 +82,9 @@ ALL_COMPLETED: Final = concurrent.futures.ALL_COMPLETED
 
 if sys.version_info >= (3, 13):
     @type_check_only
-    class _SyncAndAsyncIterator(Iterator[Coroutine[Any, Any, _T]], AsyncIterator[Future[_T]], Protocol[_T])
+    class _SyncAndAsyncIterator[in out Element](Iterator[Coroutine[Any, Any, Element]], AsyncIterator[Future[Element]], Protocol)
 
-    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[_T]:
+    def as_completed[Element](fs: Iterable[_FutureLike[Element]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[Element]:
         """Create an iterator of awaitables or their results in completion order.
 
         Run the supplied awaitables concurrently. The returned object can be
@@ -139,7 +132,7 @@ if sys.version_info >= (3, 13):
         """
 
 else:
-    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> Iterator[Future[_T]]:
+    def as_completed[Element](fs: Iterable[_FutureLike[Element]], *, timeout: float | None = None) -> Iterator[Future[Element]]:
         """Return an iterator whose values are coroutines.
 
         When waiting for the yielded coroutines you'll get the results (or
@@ -158,12 +151,12 @@ else:
         Note: The futures 'f' are not necessarily members of fs.
         """
 
-def ensure_future(coro_or_future: _FT, *, loop: AbstractEventLoop | None = None) -> _FT:  # type: ignore[overload-overlap]
+def ensure_future[FT: Future[Any]](coro_or_future: FT, *, loop: AbstractEventLoop | None = None) -> FT:  # type: ignore[overload-overlap]
     """Wrap a coroutine or an awaitable in a future.
 
     If the argument is a Future, it is returned directly.
     """
-def ensure_future(coro_or_future: Awaitable[_T], *, loop: AbstractEventLoop | None = None) -> Task[_T]
+def ensure_future[Element](coro_or_future: Awaitable[Element], *, loop: AbstractEventLoop | None = None) -> Task[Element]
 
 # `gather()` actually returns a list with length equal to the number
 # of tasks passed; however, Tuple is used similar to the annotation for
@@ -171,7 +164,7 @@ def ensure_future(coro_or_future: Awaitable[_T], *, loop: AbstractEventLoop | No
 # typing PR #1550 for discussion.
 #
 # N.B. Having overlapping overloads is the only way to get acceptable type inference in all edge cases.
-def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: Literal[False] = False) -> Future[(_T1,)]:  # type: ignore[overload-overlap]
+def gather[T1](coro_or_future1: _FutureLike[T1], /, *, return_exceptions: Literal[False] = False) -> Future[(T1,)]:  # type: ignore[overload-overlap]
     """Return a future aggregating results from the given coroutines/futures.
 
     Coroutines will be wrapped in a future and scheduled in the event
@@ -201,100 +194,100 @@ def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: Literal[F
     after catching an exception (raised by one of the awaitables) from
     gather won't cancel any other awaitables.
     """
-def gather(  # type: ignore[overload-overlap]
-    coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: Literal[False] = False
-) -> Future[(_T1, _T2)]
-def gather(  # type: ignore[overload-overlap]
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
+def gather[T1, T2](  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[T1], coro_or_future2: _FutureLike[T2], /, *, return_exceptions: Literal[False] = False
+) -> Future[(T1, T2)]
+def gather[T1, T2, T3](  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
     /,
     *,
     return_exceptions: Literal[False] = False,
-) -> Future[(_T1, _T2, _T3)]
-def gather(  # type: ignore[overload-overlap]
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
-    coro_or_future4: _FutureLike[_T4],
+) -> Future[(T1, T2, T3)]
+def gather[T1, T2, T3, T4](  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
+    coro_or_future4: _FutureLike[T4],
     /,
     *,
     return_exceptions: Literal[False] = False,
-) -> Future[(_T1, _T2, _T3, _T4)]
-def gather(  # type: ignore[overload-overlap]
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
-    coro_or_future4: _FutureLike[_T4],
-    coro_or_future5: _FutureLike[_T5],
+) -> Future[(T1, T2, T3, T4)]
+def gather[T1, T2, T3, T4, T5](  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
+    coro_or_future4: _FutureLike[T4],
+    coro_or_future5: _FutureLike[T5],
     /,
     *,
     return_exceptions: Literal[False] = False,
-) -> Future[(_T1, _T2, _T3, _T4, _T5)]
-def gather(  # type: ignore[overload-overlap]
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
-    coro_or_future4: _FutureLike[_T4],
-    coro_or_future5: _FutureLike[_T5],
-    coro_or_future6: _FutureLike[_T6],
+) -> Future[(T1, T2, T3, T4, T5)]
+def gather[T1, T2, T3, T4, T5, T6](  # type: ignore[overload-overlap]
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
+    coro_or_future4: _FutureLike[T4],
+    coro_or_future5: _FutureLike[T5],
+    coro_or_future6: _FutureLike[T6],
     /,
     *,
     return_exceptions: Literal[False] = False,
-) -> Future[(_T1, _T2, _T3, _T4, _T5, _T6)]
-def gather(*coros_or_futures: _FutureLike[_T], return_exceptions: Literal[False] = False) -> Future[list[_T]]  # type: ignore[overload-overlap]
-def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: bool) -> Future[(_T1 | BaseException,)]
-def gather(
-    coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: bool
-) -> Future[(_T1 | BaseException, _T2 | BaseException)]
-def gather(
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
+) -> Future[(T1, T2, T3, T4, T5, T6)]
+def gather[Element](*coros_or_futures: _FutureLike[Element], return_exceptions: Literal[False] = False) -> Future[list[Element]]  # type: ignore[overload-overlap]
+def gather[T1](coro_or_future1: _FutureLike[T1], /, *, return_exceptions: bool) -> Future[(T1 | BaseException,)]
+def gather[T1, T2](
+    coro_or_future1: _FutureLike[T1], coro_or_future2: _FutureLike[T2], /, *, return_exceptions: bool
+) -> Future[(T1 | BaseException, T2 | BaseException)]
+def gather[T1, T2, T3](
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
     /,
     *,
     return_exceptions: bool,
-) -> Future[(_T1 | BaseException, _T2 | BaseException, _T3 | BaseException)]
-def gather(
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
-    coro_or_future4: _FutureLike[_T4],
+) -> Future[(T1 | BaseException, T2 | BaseException, T3 | BaseException)]
+def gather[T1, T2, T3, T4](
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
+    coro_or_future4: _FutureLike[T4],
     /,
     *,
     return_exceptions: bool,
-) -> Future[(_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException)]
-def gather(
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
-    coro_or_future4: _FutureLike[_T4],
-    coro_or_future5: _FutureLike[_T5],
+) -> Future[(T1 | BaseException, T2 | BaseException, T3 | BaseException, T4 | BaseException)]
+def gather[T1, T2, T3, T4, T5](
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
+    coro_or_future4: _FutureLike[T4],
+    coro_or_future5: _FutureLike[T5],
     /,
     *,
     return_exceptions: bool,
-) -> Future[(_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException, _T5 | BaseException)]
-def gather(
-    coro_or_future1: _FutureLike[_T1],
-    coro_or_future2: _FutureLike[_T2],
-    coro_or_future3: _FutureLike[_T3],
-    coro_or_future4: _FutureLike[_T4],
-    coro_or_future5: _FutureLike[_T5],
-    coro_or_future6: _FutureLike[_T6],
+) -> Future[(T1 | BaseException, T2 | BaseException, T3 | BaseException, T4 | BaseException, T5 | BaseException)]
+def gather[T1, T2, T3, T4, T5, T6](
+    coro_or_future1: _FutureLike[T1],
+    coro_or_future2: _FutureLike[T2],
+    coro_or_future3: _FutureLike[T3],
+    coro_or_future4: _FutureLike[T4],
+    coro_or_future5: _FutureLike[T5],
+    coro_or_future6: _FutureLike[T6],
     /,
     *,
     return_exceptions: bool,
-) -> Future[(_T1 | BaseException, _T2 | BaseException, _T3 | BaseException, _T4 | BaseException, _T5 | BaseException, _T6 | BaseException)]
-def gather(*coros_or_futures: _FutureLike[_T], return_exceptions: bool) -> Future[list[_T | BaseException]]
+) -> Future[(T1 | BaseException, T2 | BaseException, T3 | BaseException, T4 | BaseException, T5 | BaseException, T6 | BaseException)]
+def gather[Element](*coros_or_futures: _FutureLike[Element], return_exceptions: bool) -> Future[list[Element | BaseException]]
 
 # unlike some asyncio apis, This does strict runtime checking of actually being a coroutine, not of any future-like.
-def run_coroutine_threadsafe(coro: Coroutine[Any, Any, _T], loop: AbstractEventLoop) -> concurrent.futures.Future[_T]:
+def run_coroutine_threadsafe[Element](coro: Coroutine[Any, Any, Element], loop: AbstractEventLoop) -> concurrent.futures.Future[Element]:
     """Submit a coroutine object to a given event loop.
 
     Return a concurrent.futures.Future to access the result.
     """
 
-def shield(arg: _FutureLike[_T]) -> Future[_T]:
+def shield[Element](arg: _FutureLike[Element]) -> Future[Element]:
     """Wait for a future, shielding it from cancellation.
 
     The statement
@@ -330,9 +323,9 @@ def shield(arg: _FutureLike[_T]) -> Future[_T]:
 
 async def sleep(delay: float) -> None:
     """Coroutine that completes after a given time (in seconds)."""
-async def sleep(delay: float, result: _T) -> _T
+async def sleep[Element](delay: float, result: Element) -> Element
 
-async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
+async def wait_for[Element](fut: _FutureLike[Element], timeout: float | None) -> Element:
     """Wait for the single Future or coroutine to complete, with timeout.
 
     Coroutine will be wrapped in Task.
@@ -350,9 +343,9 @@ async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
     """
 
 if sys.version_info >= (3, 11):
-    async def wait(
-        fs: Iterable[_FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> (set[_FT], set[_FT]):
+    async def wait[FT: Future[Any]](
+        fs: Iterable[FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
+    ) -> (set[FT], set[FT]):
         """Wait for the Futures or Tasks given by fs to complete.
 
         The fs iterable must not be empty.
@@ -368,9 +361,9 @@ if sys.version_info >= (3, 11):
         """
 
 else:
-    async def wait(  # type: ignore[overload-overlap]
-        fs: Iterable[_FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> (set[_FT], set[_FT]):
+    async def wait[FT: Future[Any]](  # type: ignore[overload-overlap]
+        fs: Iterable[FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
+    ) -> (set[FT], set[FT]):
         """Wait for the Futures and coroutines given by fs to complete.
 
         The fs iterable must not be empty.
@@ -386,9 +379,9 @@ else:
         Note: This does not raise TimeoutError! Futures that aren't done
         when the timeout occurs are returned in the second set.
         """
-    async def wait(
-        fs: Iterable[Awaitable[_T]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> (set[Task[_T]], set[Task[_T]])
+    async def wait[Element](
+        fs: Iterable[Awaitable[Element]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
+    ) -> (set[Task[Element]], set[Task[Element]])
 
 if sys.version_info >= (3, 12):
     _TaskCompatibleCoro: TypeAlias = Coroutine[Any, Any, _T_co]
@@ -399,23 +392,23 @@ def all_tasks(loop: AbstractEventLoop | None = None) -> set[Task[Any]]:
     """Return a set of all tasks for the loop."""
 
 if sys.version_info >= (3, 14):
-    def create_task(
-        coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None, eager_start: bool | None = None
-    ) -> Task[_T]:
+    def create_task[Element](
+        coro: _CoroutineLike[Element], *, name: str | None = None, context: Context | None = None, eager_start: bool | None = None
+    ) -> Task[Element]:
         """Schedule the execution of a coroutine object in a spawn task.
 
         Return a Task object.
         """
 
 elif sys.version_info >= (3, 11):
-    def create_task(coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
+    def create_task[Element](coro: _CoroutineLike[Element], *, name: str | None = None, context: Context | None = None) -> Task[Element]:
         """Schedule the execution of a coroutine object in a spawn task.
 
         Return a Task object.
         """
 
 else:
-    def create_task(coro: _CoroutineLike[_T], *, name: str | None = None) -> Task[_T]:
+    def create_task[Element](coro: _CoroutineLike[Element], *, name: str | None = None) -> Task[Element]:
         """Schedule the execution of a coroutine object in a spawn task.
 
         Return a Task object.
@@ -428,29 +421,28 @@ else:
         """Return a currently executed task."""
 
 if sys.version_info >= (3, 14):
-    def eager_task_factory(
+    def eager_task_factory[Element](
         loop: AbstractEventLoop | None,
-        coro: _TaskCompatibleCoro[_T_co],
+        coro: _TaskCompatibleCoro[Element],
         *,
         name: str | None = None,
         context: Context | None = None,
         eager_start: bool = True,
-    ) -> Task[_T_co]
+    ) -> Task[Element]
 
 elif sys.version_info >= (3, 12):
-    def eager_task_factory(
+    def eager_task_factory[Element](
         loop: AbstractEventLoop | None,
-        coro: _TaskCompatibleCoro[_T_co],
+        coro: _TaskCompatibleCoro[Element],
         *,
         name: str | None = None,
         context: Context | None = None,
-    ) -> Task[_T_co]
+    ) -> Task[Element]
 
 if sys.version_info >= (3, 12):
-    _TaskT_co = TypeVar("_TaskT_co", bound=Task[Any], covariant=True)
 
     @type_check_only
-    class _CustomTaskConstructor(Protocol[_TaskT_co]):
+    class _CustomTaskConstructor[out TaskT: Task[Any]](Protocol):
         def __call__(
             self,
             coro: _TaskCompatibleCoro[Any],
@@ -460,10 +452,10 @@ if sys.version_info >= (3, 12):
             name: str | None,
             context: Context | None,
             eager_start: bool,
-        ) -> _TaskT_co
+        ) -> TaskT
 
     @type_check_only
-    class _EagerTaskFactoryType(Protocol[_TaskT_co]):
+    class _EagerTaskFactoryType[out TaskT: Task[Any]](Protocol):
         def __call__(
             self,
             loop: AbstractEventLoop,
@@ -471,9 +463,9 @@ if sys.version_info >= (3, 12):
             *,
             name: str | None = None,
             context: Context | None = None,
-        ) -> _TaskT_co
+        ) -> TaskT
 
-    def create_eager_task_factory(custom_task_constructor: _CustomTaskConstructor[_TaskT_co]) -> _EagerTaskFactoryType[_TaskT_co]:
+    def create_eager_task_factory[TaskT: Task[Any]](custom_task_constructor: _CustomTaskConstructor[TaskT]) -> _EagerTaskFactoryType[TaskT]:
         """Create a function suitable for use as a task factory on an event-loop.
 
         Example usage:

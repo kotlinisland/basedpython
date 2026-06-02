@@ -33,7 +33,6 @@ from typing import IO, ClassVar, Literal, TypeAlias, TypeVar
 command_re: Pattern[str]
 
 _OptionsList: TypeAlias = list[tuple[str, str | None, str, int] | tuple[str, str | None, str]]
-_CommandT = TypeVar("_CommandT", bound=Command)
 
 class DistributionMetadata:
     """Dummy class to hold the distribution meta-data: name, version,
@@ -335,7 +334,7 @@ class Distribution:
     def reinitialize_command(self, command: Literal["sdist"], reinit_subcommands: bool = False) -> sdist
     def reinitialize_command(self, command: Literal["upload"], reinit_subcommands: bool = False) -> upload
     def reinitialize_command(self, command: str, reinit_subcommands: bool = False) -> Command
-    def reinitialize_command(self, command: _CommandT, reinit_subcommands: bool = False) -> _CommandT
+    def reinitialize_command[CommandT: Command](self, command: CommandT, reinit_subcommands: bool = False) -> CommandT
 
     def announce(self, msg, level: int = 2) -> None
     def run_commands(self) -> None:

@@ -1114,16 +1114,16 @@ class Bad:
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `__eq__`
-   --> src/mdtest_snippet.py:3:9
-    |
-  3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
-    |
-   ::: stdlib/builtins.byi:111:9
-    |
-111 |     def __eq__(self, value: object, /) -> bool
-    |         -------------------------------------- `object.__eq__` defined here
-    |
+  --> src/mdtest_snippet.py:3:9
+   |
+ 3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
+   |
+  ::: stdlib/builtins.byi:92:9
+   |
+92 |     def __eq__(self, value: object, /) -> bool
+   |         -------------------------------------- `object.__eq__` defined here
+   |
 info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`
 info: This violates the Liskov Substitution Principle
 help: It is recommended for `__eq__` to work with arbitrary objects, for example:

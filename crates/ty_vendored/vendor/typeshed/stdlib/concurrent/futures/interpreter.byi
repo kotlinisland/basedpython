@@ -7,27 +7,24 @@ from typing import Any, Literal, ParamSpec, Protocol, TypeAlias, type_check_only
 from typing_extensions import Self, TypeVar, TypeVarTuple, Unpack
 
 _Task: TypeAlias = tuple[bytes, Literal["function", "script"]]
-_Ts = TypeVarTuple("_Ts")
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
 
 @type_check_only
 class _TaskFunc(Protocol):
-    def __call__(self, fn: Callable[_P, _R], *args: _P.args, **kwargs: _P.kwargs) -> (bytes, Literal["function"])
+    def __call__[**P, R](self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> (bytes, Literal["function"])
     def __call__(self, fn: str) -> (bytes, Literal["script"])
 
 if sys.version_info >= (3, 14):
     from concurrent.futures.thread import BrokenThreadPool, WorkerContext as ThreadWorkerContext
     from concurrent.interpreters import Interpreter, Queue
 
-    def do_call(results: Queue, func: Callable[..., _R], args: (*: Any), kwargs: dict[str, Any]) -> _R
+    def do_call[R](results: Queue, func: Callable[..., R], args: (*: Any), kwargs: dict[str, Any]) -> R
 
     class WorkerContext(ThreadWorkerContext):
         interp: Interpreter | None
         results: Queue | None
 
-        class def prepare(
-            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: (Unpack[_Ts],)
+        class def prepare[*Ts](
+            cls, initializer: Callable[[Unpack[Ts]], object], initargs: (Unpack[Ts],)
         ) -> (Callable[[], Self], _TaskFunc)
         class def prepare(cls, initializer: Callable[[], object], initargs: tuple[()]) -> (Callable[[], Self], _TaskFunc)
 
@@ -46,8 +43,8 @@ if sys.version_info >= (3, 14):
         class def prepare_context(
             cls, initializer: Callable[[], object], initargs: tuple[()]
         ) -> (Callable[[], WorkerContext], _TaskFunc)
-        class def prepare_context(
-            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: (Unpack[_Ts],)
+        class def prepare_context[*Ts](
+            cls, initializer: Callable[[Unpack[Ts]], object], initargs: (Unpack[Ts],)
         ) -> (Callable[[], WorkerContext], _TaskFunc)
 
         def __init__(
@@ -67,18 +64,18 @@ if sys.version_info >= (3, 14):
                     each worker interpreter.
                 initargs: A tuple of arguments to pass to the initializer.
             """
-        def __init__(
+        def __init__[*Ts](
             self,
             max_workers: int | None = None,
             thread_name_prefix: str = "",
             *,
-            initializer: Callable[[Unpack[_Ts]], object],
-            initargs: (Unpack[_Ts],),
+            initializer: Callable[[Unpack[Ts]], object],
+            initargs: (Unpack[Ts],),
         ) -> None
-        def __init__(
+        def __init__[*Ts](
             self,
             max_workers: int | None,
             thread_name_prefix: str,
-            initializer: Callable[[Unpack[_Ts]], object],
-            initargs: (Unpack[_Ts],),
+            initializer: Callable[[Unpack[Ts]], object],
+            initargs: (Unpack[Ts],),
         ) -> None

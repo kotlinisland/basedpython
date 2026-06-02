@@ -140,19 +140,16 @@ if sys.version_info >= (3, 13):
 
 # Most functions in this module accept homogeneous collections of one of these types
 _Number: TypeAlias = float | Decimal | Fraction
-_NumberT = TypeVar("_NumberT", float, Decimal, Fraction)
 
 # Used in mode, multimode
-_HashableT = TypeVar("_HashableT", bound=Hashable)
 
 # Used in NormalDist.samples and kde_random
 _Seed: TypeAlias = int | float | str | bytes | bytearray  # noqa: Y041
 
 # Used in linear_regression
-_T_co = TypeVar("_T_co", covariant=True)
 
 @type_check_only
-class _SizedIterable(Iterable[_T_co], Sized, Protocol[_T_co])
+class _SizedIterable[out Element](Iterable[Element], Sized, Protocol)
 
 class StatisticsError(ValueError)
 
@@ -195,7 +192,7 @@ def geometric_mean(data: Iterable[SupportsFloat]) -> float:
 
     """
 
-def mean(data: Iterable[_NumberT]) -> _NumberT:
+def mean[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT]) -> NumberT:
     """Return the sample arithmetic mean of data.
 
     >>> mean([1, 2, 3, 4, 4])
@@ -213,7 +210,7 @@ def mean(data: Iterable[_NumberT]) -> _NumberT:
 
     """
 
-def harmonic_mean(data: Iterable[_NumberT], weights: Iterable[_Number] | None = None) -> _NumberT:
+def harmonic_mean[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], weights: Iterable[_Number] | None = None) -> NumberT:
     """Return the harmonic mean of data.
 
     The harmonic mean is the reciprocal of the arithmetic mean of the
@@ -238,7 +235,7 @@ def harmonic_mean(data: Iterable[_NumberT], weights: Iterable[_Number] | None = 
 
     """
 
-def median(data: Iterable[_NumberT]) -> _NumberT:
+def median[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT]) -> NumberT:
     """Return the median (middle value) of numeric data.
 
     When the number of data points is odd, return the middle data point.
@@ -324,7 +321,7 @@ if sys.version_info >= (3, 11):
         """
 
 else:
-    def median_grouped(data: Iterable[_NumberT], interval: _NumberT | float = 1) -> _NumberT | float:
+    def median_grouped[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], interval: NumberT | float = 1) -> NumberT | float:
         """Return the 50th percentile (median) of grouped continuous data.
 
         >>> median_grouped([1, 2, 2, 3, 4, 4, 4, 4, 4, 5])
@@ -351,7 +348,7 @@ else:
         ``interval`` apart.
         """
 
-def mode(data: Iterable[_HashableT]) -> _HashableT:
+def mode[HashableT: Hashable](data: Iterable[HashableT]) -> HashableT:
     """Return the most common data point from discrete or nominal data.
 
     ``mode`` assumes discrete data, and returns a single value. This is the
@@ -375,7 +372,7 @@ def mode(data: Iterable[_HashableT]) -> _HashableT:
 
     """
 
-def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
+def multimode[HashableT: Hashable](data: Iterable[HashableT]) -> list[HashableT]:
     """Return a list of the most frequently occurring values.
 
     Will return more than one result if there are multiple modes
@@ -390,7 +387,7 @@ def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
 
     """
 
-def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
+def pstdev[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], mu: NumberT | None = None) -> NumberT:
     """Return the square root of the population variance.
 
     See ``pvariance`` for arguments and other details.
@@ -400,7 +397,7 @@ def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
 
     """
 
-def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
+def pvariance[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], mu: NumberT | None = None) -> NumberT:
     """Return the population variance of ``data``.
 
     data should be a sequence or iterable of Real-valued numbers, with at least one
@@ -436,7 +433,7 @@ def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
 
     """
 
-def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusive", "exclusive"] = "exclusive") -> list[_NumberT]:
+def quantiles[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], *, n: int = 4, method: Literal["inclusive", "exclusive"] = "exclusive") -> list[NumberT]:
     """Divide *data* into *n* continuous intervals with equal probability.
 
     Returns a list of (n - 1) cut points separating the intervals.
@@ -454,7 +451,7 @@ def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusiv
 
     """
 
-def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
+def stdev[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], xbar: NumberT | None = None) -> NumberT:
     """Return the square root of the sample variance.
 
     See ``variance`` for arguments and other details.
@@ -464,7 +461,7 @@ def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
 
     """
 
-def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
+def variance[NumberT: constraints (float, Decimal, Fraction)](data: Iterable[NumberT], xbar: NumberT | None = None) -> NumberT:
     """Return the sample variance of data.
 
     data should be an iterable of Real-valued numbers, with at least two

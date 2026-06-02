@@ -25,7 +25,6 @@ from types import GenericAlias, TracebackType
 from typing import IO, Any, BinaryIO, ClassVar, Literal, TypeVar
 from typing_extensions import Never, Self, deprecated
 
-_PathT = TypeVar("_PathT", bound=PurePath)
 
 __all__ = ["PurePath", "PurePosixPath", "PureWindowsPath", "Path", "PosixPath", "WindowsPath"]
 
@@ -462,25 +461,25 @@ class Path(PurePath):
             of this path.
             """
 
-        def move_into(self, target_dir: _PathT) -> _PathT:  # type: ignore[overload-overlap]
+        def move_into[PathT: PurePath](self, target_dir: PathT) -> PathT:  # type: ignore[overload-overlap]
             """
             Move this file or directory tree into the given existing directory.
             """
         def move_into(self, target_dir: StrPath) -> Self  # type: ignore[overload-overlap]
 
-        def move(self, target: _PathT) -> _PathT:  # type: ignore[overload-overlap]
+        def move[PathT: PurePath](self, target: PathT) -> PathT:  # type: ignore[overload-overlap]
             """
             Recursively move this file or directory tree to the given destination.
             """
         def move(self, target: StrPath) -> Self  # type: ignore[overload-overlap]
 
-        def copy_into(self, target_dir: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT:  # type: ignore[overload-overlap]
+        def copy_into[PathT: PurePath](self, target_dir: PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> PathT:  # type: ignore[overload-overlap]
             """
             Copy this file or directory tree into the given existing directory.
             """
         def copy_into(self, target_dir: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self  # type: ignore[overload-overlap]
 
-        def copy(self, target: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT:  # type: ignore[overload-overlap]
+        def copy[PathT: PurePath](self, target: PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> PathT:  # type: ignore[overload-overlap]
             """
             Recursively copy this file or directory tree to the given destination.
             """

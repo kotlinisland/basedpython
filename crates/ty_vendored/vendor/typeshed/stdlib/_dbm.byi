@@ -5,7 +5,6 @@ from typing import Final, TypeAlias, TypeVar, final, type_check_only
 from typing_extensions import Self
 
 if sys.platform != "win32":
-    _T = TypeVar("_T")
     _KeyType: TypeAlias = str | ReadOnlyBuffer
     _ValueType: TypeAlias = str | ReadOnlyBuffer
 
@@ -30,7 +29,7 @@ if sys.platform != "win32":
         ) -> None
 
         def get(self, k: _KeyType, /) -> bytes | None
-        def get(self, k: _KeyType, default: _T, /) -> bytes | _T
+        def get[Element](self, k: _KeyType, default: Element, /) -> bytes | Element
 
         def keys(self) -> list[bytes]
         def setdefault(self, k: _KeyType, default: _ValueType = b"", /) -> bytes

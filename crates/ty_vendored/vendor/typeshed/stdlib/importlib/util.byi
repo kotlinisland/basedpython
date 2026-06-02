@@ -18,14 +18,13 @@ from types import TracebackType
 from typing import Literal, ParamSpec
 from typing_extensions import Self, deprecated
 
-_P = ParamSpec("_P")
 
 if sys.version_info < (3, 12):
     @deprecated(
         "Deprecated since Python 3.4; removed in Python 3.12. "
         "`__name__`, `__package__` and `__loader__` are now set automatically."
     )
-    def module_for_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
+    def module_for_loader[**P](fxn: Callable[P, types.ModuleType]) -> Callable[P, types.ModuleType]:
         """Decorator to handle selecting the proper module for loaders.
 
         The decorated function is passed the module to use instead of the module
@@ -48,7 +47,7 @@ if sys.version_info < (3, 12):
         "Deprecated since Python 3.4; removed in Python 3.12. "
         "`__name__`, `__package__` and `__loader__` are now set automatically."
     )
-    def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
+    def set_loader[**P](fxn: Callable[P, types.ModuleType]) -> Callable[P, types.ModuleType]:
         """Set __loader__ on the returned module.
 
         This function is deprecated.
@@ -59,7 +58,7 @@ if sys.version_info < (3, 12):
         "Deprecated since Python 3.4; removed in Python 3.12. "
         "`__name__`, `__package__` and `__loader__` are now set automatically."
     )
-    def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
+    def set_package[**P](fxn: Callable[P, types.ModuleType]) -> Callable[P, types.ModuleType]:
         """Set __package__ on the returned module.
 
         This function is deprecated.

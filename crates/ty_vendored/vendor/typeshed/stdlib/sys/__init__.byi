@@ -80,7 +80,6 @@ from types import FrameType, ModuleType, SimpleNamespace, TracebackType
 from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeAlias, TypeVar, final, type_check_only
 from typing_extensions import LiteralString, deprecated
 
-_T = TypeVar("_T")
 _LazyImportMode: TypeAlias = Literal["normal", "all", "none"]
 _LazyImportFilter: TypeAlias = Callable[[str, str, tuple[str, ...] | None], bool]
 
@@ -582,7 +581,7 @@ version_info: _version_info
 Version information as a named tuple.
 """
 
-def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
+def call_tracing[Element](func: Callable[..., Element], args: Any, /) -> Element:
     """Call func(*args), while tracing is enabled.
 
     The tracing state is saved, and restored afterwards.  This is intended

@@ -352,8 +352,6 @@ __all__ = ["run", "pm", "Pdb", "runeval", "runctx", "runcall", "set_trace", "pos
 if sys.version_info >= (3, 14):
     __all__ += ["set_default_backend", "get_default_backend"]
 
-_T = TypeVar("_T")
-_P = ParamSpec("_P")
 _Mode: TypeAlias = Literal["inline", "cli"]
 
 line_prefix: Final[str]  # undocumented
@@ -390,7 +388,7 @@ def runeval(  # matches `builtins.eval`
     Otherwise this function is similar to run().
     """
 
-def runcall(func: Callable[_P, _T], *args: _P.args, **kwds: _P.kwargs) -> _T | None:
+def runcall[**P, Element](func: Callable[P, Element], *args: P.args, **kwds: P.kwargs) -> Element | None:
     """Call the function (a function or method object, not a string)
     with the given arguments.
 

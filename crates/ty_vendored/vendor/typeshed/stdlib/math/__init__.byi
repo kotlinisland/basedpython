@@ -7,8 +7,6 @@ from _typeshed import SupportsMul, SupportsRMul
 from collections.abc import Iterable
 from typing import Any, Final, Literal, Protocol, SupportsFloat, SupportsIndex, TypeAlias, TypeVar, type_check_only
 
-_T = TypeVar("_T")
-_T_co = TypeVar("_T_co", covariant=True)
 
 _SupportsFloatOrIndex: TypeAlias = SupportsFloat | SupportsIndex
 
@@ -56,10 +54,10 @@ if sys.version_info >= (3, 11):
         """Return the cube root of x."""
 
 @type_check_only
-class _SupportsCeil(Protocol[_T_co]):
-    def __ceil__(self) -> _T_co
+class _SupportsCeil[out Element](Protocol):
+    def __ceil__(self) -> Element
 
-def ceil(x: _SupportsCeil[_T], /) -> _T:
+def ceil[Element](x: _SupportsCeil[Element], /) -> Element:
     """Return the ceiling of x as an Integral.
 
     This is the smallest integer >= x.
@@ -132,10 +130,10 @@ def factorial(x: SupportsIndex, /) -> int:
     """Find n!."""
 
 @type_check_only
-class _SupportsFloor(Protocol[_T_co]):
-    def __floor__(self) -> _T_co
+class _SupportsFloor[out Element](Protocol):
+    def __floor__(self) -> Element
 
-def floor(x: _SupportsFloor[_T], /) -> _T:
+def floor[Element](x: _SupportsFloor[Element], /) -> Element:
     """Return the floor of x as an Integral.
 
     This is the largest integer <= x.
@@ -299,13 +297,10 @@ _PositiveInteger: TypeAlias = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
 _NegativeInteger: TypeAlias = Literal[-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20]
 _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
 
-_MultiplicableT1 = TypeVar("_MultiplicableT1", bound=SupportsMul[Any, Any])
-_MultiplicableT2 = TypeVar("_MultiplicableT2", bound=SupportsMul[Any, Any])
 
 @type_check_only
 class _SupportsProdWithNoDefaultGiven(SupportsMul[Any, Any], SupportsRMul[int, Any], Protocol)
 
-_SupportsProdNoDefaultT = TypeVar("_SupportsProdNoDefaultT", bound=_SupportsProdWithNoDefaultGiven)
 
 # This stub is based on the type stub for `builtins.sum`.
 # Like `builtins.sum`, it cannot be precisely represented in a type stub
@@ -321,8 +316,8 @@ def prod(iterable: Iterable[bool | _LiteralInteger], /, *, start: int = 1) -> in
     intended specifically for use with numeric values and may reject
     non-numeric types.
     """
-def prod(iterable: Iterable[_SupportsProdNoDefaultT], /) -> _SupportsProdNoDefaultT | Literal[1]
-def prod(iterable: Iterable[_MultiplicableT1], /, *, start: _MultiplicableT2) -> _MultiplicableT1 | _MultiplicableT2
+def prod[SupportsProdNoDefaultT: _SupportsProdWithNoDefaultGiven](iterable: Iterable[SupportsProdNoDefaultT], /) -> SupportsProdNoDefaultT | Literal[1]
+def prod[MultiplicableT1: SupportsMul[Any, Any], MultiplicableT2: SupportsMul[Any, Any]](iterable: Iterable[MultiplicableT1], /, *, start: MultiplicableT2) -> MultiplicableT1 | MultiplicableT2
 
 def radians(x: _SupportsFloatOrIndex, /) -> float:
     """Convert angle x from degrees to radians."""
@@ -367,10 +362,10 @@ def tanh(x: _SupportsFloatOrIndex, /) -> float:
 
 # Is different from `_typeshed.SupportsTrunc`, which is not generic
 @type_check_only
-class _SupportsTrunc(Protocol[_T_co]):
-    def __trunc__(self) -> _T_co
+class _SupportsTrunc[out Element](Protocol):
+    def __trunc__(self) -> Element
 
-def trunc(x: _SupportsTrunc[_T], /) -> _T:
+def trunc[Element](x: _SupportsTrunc[Element], /) -> Element:
     """Truncates the Real x to the nearest Integral toward 0.
 
     Uses the __trunc__ magic method.

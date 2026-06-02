@@ -867,20 +867,19 @@ class LogRecord:
     # Allows setting contextual information on LogRecord objects as per the docs, see #7833
     def __setattr__(self, name: str, value: Any, /) -> None
 
-_L = TypeVar("_L", bound=Logger | LoggerAdapter[Any])
 
-class LoggerAdapter(Generic[_L]):
+class LoggerAdapter[in out L: Logger | LoggerAdapter[Any]]:
     """
     An adapter for loggers which makes it easier to specify contextual
     information in logging output.
     """
 
-    logger: _L
+    logger: L
     manager: Manager  # undocumented
     extra: Mapping[str, object] | None
 
     if sys.version_info >= (3, 13):
-        def __init__(self, logger: _L, extra: Mapping[str, object] | None = None, merge_extra: bool = False) -> None:
+        def __init__(self, logger: L, extra: Mapping[str, object] | None = None, merge_extra: bool = False) -> None:
             """
             Initialize the adapter with a logger and an optional dict-like object
             which provides contextual information. This constructor signature
@@ -902,7 +901,7 @@ class LoggerAdapter(Generic[_L]):
                The *merge_extra* argument was added.
             """
     else:
-        def __init__(self, logger: _L, extra: Mapping[str, object] | None = None) -> None:
+        def __init__(self, logger: L, extra: Mapping[str, object] | None = None) -> None:
             """
             Initialize the adapter with a logger and a dict-like object which
             provides contextual information. This constructor signature allows
@@ -1397,16 +1396,15 @@ def setLogRecordFactory(factory: Callable[..., LogRecord]) -> None:
 
 lastResort: Handler | None
 
-_StreamT = TypeVar("_StreamT", bound=SupportsWrite[str])
 
-class StreamHandler(Handler, Generic[_StreamT]):
+class StreamHandler[in out StreamT: SupportsWrite[str]](Handler):
     """
     A handler class which writes logging records, appropriately formatted,
     to a stream. Note that this class does not close the stream, as
     sys.stdout or sys.stderr may be used.
     """
 
-    stream: _StreamT  # undocumented
+    stream: StreamT  # undocumented
     terminator: str
 
     def __init__(self: StreamHandler[TextIO], stream: None = None) -> None:
@@ -1415,9 +1413,9 @@ class StreamHandler(Handler, Generic[_StreamT]):
 
         If stream is not specified, sys.stderr is used.
         """
-    def __init__(self: StreamHandler[_StreamT], stream: _StreamT) -> None  # pyright: ignore[reportInvalidTypeVarUse]  #11780
+    def __init__(self: StreamHandler[StreamT], stream: StreamT) -> None  # pyright: ignore[reportInvalidTypeVarUse]  #11780
 
-    def setStream(self, stream: _StreamT) -> _StreamT | None:
+    def setStream(self, stream: StreamT) -> StreamT | None:
         """
         Sets the StreamHandler's stream to the specified value,
         if it is different.

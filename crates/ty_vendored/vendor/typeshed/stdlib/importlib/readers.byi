@@ -29,9 +29,8 @@ if sys.version_info >= (3, 11):
     __all__ = ["FileReader", "ZipReader", "MultiplexedPath", "NamespaceReader"]
 
 if sys.version_info < (3, 11):
-    _T = TypeVar("_T")
 
-    def remove_duplicates(items: Iterable[_T]) -> Iterator[_T]
+    def remove_duplicates[Element](items: Iterable[Element]) -> Iterator[Element]
 
 class FileReader(abc.TraversableResources):
     path: pathlib.Path

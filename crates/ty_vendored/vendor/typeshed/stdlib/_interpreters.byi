@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any, Final, Literal, SupportsIndex, TypeAlias, TypeVar
 from typing_extensions import disjoint_base
 
-_R = TypeVar("_R")
 
 _Configs: TypeAlias = Literal["default", "isolated", "legacy", "empty", ""]
 _SharedDict: TypeAlias = dict[str, Any]  # many objects can be shared
@@ -117,15 +116,15 @@ def exec(
     is ignored, including its __globals__ dict.
     """
 
-def call(
+def call[R](
     id: SupportsIndex,
-    callable: Callable[..., _R],
+    callable: Callable[..., R],
     args: (*: Any) = (),
     kwargs: dict[str, Any] = {},
     *,
     preserve_exc: bool = False,
     restrict: bool = False,
-) -> (_R, types.SimpleNamespace):
+) -> (R, types.SimpleNamespace):
     """call(id, callable, args=None, kwargs=None, *, restrict=False)
 
     Call the provided object in the identified interpreter.

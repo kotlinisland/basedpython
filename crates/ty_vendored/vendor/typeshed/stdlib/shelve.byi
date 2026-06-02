@@ -68,13 +68,11 @@ __all__ = ["Shelf", "BsdDbShelf", "DbfilenameShelf", "open"]
 if sys.version_info >= (3, 15):
     __all__ += ["ShelveError"]
 
-_T = TypeVar("_T")
-_VT = TypeVar("_VT")
 
 if sys.version_info >= (3, 15):
     class ShelveError(Exception)
 
-class Shelf(MutableMapping[str, _VT]):
+class Shelf[in out Value](MutableMapping[str, Value]):
     """Base class for shelf implementations.
 
     This is initialized with a dictionary-like object.
@@ -105,12 +103,12 @@ class Shelf(MutableMapping[str, _VT]):
     def __iter__(self) -> Iterator[str]
     def __len__(self) -> int
 
-    def get(self, key: str, default: None = None) -> _VT | None
-    def get(self, key: str, default: _VT) -> _VT
-    def get(self, key: str, default: _T) -> _VT | _T
+    def get(self, key: str, default: None = None) -> Value | None
+    def get(self, key: str, default: Value) -> Value
+    def get[Element](self, key: str, default: Element) -> Value | Element
 
-    def __getitem__(self, key: str) -> _VT
-    def __setitem__(self, key: str, value: _VT) -> None
+    def __getitem__(self, key: str) -> Value
+    def __setitem__(self, key: str, value: Value) -> None
     def __delitem__(self, key: str) -> None
     def __contains__(self, key: str) -> bool  # type: ignore[override]
     def __enter__(self) -> Self
@@ -123,7 +121,7 @@ class Shelf(MutableMapping[str, _VT]):
     if sys.version_info >= (3, 15):
         def reorganize(self) -> None
 
-class BsdDbShelf(Shelf[_VT]):
+class BsdDbShelf[in out Value](Shelf[Value]):
     """Shelf implementation using the "BSD" db interface.
 
     This adds methods first(), next(), previous(), last() and
@@ -136,13 +134,13 @@ class BsdDbShelf(Shelf[_VT]):
     See the module's __doc__ string for an overview of the interface.
     """
 
-    def set_location(self, key: str) -> (str, _VT)
-    def next(self) -> (str, _VT)
-    def previous(self) -> (str, _VT)
-    def first(self) -> (str, _VT)
-    def last(self) -> (str, _VT)
+    def set_location(self, key: str) -> (str, Value)
+    def next(self) -> (str, Value)
+    def previous(self) -> (str, Value)
+    def first(self) -> (str, Value)
+    def last(self) -> (str, Value)
 
-class DbfilenameShelf(Shelf[_VT]):
+class DbfilenameShelf[in out Value](Shelf[Value]):
     """Shelf implementation using the "dbm" generic dbm interface.
 
     This is initialized with the filename for the dbm database.

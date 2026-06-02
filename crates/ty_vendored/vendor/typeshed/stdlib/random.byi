@@ -85,7 +85,6 @@ __all__ = [
 if sys.version_info >= (3, 12):
     __all__ += ["binomialvariate"]
 
-_T = TypeVar("_T")
 
 class Random(_random.Random):
     """Random number generator base class used by bound module functions.
@@ -149,17 +148,17 @@ class Random(_random.Random):
     def randbytes(self, n: int) -> bytes:
         """Generate n random bytes."""
 
-    def choice(self, seq: SupportsLenAndGetItem[_T]) -> _T:
+    def choice[Element](self, seq: SupportsLenAndGetItem[Element]) -> Element:
         """Choose a random element from a non-empty sequence."""
 
-    def choices(
+    def choices[Element](
         self,
-        population: SupportsLenAndGetItem[_T],
+        population: SupportsLenAndGetItem[Element],
         weights: Sequence[float | Fraction] | None = None,
         *,
         cum_weights: Sequence[float | Fraction] | None = None,
         k: int = 1,
-    ) -> list[_T]:
+    ) -> list[Element]:
         """Return a k sized list of population elements chosen with replacement.
 
         If the relative weights or cumulative weights are not specified,
@@ -182,7 +181,7 @@ class Random(_random.Random):
         def shuffle(self, x: MutableSequence[Any], random: Callable[[], float] | None = None) -> None
 
     if sys.version_info >= (3, 11):
-        def sample(self, population: Sequence[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
+        def sample[Element](self, population: Sequence[Element], k: int, *, counts: Iterable[int] | None = None) -> list[Element]:
             """Chooses k unique random elements from a population sequence.
 
             Returns a new list containing elements from the population while
@@ -212,7 +211,7 @@ class Random(_random.Random):
 
             """
     else:
-        def sample(self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
+        def sample[Element](self, population: Sequence[Element] | AbstractSet[Element], k: int, *, counts: Iterable[int] | None = None) -> list[Element]:
             """Chooses k unique random elements from a population sequence or set.
 
             Returns a new list containing elements from the population while

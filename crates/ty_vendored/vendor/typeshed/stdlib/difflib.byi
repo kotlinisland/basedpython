@@ -47,7 +47,6 @@ __all__ = [
     "Match",
 ]
 
-_T = TypeVar("_T")
 
 class Match(NamedTuple):
     """Match(a, b, size)"""
@@ -56,7 +55,7 @@ class Match(NamedTuple):
     b: int
     size: int
 
-class SequenceMatcher(Generic[_T]):
+class SequenceMatcher[in out Element]:
     """
     SequenceMatcher is a flexible class for comparing pairs of sequences of
     any type, so long as the sequence elements are hashable.  The basic
@@ -131,7 +130,7 @@ class SequenceMatcher(Generic[_T]):
     elements the sequences have in common; best case time is linear.
     """
 
-    def __init__(self, isjunk: Callable[[_T], bool] | None, a: Sequence[_T], b: Sequence[_T], autojunk: bool = True) -> None:
+    def __init__(self, isjunk: Callable[[Element], bool] | None, a: Sequence[Element], b: Sequence[Element], autojunk: bool = True) -> None:
         """Construct a SequenceMatcher.
 
         Optional arg isjunk is None (the default), or a one-argument
@@ -154,7 +153,7 @@ class SequenceMatcher(Generic[_T]):
         "automatic junk heuristic" that treats popular elements as junk
         (see module documentation for more information).
         """
-    def __init__(self, *, a: Sequence[_T], b: Sequence[_T], autojunk: bool = True) -> None
+    def __init__(self, *, a: Sequence[Element], b: Sequence[Element], autojunk: bool = True) -> None
     def __init__(
         self: SequenceMatcher[str],
         isjunk: Callable[[str], bool] | None = None,
@@ -163,7 +162,7 @@ class SequenceMatcher(Generic[_T]):
         autojunk: bool = True,
     ) -> None
 
-    def set_seqs(self, a: Sequence[_T], b: Sequence[_T]) -> None:
+    def set_seqs(self, a: Sequence[Element], b: Sequence[Element]) -> None:
         """Set the two sequences to be compared.
 
         >>> s = SequenceMatcher()
@@ -172,7 +171,7 @@ class SequenceMatcher(Generic[_T]):
         0.75
         """
 
-    def set_seq1(self, a: Sequence[_T]) -> None:
+    def set_seq1(self, a: Sequence[Element]) -> None:
         """Set the first sequence to be compared.
 
         The second sequence to be compared is not changed.
@@ -193,7 +192,7 @@ class SequenceMatcher(Generic[_T]):
         See also set_seqs() and set_seq2().
         """
 
-    def set_seq2(self, b: Sequence[_T]) -> None:
+    def set_seq2(self, b: Sequence[Element]) -> None:
         """Set the second sequence to be compared.
 
         The first sequence to be compared is not changed.
@@ -403,9 +402,9 @@ def get_close_matches(word: AnyStr, possibilities: Iterable[AnyStr], n: int = 3,
     >>> get_close_matches("accept", _keyword.kwlist)
     ['except']
     """
-def get_close_matches(
-    word: Sequence[_T], possibilities: Iterable[Sequence[_T]], n: int = 3, cutoff: float = 0.6
-) -> list[Sequence[_T]]
+def get_close_matches[Element](
+    word: Sequence[Element], possibilities: Iterable[Sequence[Element]], n: int = 3, cutoff: float = 0.6
+) -> list[Sequence[Element]]
 
 class Differ:
     """

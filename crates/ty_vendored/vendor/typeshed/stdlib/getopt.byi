@@ -17,18 +17,17 @@ option involved with the exception.
 from collections.abc import Iterable, Sequence
 from typing import Protocol, TypeVar, type_check_only
 
-_StrSequenceT_co = TypeVar("_StrSequenceT_co", covariant=True, bound=Sequence[str])
 
 @type_check_only
-class _SliceableT(Protocol[_StrSequenceT_co]):
+class _SliceableT[out StrSequenceT: Sequence[str]](Protocol):
     def __getitem__(self, key: int, /) -> str
-    def __getitem__(self, key: slice, /) -> _StrSequenceT_co
+    def __getitem__(self, key: slice, /) -> StrSequenceT
 
 __all__ = ["GetoptError", "error", "getopt", "gnu_getopt"]
 
-def getopt(
-    args: _SliceableT[_StrSequenceT_co], shortopts: str, longopts: Iterable[str] | str = []
-) -> (list[(str, str)], _StrSequenceT_co):
+def getopt[StrSequenceT: Sequence[str]](
+    args: _SliceableT[StrSequenceT], shortopts: str, longopts: Iterable[str] | str = []
+) -> (list[(str, str)], StrSequenceT):
     """getopt(args, options[, long_options]) -> opts, args
 
     Parses command line options and parameter list.  args is the

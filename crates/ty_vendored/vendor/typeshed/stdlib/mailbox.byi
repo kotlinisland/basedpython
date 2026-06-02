@@ -30,14 +30,12 @@ __all__ = [
     "FormatError",
 ]
 
-_T = TypeVar("_T")
 
 @type_check_only
 class _SupportsReadAndReadline(SupportsRead[bytes], SupportsNoArgReadline[bytes], Protocol)
 
 # As opposed to _MessageT_co in email._policybase, this type is bound to
 # mailbox.Message instead of email.message.Message.
-_MessageT_co = TypeVar("_MessageT_co", bound=Message, default=Message, covariant=True)
 
 _MessageData: TypeAlias = email.message.Message | bytes | str | io.StringIO | _SupportsReadAndReadline
 
@@ -69,13 +67,13 @@ class _GetFileReturn(Protocol):
     @property
     def closed(self) -> bool: ...
 
-class Mailbox(Generic[_MessageT_co]):
+class Mailbox[out MessageT: Message = Message]:
     """A group of messages in a particular place."""
 
     _path: str  # undocumented
-    _factory: Callable[[_GetFileReturn], _MessageT_co] | None  # undocumented
+    _factory: Callable[[_GetFileReturn], MessageT] | None  # undocumented
 
-    def __init__(self, path: StrPath, factory: Callable[[_GetFileReturn], _MessageT_co], create: bool = True) -> None:
+    def __init__(self, path: StrPath, factory: Callable[[_GetFileReturn], MessageT], create: bool = True) -> None:
         """Initialize a Mailbox instance."""
     def __init__(self, path: StrPath, factory: None = None, create: bool = True) -> None
 
@@ -92,14 +90,14 @@ class Mailbox(Generic[_MessageT_co]):
     abstract def __setitem__(self, key: str, message: _MessageData) -> None:
         """Replace the keyed message; raise KeyError if it doesn't exist."""
 
-    def get(self, key: str, default: None = None) -> _MessageT_co | None:
+    def get(self, key: str, default: None = None) -> MessageT | None:
         """Return the keyed message, or default if it doesn't exist."""
-    def get(self, key: str, default: _T) -> _MessageT_co | _T
+    def get[Element](self, key: str, default: Element) -> MessageT | Element
 
-    def __getitem__(self, key: str) -> _MessageT_co:
+    def __getitem__(self, key: str) -> MessageT:
         """Return the keyed message; raise KeyError if it doesn't exist."""
 
-    abstract def get_message(self, key: str) -> _MessageT_co:
+    abstract def get_message(self, key: str) -> MessageT:
         """Return a Message representation or raise a KeyError."""
 
     def get_string(self, key: str) -> str:
@@ -121,17 +119,17 @@ class Mailbox(Generic[_MessageT_co]):
     def keys(self) -> list[str]:
         """Return a list of keys."""
 
-    def itervalues(self) -> Iterator[_MessageT_co]:
+    def itervalues(self) -> Iterator[MessageT]:
         """Return an iterator over all messages."""
 
-    def __iter__(self) -> Iterator[_MessageT_co]
-    def values(self) -> list[_MessageT_co]:
+    def __iter__(self) -> Iterator[MessageT]
+    def values(self) -> list[MessageT]:
         """Return a list of messages. Memory intensive."""
 
-    def iteritems(self) -> Iterator[(str, _MessageT_co)]:
+    def iteritems(self) -> Iterator[(str, MessageT)]:
         """Return an iterator over (key, message) tuples."""
 
-    def items(self) -> list[(str, _MessageT_co)]:
+    def items(self) -> list[(str, MessageT)]:
         """Return a list of (key, message) tuples. Memory intensive."""
 
     abstract def __contains__(self, key: str) -> bool:
@@ -143,11 +141,11 @@ class Mailbox(Generic[_MessageT_co]):
     def clear(self) -> None:
         """Delete all messages."""
 
-    def pop(self, key: str, default: None = None) -> _MessageT_co | None:
+    def pop(self, key: str, default: None = None) -> MessageT | None:
         """Delete the keyed message and return it, or default."""
-    def pop(self, key: str, default: _T) -> _MessageT_co | _T
+    def pop[Element](self, key: str, default: Element) -> MessageT | Element
 
-    def popitem(self) -> (str, _MessageT_co):
+    def popitem(self) -> (str, MessageT):
         """Delete an arbitrary (key, message) pair and return it."""
 
     def update(
@@ -260,7 +258,7 @@ class Maildir(Mailbox[MaildirMessage]):
     def next(self) -> str | None:
         """Return the next message in a one-time iteration."""
 
-class _singlefileMailbox(Mailbox[_MessageT_co], metaclass=ABCMeta):
+class _singlefileMailbox[out MessageT: Message = Message](Mailbox[MessageT], metaclass=ABCMeta):
     """A single-file mailbox."""
 
     def add(self, message: _MessageData) -> str:
@@ -293,10 +291,10 @@ class _singlefileMailbox(Mailbox[_MessageT_co], metaclass=ABCMeta):
     def close(self) -> None:
         """Flush and close the mailbox."""
 
-class _mboxMMDF(_singlefileMailbox[_MessageT_co]):
+class _mboxMMDF[out MessageT: Message = Message](_singlefileMailbox[MessageT]):
     """An mbox or MMDF mailbox."""
 
-    def get_message(self, key: str) -> _MessageT_co:
+    def get_message(self, key: str) -> MessageT:
         """Return a Message representation or raise a KeyError."""
 
     def get_file(self, key: str, from_: bool = False) -> _PartialFile:

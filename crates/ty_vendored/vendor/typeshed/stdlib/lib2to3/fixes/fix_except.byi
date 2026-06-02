@@ -26,9 +26,8 @@ from typing import ClassVar, Literal, TypeVar
 from .. import fixer_base
 from ..pytree import Base
 
-_N = TypeVar("_N", bound=Base)
 
-def find_excepts(nodes: Iterable[_N]) -> Generator[(_N, _N)]
+def find_excepts[N: Base](nodes: Iterable[N]) -> Generator[(N, N)]
 
 class FixExcept(fixer_base.BaseFix):
     BM_compatible: ClassVar[Literal[True]]

@@ -9,13 +9,10 @@ if sys.version_info >= (3, 11):
 else:
     __all__ = ("coroutine", "iscoroutinefunction", "iscoroutine")
 
-_T = TypeVar("_T")
-_FunctionT = TypeVar("_FunctionT", bound=Callable[..., Any])
-_P = ParamSpec("_P")
 
 if sys.version_info < (3, 11):
     @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `async def` instead.")
-    def coroutine(func: _FunctionT) -> _FunctionT:
+    def coroutine[FunctionT: Callable[..., Any]](func: FunctionT) -> FunctionT:
         """Decorator to mark coroutines.
 
         If the coroutine is not yielded from before it is destroyed,
@@ -30,9 +27,9 @@ if sys.version_info >= (3, 11):
     def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
         """Return True if func is a decorated coroutine function."""
     @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
-    def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]
+    def iscoroutinefunction[**P, Element](func: Callable[P, Awaitable[Element]]) -> TypeGuard[Callable[P, Coroutine[Any, Any, Element]]]
     @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
-    def iscoroutinefunction(func: Callable[_P, object]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, Any]]]
+    def iscoroutinefunction[**P](func: Callable[P, object]) -> TypeGuard[Callable[P, Coroutine[Any, Any, Any]]]
     @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: object) -> TypeGuard[Callable[..., Coroutine[Any, Any, Any]]]
 else:
@@ -40,6 +37,6 @@ else:
     # which was removed in 3.11 which the inspect version doesn't support.
     def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
         """Return True if func is a decorated coroutine function."""
-    def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]
-    def iscoroutinefunction(func: Callable[_P, object]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, Any]]]
+    def iscoroutinefunction[**P, Element](func: Callable[P, Awaitable[Element]]) -> TypeGuard[Callable[P, Coroutine[Any, Any, Element]]]
+    def iscoroutinefunction[**P](func: Callable[P, object]) -> TypeGuard[Callable[P, Coroutine[Any, Any, Any]]]
     def iscoroutinefunction(func: object) -> TypeGuard[Callable[..., Coroutine[Any, Any, Any]]]

@@ -11,6 +11,7 @@
 //! and the ongoing typeshed sync workflow
 
 pub mod patches;
+pub mod pep695;
 
 use std::path::Path;
 

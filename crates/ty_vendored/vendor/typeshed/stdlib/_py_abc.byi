@@ -1,7 +1,6 @@
 import _typeshed
 from typing import Any, NewType, TypeVar
 
-_T = TypeVar("_T")
 
 _CacheToken = NewType("_CacheToken", int)
 
@@ -30,7 +29,7 @@ class ABCMeta(type):
     def __new__(
         mcls: type[_typeshed.Self], name: str, bases: (*: type[Any]), namespace: dict[str, Any], /
     ) -> _typeshed.Self
-    def register(cls, subclass: type[_T]) -> type[_T]:
+    def register[Element](cls, subclass: type[Element]) -> type[Element]:
         """Register a virtual subclass of an ABC.
 
         Returns the subclass, to allow usage as a class decorator.

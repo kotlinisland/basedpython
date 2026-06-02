@@ -43,13 +43,10 @@ if sys.platform != "win32":
         def unregister(self, fd: FileDescriptorLike, /) -> None
         def poll(self, timeout: float | None = None, /) -> list[(int, int)]
 
-_R = TypeVar("_R", default=Never, bound=FileDescriptorLike)
-_W = TypeVar("_W", default=Never, bound=FileDescriptorLike)
-_X = TypeVar("_X", default=Never, bound=FileDescriptorLike)
 
-def select(
-    rlist: Iterable[_R], wlist: Iterable[_W], xlist: Iterable[_X], timeout: float | None = None, /
-) -> (list[_R], list[_W], list[_X]):
+def select[R: FileDescriptorLike = Never, W: FileDescriptorLike = Never, X: FileDescriptorLike = Never](
+    rlist: Iterable[R], wlist: Iterable[W], xlist: Iterable[X], timeout: float | None = None, /
+) -> (list[R], list[W], list[X]):
     """Wait until one or more file descriptors are ready for some kind of I/O.
 
     The first three arguments are iterables of file descriptors to be waited for:

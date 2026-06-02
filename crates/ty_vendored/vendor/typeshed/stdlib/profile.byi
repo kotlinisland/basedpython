@@ -28,8 +28,6 @@ def runctx(
     statement and filename have the same semantics as profile.run
     """
 
-_T = TypeVar("_T")
-_P = ParamSpec("_P")
 _Label: TypeAlias = tuple[str, int, str]
 
 class Profile:
@@ -83,5 +81,5 @@ class Profile:
     def snapshot_stats(self) -> None
     def run(self, cmd: str) -> Self
     def runctx(self, cmd: str, globals: dict[str, Any], locals: Mapping[str, Any]) -> Self
-    def runcall(self, func: Callable[_P, _T], /, *args: _P.args, **kw: _P.kwargs) -> _T
+    def runcall[**P, Element](self, func: Callable[P, Element], /, *args: P.args, **kw: P.kwargs) -> Element
     def calibrate(self, m: int, verbose: int = 0) -> float

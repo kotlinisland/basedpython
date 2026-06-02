@@ -27,8 +27,6 @@ from typing import Any, ParamSpec, TypeAlias, TypeVar
 
 __all__ = ["Trace", "CoverageResults"]
 
-_T = TypeVar("_T")
-_P = ParamSpec("_P")
 _FileModuleFunction: TypeAlias = tuple[str, str | None, str]
 
 class CoverageResults:
@@ -140,7 +138,7 @@ class Trace:
     def runctx(
         self, cmd: str | types.CodeType, globals: Mapping[str, Any] | None = None, locals: Mapping[str, Any] | None = None
     ) -> None
-    def runfunc(self, func: Callable[_P, _T], /, *args: _P.args, **kw: _P.kwargs) -> _T
+    def runfunc[**P, Element](self, func: Callable[P, Element], /, *args: P.args, **kw: P.kwargs) -> Element
     def file_module_function_of(self, frame: types.FrameType) -> _FileModuleFunction
     def globaltrace_trackcallers(self, frame: types.FrameType, why: str, arg: Any) -> None:
         """Handler for call events.

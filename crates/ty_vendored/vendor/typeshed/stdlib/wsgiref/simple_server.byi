@@ -41,10 +41,9 @@ class WSGIRequestHandler(BaseHTTPRequestHandler):
 
 def demo_app(environ: WSGIEnvironment, start_response: StartResponse) -> list[bytes]
 
-_S = TypeVar("_S", bound=WSGIServer)
 
 def make_server(host: str, port: int, app: WSGIApplication, *, handler_class: type[WSGIRequestHandler] = ...) -> WSGIServer:
     """Create a new WSGI server listening on `host` and `port` for `app`"""
-def make_server(
-    host: str, port: int, app: WSGIApplication, server_class: type[_S], handler_class: type[WSGIRequestHandler] = ...
-) -> _S
+def make_server[Other: WSGIServer](
+    host: str, port: int, app: WSGIApplication, server_class: type[Other], handler_class: type[WSGIRequestHandler] = ...
+) -> Other

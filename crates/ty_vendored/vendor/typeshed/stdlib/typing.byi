@@ -186,7 +186,7 @@ class _Final:
 
     __slots__ = ("__weakref__",)
 
-def final(f: _T) -> _T:
+def final[Element](f: Element) -> Element:
     """Decorator to indicate final methods and final classes.
 
     Use this decorator to indicate to type checkers that the decorated
@@ -1069,31 +1069,19 @@ class NewType:
 
     def __init__(self, name: str, tp: Any) -> None  # AnnotationForm
     if sys.version_info >= (3, 11):
-        static def __call__(x: _T, /) -> _T: ...
+        static def __call__[Element](x: Element, /) -> Element: ...
     else:
-        def __call__(self, x: _T) -> _T
+        def __call__[Element](self, x: Element) -> Element
 
     def __or__(self, other: Any) -> _SpecialForm
     def __ror__(self, other: Any) -> _SpecialForm
     __supertype__: type | NewType
     __name__: str
 
-_F = TypeVar("_F", bound=Callable[..., Any])
-_P = ParamSpec("_P")
-_T = TypeVar("_T")
 
-_FT = TypeVar("_FT", bound=Callable[..., Any] | type)
 
 # These type variables are used by the container types.
-_S = TypeVar("_S")
-_KT = TypeVar("_KT")  # Key type.
-_VT = TypeVar("_VT")  # Value type.
-_T_co = TypeVar("_T_co", covariant=True)  # Any type covariant containers.
-_KT_co = TypeVar("_KT_co", covariant=True)  # Key type covariant containers.
-_VT_co = TypeVar("_VT_co", covariant=True)  # Value type covariant containers.
-_TC = TypeVar("_TC", bound=type[object])
-
-def overload(func: _F) -> _F:
+def overload[F: Callable[..., Any]](func: F) -> F:
     """Decorator for overloaded functions/methods.
 
     In a stub file, place two or more stub definitions for the same
@@ -1125,7 +1113,7 @@ def overload(func: _F) -> _F:
     get_overloads() function.
     """
 
-def no_type_check(arg: _F) -> _F:
+def no_type_check[F: Callable[..., Any]](arg: F) -> F:
     """Decorator to indicate that annotations are not type hints.
 
     The argument must be a class or function; if it is a class, it
@@ -1137,7 +1125,7 @@ def no_type_check(arg: _F) -> _F:
 
 if sys.version_info < (3, 15):
     @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
-    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
+    def no_type_check_decorator[**P, Element](decorator: Callable[P, Element]) -> Callable[P, Element]:
         """Decorator to give another decorator the @no_type_check effect.
 
         This wraps the decorator with something that wraps the decorated
@@ -1145,10 +1133,10 @@ if sys.version_info < (3, 15):
         """
 
 if sys.version_info >= (3, 15):
-    def disjoint_base(cls: _TC) -> _TC
+    def disjoint_base[TC: type[object]](cls: TC) -> TC
 
 # This itself is only available during type checking
-def type_check_only(func_or_cls: _FT) -> _FT
+def type_check_only[FT: Callable[..., Any] | type](func_or_cls: FT) -> FT
 
 # Type aliases and type constructors
 
@@ -1280,7 +1268,7 @@ class _ProtocolMeta(ABCMeta):
 
 # Abstract base classes.
 
-def runtime_checkable(cls: _TC) -> _TC:
+def runtime_checkable[TC: type[object]](cls: TC) -> TC:
     """Mark a protocol class as a runtime protocol.
 
     Such protocol can be used with isinstance() and issubclass().
@@ -1336,20 +1324,20 @@ class SupportsIndex(Protocol, metaclass=ABCMeta):
     abstract def __index__(self) -> int: ...
 
 @runtime_checkable
-class SupportsAbs(Protocol[_T_co]):
+class SupportsAbs[out Element](Protocol):
     """An ABC with one abstract method __abs__ that is covariant in its return type."""
 
     __slots__ = ()
-    abstract def __abs__(self) -> _T_co: ...
+    abstract def __abs__(self) -> Element: ...
 
 @runtime_checkable
-class SupportsRound(Protocol[_T_co]):
+class SupportsRound[out Element](Protocol):
     """An ABC with one abstract method __round__ that is covariant in its return type."""
 
     __slots__ = ()
 
     abstract def __round__(self) -> int
-    abstract def __round__(self, ndigits: int, /) -> _T_co
+    abstract def __round__(self, ndigits: int, /) -> Element
 
 @runtime_checkable
 class Sized(Protocol, metaclass=ABCMeta):
@@ -1363,52 +1351,49 @@ class Hashable(Protocol, metaclass=ABCMeta):
     abstract def __hash__(self) -> int: ...
 
 @runtime_checkable
-class Iterable(Protocol[_T_co]):
-    abstract def __iter__(self) -> Iterator[_T_co]: ...
+class Iterable[out Element](Protocol):
+    abstract def __iter__(self) -> Iterator[Element]: ...
 
 @runtime_checkable
-class Iterator(Iterable[_T_co], Protocol[_T_co]):
-    abstract def __next__(self) -> _T_co:
+class Iterator[out Element](Iterable[Element], Protocol):
+    abstract def __next__(self) -> Element:
         """Return the next item from the iterator. When exhausted, raise StopIteration"""
 
-    def __iter__(self) -> Iterator[_T_co]
+    def __iter__(self) -> Iterator[Element]
 
 @runtime_checkable
-class Reversible(Iterable[_T_co], Protocol[_T_co]):
-    abstract def __reversed__(self) -> Iterator[_T_co]: ...
+class Reversible[out Element](Iterable[Element], Protocol):
+    abstract def __reversed__(self) -> Iterator[Element]: ...
 
-_YieldT_co = TypeVar("_YieldT_co", covariant=True)
-_SendT_contra = TypeVar("_SendT_contra", contravariant=True, default=None)
-_ReturnT_co = TypeVar("_ReturnT_co", covariant=True, default=None)
 
 @runtime_checkable
-class Generator(Iterator[_YieldT_co], Protocol[_YieldT_co, _SendT_contra, _ReturnT_co]):
-    def __next__(self) -> _YieldT_co:
+class Generator[out Element, in Sent = None, out Return = None](Iterator[Element], Protocol):
+    def __next__(self) -> Element:
         """Return the next item from the generator.
         When exhausted, raise StopIteration.
         """
 
-    abstract def send(self, value: _SendT_contra, /) -> _YieldT_co:
+    abstract def send(self, value: Sent, /) -> Element:
         """Send a value into the generator.
         Return next yielded value or raise StopIteration.
         """
 
     abstract def throw(
         self, typ: type[BaseException], val: BaseException | object = None, tb: TracebackType | None = None, /
-    ) -> _YieldT_co:
+    ) -> Element:
         """Raise an exception in the generator.
         Return next yielded value or raise StopIteration.
         """
-    abstract def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> _YieldT_co
+    abstract def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> Element
 
     if sys.version_info >= (3, 13):
-        def close(self) -> _ReturnT_co | None:
+        def close(self) -> Return | None:
             """Raise GeneratorExit inside generator."""
     else:
         def close(self) -> None:
             """Raise GeneratorExit inside generator."""
 
-    def __iter__(self) -> Generator[_YieldT_co, _SendT_contra, _ReturnT_co]
+    def __iter__(self) -> Generator[Element, Sent, Return]
 
 # NOTE: Prior to Python 3.13 these aliases are lacking the second _ExitT_co parameter
 if sys.version_info >= (3, 13):
@@ -1417,37 +1402,35 @@ else:
     from contextlib import AbstractAsyncContextManager, AbstractContextManager
 
     @runtime_checkable
-    class ContextManager(AbstractContextManager[_T_co, bool | None], Protocol[_T_co]):
+    class ContextManager[out Element](AbstractContextManager[Element, bool | None], Protocol):
         """A generic version of contextlib.AbstractContextManager."""
 
     @runtime_checkable
-    class AsyncContextManager(AbstractAsyncContextManager[_T_co, bool | None], Protocol[_T_co]):
+    class AsyncContextManager[out Element](AbstractAsyncContextManager[Element, bool | None], Protocol):
         """A generic version of contextlib.AbstractAsyncContextManager."""
 
 @runtime_checkable
-class Awaitable(Protocol[_T_co]):
-    abstract def __await__(self) -> Generator[Any, Any, _T_co]: ...
+class Awaitable[out Element](Protocol):
+    abstract def __await__(self) -> Generator[Any, Any, Element]: ...
 
 # Non-default variations to accommodate coroutines, and `AwaitableGenerator` having a 4th type parameter.
-_SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
-_ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
-class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
+class Coroutine[out Element, in SendT_nd, out ReturnT_nd](Awaitable[ReturnT_nd]):
     __name__: str
     __qualname__: str
 
-    abstract def send(self, value: _SendT_nd_contra, /) -> _YieldT_co:
+    abstract def send(self, value: SendT_nd, /) -> Element:
         """Send a value into the coroutine.
         Return next yielded value or raise StopIteration.
         """
 
     abstract def throw(
         self, typ: type[BaseException], val: BaseException | object = None, tb: TracebackType | None = None, /
-    ) -> _YieldT_co:
+    ) -> Element:
         """Raise an exception in the coroutine.
         Return next yielded value or raise StopIteration.
         """
-    abstract def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> _YieldT_co
+    abstract def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> Element
 
     abstract def close(self) -> None:
         """Raise GeneratorExit inside coroutine."""
@@ -1456,71 +1439,65 @@ class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra,
 # The parameters correspond to Generator, but the 4th is the original type.
 # Obsolete, use _typeshed._type_checker_internals.AwaitableGenerator instead.
 @type_check_only
-class AwaitableGenerator(
-    Awaitable[_ReturnT_nd_co],
-    Generator[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co],
-    Generic[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co, _S],
-    metaclass=ABCMeta,
-)
+class AwaitableGenerator[out Element, in SendT_nd, out ReturnT_nd, in out Other](Awaitable[ReturnT_nd], Generator[Element, SendT_nd, ReturnT_nd], metaclass=ABCMeta)
 
 @runtime_checkable
-class AsyncIterable(Protocol[_T_co]):
-    abstract def __aiter__(self) -> AsyncIterator[_T_co]: ...
+class AsyncIterable[out Element](Protocol):
+    abstract def __aiter__(self) -> AsyncIterator[Element]: ...
 
 @runtime_checkable
-class AsyncIterator(AsyncIterable[_T_co], Protocol[_T_co]):
-    abstract def __anext__(self) -> Awaitable[_T_co]:
+class AsyncIterator[out Element](AsyncIterable[Element], Protocol):
+    abstract def __anext__(self) -> Awaitable[Element]:
         """Return the next item or raise StopAsyncIteration when exhausted."""
 
-    def __aiter__(self) -> AsyncIterator[_T_co]
+    def __aiter__(self) -> AsyncIterator[Element]
 
 @runtime_checkable
-class AsyncGenerator(AsyncIterator[_YieldT_co], Protocol[_YieldT_co, _SendT_contra]):
-    def __anext__(self) -> Coroutine[Any, Any, _YieldT_co]:
+class AsyncGenerator[out Element, in Sent = None](AsyncIterator[Element], Protocol):
+    def __anext__(self) -> Coroutine[Any, Any, Element]:
         """Return the next item from the asynchronous generator.
         When exhausted, raise StopAsyncIteration.
         """
 
-    abstract def asend(self, value: _SendT_contra, /) -> Coroutine[Any, Any, _YieldT_co]:
+    abstract def asend(self, value: Sent, /) -> Coroutine[Any, Any, Element]:
         """Send a value into the asynchronous generator.
         Return next yielded value or raise StopAsyncIteration.
         """
 
     abstract def athrow(
         self, typ: type[BaseException], val: BaseException | object = None, tb: TracebackType | None = None, /
-    ) -> Coroutine[Any, Any, _YieldT_co]:
+    ) -> Coroutine[Any, Any, Element]:
         """Raise an exception in the asynchronous generator.
         Return next yielded value or raise StopAsyncIteration.
         """
     abstract def athrow(
         self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /
-    ) -> Coroutine[Any, Any, _YieldT_co]
+    ) -> Coroutine[Any, Any, Element]
 
     def aclose(self) -> Coroutine[Any, Any, None]:
         """Raise GeneratorExit inside coroutine."""
 
-_ContainerT_contra = TypeVar("_ContainerT_contra", contravariant=True, default=Any)
 
 @runtime_checkable
-class Container(Protocol[_ContainerT_contra]):
+class Container[in ContainerT = Any](Protocol):
     # This is generic more on vibes than anything else
-    abstract def __contains__(self, x: _ContainerT_contra, /) -> bool: ...
+    abstract def __contains__(self, x: ContainerT, /) -> bool: ...
 
 @runtime_checkable
-class Collection(Iterable[_T_co], Container[Any], Protocol[_T_co]):
+class Collection[out Element](Iterable[Element], Container[Any], Protocol):
     # Note: need to use Container[Any] instead of Container[_T_co] to ensure covariance.
     # Implement Sized (but don't have it as a base class).
     abstract def __len__(self) -> int: ...
 
-class Sequence(Reversible[_T_co], Collection[_T_co]):
+class Sequence[out Element](Reversible[Element], Collection[Element]):
     """All the operations on a read-only sequence.
 
     Concrete subclasses must override __new__ or __init__,
     __getitem__, and __len__.
     """
 
-    abstract def __getitem__(self, index: int, /) -> _T_co
-    abstract def __getitem__(self, index: slice[int | None], /) -> Sequence[_T_co]
+    abstract def __getitem__(self, index: int, /) -> Element
+    abstract def __getitem__(self, index: slice[int | None], /) -> Sequence[Element]
 
     # Mixin methods
     def index(self, value: Any, start: int = 0, stop: int = ..., /) -> int:
@@ -1535,54 +1512,54 @@ class Sequence(Reversible[_T_co], Collection[_T_co]):
         """S.count(value) -> integer -- return number of occurrences of value"""
 
     def __contains__(self, value: object, /) -> bool
-    def __iter__(self) -> Iterator[_T_co]
-    def __reversed__(self) -> Iterator[_T_co]
+    def __iter__(self) -> Iterator[Element]
+    def __reversed__(self) -> Iterator[Element]
 
-class MutableSequence(Sequence[_T]):
+class MutableSequence[in out Element](Sequence[Element]):
     """All the operations on a read-write sequence.
 
     Concrete subclasses must provide __new__ or __init__,
     __getitem__, __setitem__, __delitem__, __len__, and insert().
     """
 
-    abstract def insert(self, index: int, value: _T, /) -> None:
+    abstract def insert(self, index: int, value: Element, /) -> None:
         """S.insert(index, value) -- insert value before index"""
 
-    abstract def __getitem__(self, index: int, /) -> _T
-    abstract def __getitem__(self, index: slice[int | None], /) -> MutableSequence[_T]
+    abstract def __getitem__(self, index: int, /) -> Element
+    abstract def __getitem__(self, index: slice[int | None], /) -> MutableSequence[Element]
 
-    abstract def __setitem__(self, index: int, value: _T, /) -> None
-    abstract def __setitem__(self, index: slice[int | None], value: Iterable[_T], /) -> None
+    abstract def __setitem__(self, index: int, value: Element, /) -> None
+    abstract def __setitem__(self, index: slice[int | None], value: Iterable[Element], /) -> None
 
     abstract def __delitem__(self, index: int, /) -> None
     abstract def __delitem__(self, index: slice[int | None], /) -> None
 
     # Mixin methods
-    def append(self, value: _T, /) -> None:
+    def append(self, value: Element, /) -> None:
         """S.append(value) -- append value to the end of the sequence"""
 
     def clear(self) -> None:
         """S.clear() -> None -- remove all items from S"""
 
-    def extend(self, values: Iterable[_T], /) -> None:
+    def extend(self, values: Iterable[Element], /) -> None:
         """S.extend(iterable) -- extend sequence by appending elements from the iterable"""
 
     def reverse(self) -> None:
         """S.reverse() -- reverse *IN PLACE*"""
 
-    def pop(self, index: int = -1, /) -> _T:
+    def pop(self, index: int = -1, /) -> Element:
         """S.pop([index]) -> item -- remove and return item at index (default last).
         Raise IndexError if list is empty or index is out of range.
         """
 
-    def remove(self, value: _T, /) -> None:
+    def remove(self, value: Element, /) -> None:
         """S.remove(value) -- remove first occurrence of value.
         Raise ValueError if the value is not present.
         """
 
-    def __iadd__(self, values: Iterable[_T], /) -> typing_extensions.Self
+    def __iadd__(self, values: Iterable[Element], /) -> typing_extensions.Self
 
-class AbstractSet(Collection[_T_co]):
+class AbstractSet[out Element](Collection[Element]):
     """A set is a finite, iterable container.
 
     This class provides concrete generic implementations of all
@@ -1610,7 +1587,7 @@ class AbstractSet(Collection[_T_co]):
         by the built-in frozenset type.
         """
     # Mixin methods
-    class def _from_iterable(cls, it: Iterable[_S], /) -> AbstractSet[_S]:
+    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> AbstractSet[Other]:
         """Construct an instance of the class from any iterable input.
 
         Must override this method if the class constructor signature
@@ -1621,15 +1598,15 @@ class AbstractSet(Collection[_T_co]):
     def __lt__(self, other: AbstractSet[Any], /) -> bool
     def __gt__(self, other: AbstractSet[Any], /) -> bool
     def __ge__(self, other: AbstractSet[Any], /) -> bool
-    def __and__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]
-    def __or__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]
-    def __sub__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]
-    def __xor__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]
+    def __and__(self, other: AbstractSet[Any], /) -> AbstractSet[Element]
+    def __or__[T](self, other: AbstractSet[T], /) -> AbstractSet[Element | T]
+    def __sub__(self, other: AbstractSet[Any], /) -> AbstractSet[Element]
+    def __xor__[T](self, other: AbstractSet[T], /) -> AbstractSet[Element | T]
     def __eq__(self, other: object, /) -> bool
     def isdisjoint(self, other: Iterable[Any], /) -> bool:
         """Return True if two sets have a null intersection."""
 
-class MutableSet(AbstractSet[_T]):
+class MutableSet[in out Element](AbstractSet[Element]):
     """A mutable set is a finite, iterable container.
 
     This class provides concrete generic implementations of all
@@ -1641,24 +1618,24 @@ class MutableSet(AbstractSet[_T]):
     then the other operations will automatically follow suit.
     """
 
-    abstract def add(self, value: _T, /) -> None:
+    abstract def add(self, value: Element, /) -> None:
         """Add an element."""
 
-    abstract def discard(self, value: _T, /) -> None:
+    abstract def discard(self, value: Element, /) -> None:
         """Remove an element.  Do not raise an exception if absent."""
     # Mixin methods
     def clear(self) -> None:
         """This is slow (creates N new iterators!) but effective."""
 
-    def pop(self) -> _T:
+    def pop(self) -> Element:
         """Return the popped value.  Raise KeyError if empty."""
 
-    def remove(self, value: _T, /) -> None:
+    def remove(self, value: Element, /) -> None:
         """Remove an element. If not a member, raise a KeyError."""
 
-    def __ior__(self, it: AbstractSet[_T], /) -> typing_extensions.Self  # type: ignore[override,misc]
+    def __ior__(self, it: AbstractSet[Element], /) -> typing_extensions.Self  # type: ignore[override,misc]
     def __iand__(self, it: AbstractSet[Any], /) -> typing_extensions.Self
-    def __ixor__(self, it: AbstractSet[_T], /) -> typing_extensions.Self  # type: ignore[override,misc]
+    def __ixor__(self, it: AbstractSet[Element], /) -> typing_extensions.Self  # type: ignore[override,misc]
     def __isub__(self, it: AbstractSet[Any], /) -> typing_extensions.Self
 
 class MappingView(Sized):
@@ -1666,45 +1643,45 @@ class MappingView(Sized):
     def __init__(self, mapping: Sized) -> None  # undocumented
     def __len__(self) -> int
 
-class ItemsView(MappingView, AbstractSet[tuple[_KT_co, _VT_co]], Generic[_KT_co, _VT_co]):
-    def __init__(self, mapping: SupportsGetItemViewable[_KT_co, _VT_co]) -> None  # undocumented
-    class def _from_iterable(cls, it: Iterable[_S], /) -> set[_S]: ...
-    def __and__(self, other: Iterable[Any], /) -> set[(_KT_co, _VT_co)]
-    def __rand__(self, other: Iterable[_T], /) -> set[_T]
+class ItemsView[out Key, out Value](MappingView, AbstractSet[tuple[Key, Value]]):
+    def __init__(self, mapping: SupportsGetItemViewable[Key, Value]) -> None  # undocumented
+    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> set[Other]: ...
+    def __and__(self, other: Iterable[Any], /) -> set[(Key, Value)]
+    def __rand__[Element](self, other: Iterable[Element], /) -> set[Element]
     def __contains__(self, item: (object, object), /) -> bool  # type: ignore[override]
-    def __iter__(self) -> Iterator[(_KT_co, _VT_co)]
-    def __or__(self, other: Iterable[_T], /) -> set[(_KT_co, _VT_co) | _T]
-    def __ror__(self, other: Iterable[_T], /) -> set[(_KT_co, _VT_co) | _T]
-    def __sub__(self, other: Iterable[Any], /) -> set[(_KT_co, _VT_co)]
-    def __rsub__(self, other: Iterable[_T], /) -> set[_T]
-    def __xor__(self, other: Iterable[_T], /) -> set[(_KT_co, _VT_co) | _T]
-    def __rxor__(self, other: Iterable[_T], /) -> set[(_KT_co, _VT_co) | _T]
+    def __iter__(self) -> Iterator[(Key, Value)]
+    def __or__[Element](self, other: Iterable[Element], /) -> set[(Key, Value) | Element]
+    def __ror__[Element](self, other: Iterable[Element], /) -> set[(Key, Value) | Element]
+    def __sub__(self, other: Iterable[Any], /) -> set[(Key, Value)]
+    def __rsub__[Element](self, other: Iterable[Element], /) -> set[Element]
+    def __xor__[Element](self, other: Iterable[Element], /) -> set[(Key, Value) | Element]
+    def __rxor__[Element](self, other: Iterable[Element], /) -> set[(Key, Value) | Element]
 
-class KeysView(MappingView, AbstractSet[_KT_co]):
-    def __init__(self, mapping: Viewable[_KT_co]) -> None  # undocumented
-    class def _from_iterable(cls, it: Iterable[_S], /) -> set[_S]: ...
-    def __and__(self, other: Iterable[Any], /) -> set[_KT_co]
-    def __rand__(self, other: Iterable[_T], /) -> set[_T]
+class KeysView[out Key](MappingView, AbstractSet[Key]):
+    def __init__(self, mapping: Viewable[Key]) -> None  # undocumented
+    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> set[Other]: ...
+    def __and__(self, other: Iterable[Any], /) -> set[Key]
+    def __rand__[Element](self, other: Iterable[Element], /) -> set[Element]
     def __contains__(self, key: object, /) -> bool
-    def __iter__(self) -> Iterator[_KT_co]
-    def __or__(self, other: Iterable[_T], /) -> set[_KT_co | _T]
-    def __ror__(self, other: Iterable[_T], /) -> set[_KT_co | _T]
-    def __sub__(self, other: Iterable[Any], /) -> set[_KT_co]
-    def __rsub__(self, other: Iterable[_T], /) -> set[_T]
-    def __xor__(self, other: Iterable[_T], /) -> set[_KT_co | _T]
-    def __rxor__(self, other: Iterable[_T], /) -> set[_KT_co | _T]
+    def __iter__(self) -> Iterator[Key]
+    def __or__[Element](self, other: Iterable[Element], /) -> set[Key | Element]
+    def __ror__[Element](self, other: Iterable[Element], /) -> set[Key | Element]
+    def __sub__(self, other: Iterable[Any], /) -> set[Key]
+    def __rsub__[Element](self, other: Iterable[Element], /) -> set[Element]
+    def __xor__[Element](self, other: Iterable[Element], /) -> set[Key | Element]
+    def __rxor__[Element](self, other: Iterable[Element], /) -> set[Key | Element]
 
-class ValuesView(MappingView, Collection[_VT_co]):
-    def __init__(self, mapping: SupportsGetItemViewable[Any, _VT_co]) -> None  # undocumented
+class ValuesView[out Value](MappingView, Collection[Value]):
+    def __init__(self, mapping: SupportsGetItemViewable[Any, Value]) -> None  # undocumented
     def __contains__(self, value: object, /) -> bool
-    def __iter__(self) -> Iterator[_VT_co]
+    def __iter__(self) -> Iterator[Value]
 
 # note for Mapping.get and MutableMapping.pop and MutableMapping.setdefault
 # In _collections_abc.py the parameters are positional-or-keyword,
 # but dict and types.MappingProxyType (the vast majority of Mapping types)
 # don't allow keyword arguments.
 
-class Mapping(Collection[_KT_co], Generic[_KT_co, _VT_co]):
+class Mapping[out Key, out Value](Collection[Key]):
     """A Mapping is a generic container for associating key/value
     pairs.
 
@@ -1714,27 +1691,27 @@ class Mapping(Collection[_KT_co], Generic[_KT_co, _VT_co]):
 
     # TODO: We wish the key type could also be covariant, but that doesn't work,
     # see discussion in https://github.com/python/typing/pull/273.
-    abstract def __getitem__(self, key: _KT_co, /) -> _VT_co: ...
+    abstract def __getitem__(self, key: Key, /) -> Value: ...
 
     # Mixin methods
-    def get(self, key: _KT_co, /) -> _VT_co | None:
+    def get(self, key: Key, /) -> Value | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-    def get(self, key: _KT_co, default: _VT_co, /) -> _VT_co  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
-    def get(self, key: _KT_co, default: _T, /) -> _VT_co | _T
+    def get(self, key: Key, default: Value, /) -> Value  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get[Element](self, key: Key, default: Element, /) -> Value | Element
 
-    def items(self) -> ItemsView[_KT_co, _VT_co]:
+    def items(self) -> ItemsView[Key, Value]:
         """D.items() -> a set-like object providing a view on D's items"""
 
-    def keys(self) -> KeysView[_KT_co]:
+    def keys(self) -> KeysView[Key]:
         """D.keys() -> a set-like object providing a view on D's keys"""
 
-    def values(self) -> ValuesView[_VT_co]:
+    def values(self) -> ValuesView[Value]:
         """D.values() -> an object providing a view on D's values"""
 
     def __contains__(self, key: object, /) -> bool
     def __eq__(self, other: object, /) -> bool
 
-class MutableMapping(Mapping[_KT, _VT]):
+class MutableMapping[in out Key, in out Value](Mapping[Key, Value]):
     """A MutableMapping is a generic container for associating
     key/value pairs.
 
@@ -1743,19 +1720,19 @@ class MutableMapping(Mapping[_KT, _VT]):
     __iter__, and __len__.
     """
 
-    abstract def __setitem__(self, key: _KT, value: _VT, /) -> None: ...
-    abstract def __delitem__(self, key: _KT, /) -> None: ...
+    abstract def __setitem__(self, key: Key, value: Value, /) -> None: ...
+    abstract def __delitem__(self, key: Key, /) -> None: ...
     def clear(self) -> None:
         """D.clear() -> None.  Remove all items from D."""
 
-    def pop(self, key: _KT, /) -> _VT:
+    def pop(self, key: Key, /) -> Value:
         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
         If key is not found, d is returned if given, otherwise KeyError is raised.
         """
-    def pop(self, key: _KT, default: _VT, /) -> _VT
-    def pop(self, key: _KT, default: _T, /) -> _VT | _T
+    def pop(self, key: Key, default: Value, /) -> Value
+    def pop[Element](self, key: Key, default: Element, /) -> Value | Element
 
-    def popitem(self) -> (_KT, _VT):
+    def popitem(self) -> (Key, Value):
         """D.popitem() -> (k, v), remove and return some (key, value) pair
         as a 2-tuple; but raise KeyError if D is empty.
         """
@@ -1766,9 +1743,9 @@ class MutableMapping(Mapping[_KT, _VT]):
     # -- collections.OrderedDict.setdefault
     # -- collections.ChainMap.setdefault
     # -- weakref.WeakKeyDictionary.setdefault
-    def setdefault(self: MutableMapping[_KT, _T | None], key: _KT, default: None = None, /) -> _T | None:
+    def setdefault[Element](self: MutableMapping[Key, Element | None], key: Key, default: None = None, /) -> Element | None:
         """D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D"""
-    def setdefault(self, key: _KT, default: _VT, /) -> _VT
+    def setdefault(self, key: Key, default: Value, /) -> Value
 
     # 'update' used to take a Union, but using overloading is better.
     # The second overloaded type here is a bit too general, because
@@ -1790,16 +1767,16 @@ class MutableMapping(Mapping[_KT, _VT]):
     # -- peewee.attrdict.__iadd__
     # -- weakref.WeakValueDictionary.__ior__
     # -- weakref.WeakKeyDictionary.__ior__
-    def update(self, m: SupportsKeysAndGetItem[_KT, _VT], /) -> None:
+    def update(self, m: SupportsKeysAndGetItem[Key, Value], /) -> None:
         """D.update([E, ]**F) -> None.  Update D from mapping/iterable E and F.
         If E present and has a .keys() method, does:     for k in E.keys(): D[k] = E[k]
         If E present and lacks .keys() method, does:     for (k, v) in E: D[k] = v
         In either case, this is followed by: for k, v in F.items(): D[k] = v
         """
-    def update(self: SupportsGetItem[str, _VT], m: SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> None
-    def update(self, m: Iterable[(_KT, _VT)], /) -> None
-    def update(self: SupportsGetItem[str, _VT], m: Iterable[(str, _VT)], /, **kwargs: _VT) -> None
-    def update(self: SupportsGetItem[str, _VT], /, **kwargs: _VT) -> None
+    def update(self: SupportsGetItem[str, Value], m: SupportsKeysAndGetItem[str, Value], /, **kwargs: Value) -> None
+    def update(self, m: Iterable[(Key, Value)], /) -> None
+    def update(self: SupportsGetItem[str, Value], m: Iterable[(str, Value)], /, **kwargs: Value) -> None
+    def update(self: SupportsGetItem[str, Value], /, **kwargs: Value) -> None
 
 Text = str
 
@@ -1808,7 +1785,7 @@ TYPE_CHECKING: Final[bool]
 # In stubs, the arguments of the IO class are marked as positional-only.
 # This differs from runtime, but better reflects the fact that in reality
 # classes deriving from IO use different names for the arguments.
-class IO(Generic[AnyStr]):
+class IO[in out AnyStr: constraints (str, bytes)]:
     """Generic base class for TextIO and BinaryIO.
 
     This is an abstract, generic version of the return of open().
@@ -2018,7 +1995,7 @@ def get_origin(tp: UnionType) -> type[UnionType]
 def get_origin(tp: GenericAlias) -> type
 def get_origin(tp: Any) -> Any | None  # AnnotationForm
 
-def cast(typ: type[_T], val: Any) -> _T:
+def cast[Element](typ: type[Element], val: Any) -> Element:
     """Cast a value to a type.
 
     This returns the value unchanged.  To the type checker this
@@ -2030,7 +2007,7 @@ def cast(typ: str, val: Any) -> Any
 def cast(typ: object, val: Any) -> Any
 
 if sys.version_info >= (3, 11):
-    def reveal_type(obj: _T, /) -> _T:
+    def reveal_type[Element](obj: Element, /) -> Element:
         """Ask a static type checker to reveal the inferred type of an expression.
 
         When a static type checker encounters a call to ``reveal_type()``,
@@ -2066,7 +2043,7 @@ if sys.version_info >= (3, 11):
         At runtime, this throws an exception when called.
         """
 
-    def assert_type(val: _T, typ: Any, /) -> _T:  # AnnotationForm
+    def assert_type[Element](val: Element, typ: Any, /) -> Element:  # AnnotationForm
         """Ask a static type checker to confirm that the value is of the given type.
 
         At runtime this does nothing: it returns the first argument unchanged with no
@@ -2220,7 +2197,7 @@ class _TypedDict(Mapping[str, object], metaclass=ABCMeta):
     # can go through.
     def setdefault(self, k: _Never, default: object) -> object
     # Mypy plugin hook for 'pop' expects that 'default' has a type variable type.
-    def pop(self, k: _Never, default: _T = ...) -> object  # pyright: ignore[reportInvalidTypeVarUse]
+    def pop[Element](self, k: _Never, default: Element = ...) -> object  # pyright: ignore[reportInvalidTypeVarUse]
     def update(self, m: typing_extensions.Self, /) -> None
     def __delitem__(self, k: _Never) -> None
     def items(self) -> dict_items[str, object]
@@ -2365,7 +2342,7 @@ if sys.version_info >= (3, 12):
         | typing_extensions.TypeVarTuple
     )
 
-    def override(method: _F, /) -> _F:
+    def override[F: Callable[..., Any]](method: F, /) -> F:
         """Indicate that a method is intended to override a method in a base class.
 
         Usage::

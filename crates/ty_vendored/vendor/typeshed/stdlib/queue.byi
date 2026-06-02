@@ -11,7 +11,6 @@ __all__ = ["Empty", "Full", "Queue", "PriorityQueue", "LifoQueue", "SimpleQueue"
 if sys.version_info >= (3, 13):
     __all__ += ["ShutDown"]
 
-_T = TypeVar("_T")
 
 class Full(Exception):
     """Exception raised by Queue.put(block=0)/put_nowait()."""
@@ -20,7 +19,7 @@ if sys.version_info >= (3, 13):
     class ShutDown(Exception):
         """Raised when put/get with shut-down queue."""
 
-class Queue(Generic[_T]):
+class Queue[in out Element]:
     """Create a queue object with a given maximum size.
 
     If maxsize is <= 0, the queue size is infinite.
@@ -61,7 +60,7 @@ class Queue(Generic[_T]):
         qsize() can be used.
         """
 
-    def get(self, block: bool = True, timeout: float | None = None) -> _T:
+    def get(self, block: bool = True, timeout: float | None = None) -> Element:
         """Remove and return an item from the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
@@ -76,7 +75,7 @@ class Queue(Generic[_T]):
         or if the queue has been shut down immediately.
         """
 
-    def get_nowait(self) -> _T:
+    def get_nowait(self) -> Element:
         """Remove and return an item from the queue without blocking.
 
         Only get an item if one is immediately available. Otherwise
@@ -96,8 +95,8 @@ class Queue(Generic[_T]):
             is reduced to zero, callers of Queue.join are unblocked.
             """
 
-    def _get(self) -> _T
-    def put(self, item: _T, block: bool = True, timeout: float | None = None) -> None:
+    def _get(self) -> Element
+    def put(self, item: Element, block: bool = True, timeout: float | None = None) -> None:
         """Put an item into the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
@@ -111,14 +110,14 @@ class Queue(Generic[_T]):
         Raises ShutDown if the queue has been shut down.
         """
 
-    def put_nowait(self, item: _T) -> None:
+    def put_nowait(self, item: Element) -> None:
         """Put an item into the queue without blocking.
 
         Only enqueue the item if a free slot is immediately available.
         Otherwise raise the Full exception.
         """
 
-    def _put(self, item: _T) -> None
+    def _put(self, item: Element) -> None
     def join(self) -> None:
         """Blocks until all items in the Queue have been gotten and processed.
 
@@ -162,7 +161,7 @@ class PriorityQueue(Queue[SupportsRichComparisonT]):
 
     queue: list[SupportsRichComparisonT]
 
-class LifoQueue(Queue[_T]):
+class LifoQueue[in out Element](Queue[Element]):
     """Variant of Queue that retrieves most recently added entries first."""
 
-    queue: list[_T]
+    queue: list[Element]

@@ -101,14 +101,13 @@ if sys.platform == "win32":
 else:
     _ENV: TypeAlias = Mapping[bytes, StrOrBytesPath] | Mapping[str, StrOrBytesPath]
 
-_T = TypeVar("_T")
 
 # These two are private but documented
 if sys.version_info >= (3, 11):
     _USE_VFORK: Final[bool]
 _USE_POSIX_SPAWN: Final[bool]
 
-class CompletedProcess(Generic[_T]):
+class CompletedProcess[in out Element]:
     """A process that has finished running.
 
     This is returned by run().
@@ -125,9 +124,9 @@ class CompletedProcess(Generic[_T]):
     returncode: int
     # These can both be None, but requiring checks for None would be tedious
     # and writing all the overloads would be horrific.
-    stdout: _T
-    stderr: _T
-    def __init__(self, args: _CMD, returncode: int, stdout: _T | None = None, stderr: _T | None = None) -> None
+    stdout: Element
+    stderr: Element
+    def __init__(self, args: _CMD, returncode: int, stdout: Element | None = None, stderr: Element | None = None) -> None
     def check_returncode(self) -> None:
         """Raise CalledProcessError if the exit code is non-zero."""
 

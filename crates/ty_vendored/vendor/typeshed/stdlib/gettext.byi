@@ -82,7 +82,6 @@ def find(
 def find(domain: str, localedir: StrPath | None, languages: Iterable[str] | None, all: Literal[True]) -> list[str]
 def find(domain: str, localedir: StrPath | None = None, languages: Iterable[str] | None = None, all: bool = False) -> Any
 
-_NullTranslationsT = TypeVar("_NullTranslationsT", bound=NullTranslations)
 
 if sys.version_info >= (3, 11):
     def translation(
@@ -92,21 +91,21 @@ if sys.version_info >= (3, 11):
         class_: None = None,
         fallback: Literal[False] = False,
     ) -> GNUTranslations
-    def translation(
+    def translation[NullTranslationsT: NullTranslations](
         domain: str,
         localedir: StrPath | None = None,
         languages: Iterable[str] | None = None,
         *,
-        class_: Callable[[io.BufferedReader], _NullTranslationsT],
+        class_: Callable[[io.BufferedReader], NullTranslationsT],
         fallback: Literal[False] = False,
-    ) -> _NullTranslationsT
-    def translation(
+    ) -> NullTranslationsT
+    def translation[NullTranslationsT: NullTranslations](
         domain: str,
         localedir: StrPath | None,
         languages: Iterable[str] | None,
-        class_: Callable[[io.BufferedReader], _NullTranslationsT],
+        class_: Callable[[io.BufferedReader], NullTranslationsT],
         fallback: Literal[False] = False,
-    ) -> _NullTranslationsT
+    ) -> NullTranslationsT
     def translation(
         domain: str,
         localedir: StrPath | None = None,
@@ -125,23 +124,23 @@ else:
         fallback: Literal[False] = False,
         codeset: str | None = ...,
     ) -> GNUTranslations
-    def translation(
+    def translation[NullTranslationsT: NullTranslations](
         domain: str,
         localedir: StrPath | None = None,
         languages: Iterable[str] | None = None,
         *,
-        class_: Callable[[io.BufferedReader], _NullTranslationsT],
+        class_: Callable[[io.BufferedReader], NullTranslationsT],
         fallback: Literal[False] = False,
         codeset: str | None = ...,
-    ) -> _NullTranslationsT
-    def translation(
+    ) -> NullTranslationsT
+    def translation[NullTranslationsT: NullTranslations](
         domain: str,
         localedir: StrPath | None,
         languages: Iterable[str] | None,
-        class_: Callable[[io.BufferedReader], _NullTranslationsT],
+        class_: Callable[[io.BufferedReader], NullTranslationsT],
         fallback: Literal[False] = False,
         codeset: str | None = ...,
-    ) -> _NullTranslationsT
+    ) -> NullTranslationsT
     def translation(
         domain: str,
         localedir: StrPath | None = None,

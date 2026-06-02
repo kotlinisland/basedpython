@@ -43,7 +43,6 @@ __all__ = [
     "MozillaCookieJar",
 ]
 
-_T = TypeVar("_T")
 
 class LoadError(OSError)
 
@@ -342,7 +341,7 @@ class Cookie:
     def has_nonstandard_attr(self, name: str) -> bool
 
     def get_nonstandard_attr(self, name: str) -> str | None
-    def get_nonstandard_attr(self, name: str, default: _T) -> str | _T
+    def get_nonstandard_attr[Element](self, name: str, default: Element) -> str | Element
 
     def set_nonstandard_attr(self, name: str, value: str) -> None
     def is_expired(self, now: int | None = None) -> bool

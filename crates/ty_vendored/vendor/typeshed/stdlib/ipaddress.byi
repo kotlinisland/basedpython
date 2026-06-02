@@ -14,8 +14,6 @@ from typing_extensions import Self
 IPV4LENGTH: Final = 32
 IPV6LENGTH: Final = 128
 
-_A = TypeVar("_A", IPv4Address, IPv6Address)
-_N = TypeVar("_N", IPv4Network, IPv6Network)
 
 _RawIPAddress: TypeAlias = int | str | bytes | IPv4Address | IPv6Address
 _RawNetworkPart: TypeAlias = IPv4Network | IPv6Network | IPv4Interface | IPv6Interface
@@ -151,18 +149,18 @@ class _BaseAddress(_IPAddressBase):
         def __le__(self, other: Self, NotImplemented: Any = ...) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
 
-class _BaseNetwork(_IPAddressBase, Generic[_A]):
+class _BaseNetwork[in out A: constraints (IPv4Address, IPv6Address)](_IPAddressBase):
     """A generic IP network object.
 
     This IP class contains the version independent methods which are
     used by networks.
     """
 
-    network_address: _A
-    netmask: _A
+    network_address: A
+    netmask: A
     def __contains__(self, other: Any) -> bool
-    def __getitem__(self, n: int) -> _A
-    def __iter__(self) -> Iterator[_A]
+    def __getitem__(self, n: int) -> A
+    def __iter__(self) -> Iterator[A]
     def __eq__(self, other: object) -> bool
     def __hash__(self) -> int
     def __lt__(self, other: Self) -> bool
@@ -223,7 +221,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         """
 
     @property
-    def broadcast_address(self) -> _A: ...
+    def broadcast_address(self) -> A: ...
     def compare_networks(self, other: Self) -> int:
         """Compare two IP objects.
 
@@ -257,7 +255,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
         """
 
-    def hosts(self) -> Iterator[_A]:
+    def hosts(self) -> Iterator[A]:
         """Generate Iterator over usable hosts in a network.
 
         This is like __iter__ except it doesn't return the network
@@ -405,7 +403,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
     @property
     def with_prefixlen(self) -> str: ...
     @property
-    def hostmask(self) -> _A: ...
+    def hostmask(self) -> A: ...
 
 class _BaseV4:
     """Base IPv4 object.
@@ -918,7 +916,7 @@ def summarize_address_range(
     first: IPv4Address | IPv6Address, last: IPv4Address | IPv6Address
 ) -> Iterator[IPv4Network] | Iterator[IPv6Network]
 
-def collapse_addresses(addresses: Iterable[_N]) -> Iterator[_N]:
+def collapse_addresses[N: constraints (IPv4Network, IPv6Network)](addresses: Iterable[N]) -> Iterator[N]:
     """Collapse a list of IP objects.
 
     Example:
@@ -937,7 +935,7 @@ def collapse_addresses(addresses: Iterable[_N]) -> Iterator[_N]:
 
     """
 
-def get_mixed_type_key(obj: _A) -> (int, _A):
+def get_mixed_type_key[A: constraints (IPv4Address, IPv6Address)](obj: A) -> (int, A):
     """Return a key suitable for sorting between networks and addresses.
 
     Address and Network objects are not sortable by default; they're

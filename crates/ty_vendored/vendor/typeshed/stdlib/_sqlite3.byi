@@ -25,7 +25,6 @@ if sys.version_info >= (3, 11):
     from sqlite3 import Blob as Blob
 
 _T = TypeVar("_T")
-_ConnectionT = TypeVar("_ConnectionT", bound=Connection)
 _SqliteData: TypeAlias = str | ReadableBuffer | int | float | None
 _Adapter: TypeAlias = Callable[[_T], _SqliteData]
 _Converter: TypeAlias = Callable[[bytes], Any]
@@ -218,7 +217,7 @@ if sys.version_info >= (3, 11):
 # Can take or return anything depending on what's in the registry.
 def adapt(obj: Any, proto: Any, /) -> Any:
     """Adapt given object to given protocol."""
-def adapt(obj: Any, proto: Any, alt: _T, /) -> Any | _T
+def adapt[Element](obj: Any, proto: Any, alt: Element, /) -> Any | Element
 
 def complete_statement(statement: str) -> bool:
     """Checks if a string contains a complete SQL statement."""
@@ -245,30 +244,30 @@ if sys.version_info >= (3, 12):
         'check_same_thread', 'factory', 'cached_statements' and 'uri' will
         become keyword-only parameters in Python 3.15.
         """
-    def connect(
+    def connect[ConnectionT: Connection](
         database: StrOrBytesPath,
         timeout: float,
         detect_types: int,
         isolation_level: _IsolationLevel,
         check_same_thread: bool,
-        factory: type[_ConnectionT],
+        factory: type[ConnectionT],
         cached_statements: int = 128,
         uri: bool = False,
         *,
         autocommit: bool = ...,
-    ) -> _ConnectionT
-    def connect(
+    ) -> ConnectionT
+    def connect[ConnectionT: Connection](
         database: StrOrBytesPath,
         timeout: float = 5.0,
         detect_types: int = 0,
         isolation_level: _IsolationLevel = "DEFERRED",
         check_same_thread: bool = True,
         *,
-        factory: type[_ConnectionT],
+        factory: type[ConnectionT],
         cached_statements: int = 128,
         uri: bool = False,
         autocommit: bool = ...,
-    ) -> _ConnectionT
+    ) -> ConnectionT
 else:
     def connect(
         database: StrOrBytesPath,
@@ -284,27 +283,27 @@ else:
         You can use ":memory:" to open a database connection to a database that resides
         in RAM instead of on disk.
         """
-    def connect(
+    def connect[ConnectionT: Connection](
         database: StrOrBytesPath,
         timeout: float,
         detect_types: int,
         isolation_level: _IsolationLevel,
         check_same_thread: bool,
-        factory: type[_ConnectionT],
+        factory: type[ConnectionT],
         cached_statements: int = 128,
         uri: bool = False,
-    ) -> _ConnectionT
-    def connect(
+    ) -> ConnectionT
+    def connect[ConnectionT: Connection](
         database: StrOrBytesPath,
         timeout: float = 5.0,
         detect_types: int = 0,
         isolation_level: _IsolationLevel = "DEFERRED",
         check_same_thread: bool = True,
         *,
-        factory: type[_ConnectionT],
+        factory: type[ConnectionT],
         cached_statements: int = 128,
         uri: bool = False,
-    ) -> _ConnectionT
+    ) -> ConnectionT
 
 def enable_callback_tracebacks(enable: bool, /) -> None:
     """Enable or disable callback functions throwing errors to stderr."""
@@ -324,7 +323,7 @@ if sys.version_info < (3, 12):
         the cache=shared query parameter.
         """
 
-def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
+def register_adapter[Element](type: type[Element], adapter: _Adapter[Element], /) -> None:
     """Register a function to adapt Python objects to SQLite values."""
 
 def register_converter(typename: str, converter: _Converter, /) -> None:

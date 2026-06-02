@@ -29,9 +29,9 @@ error[invalid-await]: `NonCallableAwait` is not awaitable
   5 |     await NonCallableAwait()  # error: [invalid-await]
     |           ^^^^^^^^^^^^^^^^^^
     |
-   ::: stdlib/builtins.byi:306:7
+   ::: stdlib/builtins.byi:287:7
     |
-306 | class int:
+287 | class int:
     |       --- attribute defined here
     |
 info: `__await__` is not callable

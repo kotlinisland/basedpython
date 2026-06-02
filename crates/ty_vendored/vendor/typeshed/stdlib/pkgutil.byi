@@ -22,7 +22,6 @@ if sys.version_info < (3, 14):
 if sys.version_info < (3, 12):
     __all__ += ["ImpImporter", "ImpLoader"]
 
-_PathT = TypeVar("_PathT", bound=Iterable[str])
 
 class ModuleInfo(NamedTuple):
     """A namedtuple with minimal info about a module."""
@@ -31,7 +30,7 @@ class ModuleInfo(NamedTuple):
     name: str
     ispkg: bool
 
-def extend_path(path: _PathT, name: str) -> _PathT:
+def extend_path[PathT: Iterable[str]](path: PathT, name: str) -> PathT:
     """Extend a package's path.
 
     Intended use is to place the following code in a package's __init__.py:

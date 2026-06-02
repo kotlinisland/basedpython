@@ -131,9 +131,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/typing.byi:1253:1
+            --> stdlib/typing.byi:1241:1
              |
-        1253 | Generic: type[_Generic]
+        1241 | Generic: type[_Generic]
              | -------
              |
         ");
@@ -638,9 +638,9 @@ mod tests {
           | ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -661,9 +661,9 @@ mod tests {
           |          ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -837,9 +837,9 @@ mod tests {
           4 | class MyClass:
             |       -------
             |
-           ::: stdlib/types.byi:926:13
+           ::: stdlib/types.byi:914:13
             |
-        926 | final class NoneType:
+        914 | final class NoneType:
             |             --------
             |
         "#);
@@ -896,9 +896,9 @@ mod tests {
           4 | class MyClass:
             |       -------
             |
-           ::: stdlib/types.byi:926:13
+           ::: stdlib/types.byi:914:13
             |
-        926 | final class NoneType:
+        914 | final class NoneType:
             |             --------
             |
         "#);
@@ -1511,9 +1511,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -1540,9 +1540,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:306:7
+           --> stdlib/builtins.byi:287:7
             |
-        306 | class int:
+        287 | class int:
             |       ---
             |
         ");
@@ -1568,9 +1568,9 @@ f(**kwargs<CURSOR>)
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/builtins.byi:2794:7
+            --> stdlib/builtins.byi:2775:7
              |
-        2794 | class dict(MutableMapping[_KT, _VT]):
+        2775 | class dict[in out Key, in out Value](MutableMapping[Key, Value]):
              |       ----
              |
         ");
@@ -1601,9 +1601,9 @@ def outer():
           |                ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1651,9 +1651,9 @@ def function():
           |            ^^^^^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1693,9 +1693,9 @@ def function():
           |     ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1774,9 +1774,9 @@ def function():
           |               ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1799,14 +1799,14 @@ def function():
           |     ^ Clicking here
           |
         info: Found 2 type definitions
-           --> stdlib/builtins.byi:854:7
+           --> stdlib/builtins.byi:835:7
             |
-        854 | class str(Sequence[str]):
+        835 | class str(Sequence[str]):
             |       ---
             |
-           ::: stdlib/types.byi:926:13
+           ::: stdlib/types.byi:914:13
             |
-        926 | final class NoneType:
+        914 | final class NoneType:
             |             --------
             |
         ");
@@ -2022,9 +2022,9 @@ def function():
           |                     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:306:7
+           --> stdlib/builtins.byi:287:7
             |
-        306 | class int:
+        287 | class int:
             |       ---
             |
         ");
@@ -2058,9 +2058,9 @@ def function():
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.byi:306:7
+           --> stdlib/builtins.byi:287:7
             |
-        306 | class int:
+        287 | class int:
             |       ---
             |
         ");

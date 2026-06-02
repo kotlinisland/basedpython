@@ -56,11 +56,11 @@ y = foo(1)
               "uri": "file://<typeshed>/stdlib/builtins.byi",
               "range": {
                 "start": {
-                  "line": 305,
+                  "line": 286,
                   "character": 6
                 },
                 "end": {
-                  "line": 305,
+                  "line": 286,
                   "character": 9
                 }
               }

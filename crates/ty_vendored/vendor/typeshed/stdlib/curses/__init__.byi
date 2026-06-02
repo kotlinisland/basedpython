@@ -20,8 +20,6 @@ from typing import Concatenate, Final, ParamSpec, TypeVar, final, type_check_onl
 # windows-curses package makes it available on Windows as well with the same
 # contents.
 
-_T = TypeVar("_T")
-_P = ParamSpec("_P")
 
 # available after calling `curses.initscr()`
 # not `Final` as it can change during the terminal resize:
@@ -32,7 +30,7 @@ COLS: int
 COLORS: Final[int]
 COLOR_PAIRS: Final[int]
 
-def wrapper(func: Callable[Concatenate[window, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T:
+def wrapper[**P, Element](func: Callable[Concatenate[window, P], Element], /, *arg: P.args, **kwds: P.kwargs) -> Element:
     """Wrapper function that initializes curses and calls another function,
     restoring normal keyboard/screen behavior on error.
     The callable object 'func' is then passed the main window 'stdscr'

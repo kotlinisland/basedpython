@@ -9,7 +9,6 @@ from typing import TypeVar
 
 __all__ = ["Error", "Packer", "Unpacker", "ConversionError"]
 
-_T = TypeVar("_T")
 
 class Error(Exception):
     """Exception class for this module. Use:
@@ -46,9 +45,9 @@ class Packer:
     def pack_string(self, s: bytes) -> None
     def pack_opaque(self, s: bytes) -> None
     def pack_bytes(self, s: bytes) -> None
-    def pack_list(self, list: Sequence[_T], pack_item: Callable[[_T], object]) -> None
-    def pack_farray(self, n: int, list: Sequence[_T], pack_item: Callable[[_T], object]) -> None
-    def pack_array(self, list: Sequence[_T], pack_item: Callable[[_T], object]) -> None
+    def pack_list[Element](self, list: Sequence[Element], pack_item: Callable[[Element], object]) -> None
+    def pack_farray[Element](self, n: int, list: Sequence[Element], pack_item: Callable[[Element], object]) -> None
+    def pack_array[Element](self, list: Sequence[Element], pack_item: Callable[[Element], object]) -> None
 
 class Unpacker:
     """Unpacks various data representations from the given buffer."""
@@ -72,6 +71,6 @@ class Unpacker:
     def unpack_string(self) -> bytes
     def unpack_opaque(self) -> bytes
     def unpack_bytes(self) -> bytes
-    def unpack_list(self, unpack_item: Callable[[], _T]) -> list[_T]
-    def unpack_farray(self, n: int, unpack_item: Callable[[], _T]) -> list[_T]
-    def unpack_array(self, unpack_item: Callable[[], _T]) -> list[_T]
+    def unpack_list[Element](self, unpack_item: Callable[[], Element]) -> list[Element]
+    def unpack_farray[Element](self, n: int, unpack_item: Callable[[], Element]) -> list[Element]
+    def unpack_array[Element](self, unpack_item: Callable[[], Element]) -> list[Element]

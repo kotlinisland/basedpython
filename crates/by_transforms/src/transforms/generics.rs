@@ -454,6 +454,14 @@ impl<'src> GenericPolyfill<'src> {
                     format!("({generic_str})"),
                     args.range(),
                 )));
+            } else if let Some(first_keyword) = args.keywords.first() {
+                // `Generic[_T]` is a positional base, so it has to precede any
+                // keyword (e.g. `metaclass=`). insert it just before the first
+                // keyword rather than before the closing `)`
+                self.edits.push(Fix::safe_edit(Edit::insertion(
+                    format!("{generic_str}, "),
+                    first_keyword.range().start(),
+                )));
             } else {
                 // insert `, Generic[_T]` before the closing `)` as a zero-width
                 // edit so it doesn't subsume any edits on the base expressions
@@ -1016,6 +1024,36 @@ mod tests {
                 from typing import TypeVar, Generic
                 _T = TypeVar(\"_T\")
                 class Foo(Base, Generic[_T]): ...
+            "},
+        );
+    }
+
+    #[test]
+    fn class_with_metaclass_keyword() {
+        // the synthesized `Generic[_T]` is a positional base, so it must come
+        // before the `metaclass=` keyword, not after the closing paren
+        check(
+            indoc! {"
+                class Foo[T](Base, metaclass=ABCMeta): ...
+            "},
+            indoc! {"
+                from typing import TypeVar, Generic
+                _T = TypeVar(\"_T\")
+                class Foo(Base, Generic[_T], metaclass=ABCMeta): ...
+            "},
+        );
+    }
+
+    #[test]
+    fn class_with_only_metaclass_keyword() {
+        check(
+            indoc! {"
+                class Foo[T](metaclass=ABCMeta): ...
+            "},
+            indoc! {"
+                from typing import TypeVar, Generic
+                _T = TypeVar(\"_T\")
+                class Foo(Generic[_T], metaclass=ABCMeta): ...
             "},
         );
     }

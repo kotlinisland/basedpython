@@ -38,9 +38,8 @@ class _WritelnDecorator:
     def flush(self) -> object
     def write(self, s: str, /) -> object
 
-_StreamT = TypeVar("_StreamT", bound=_TextTestStream, default=_WritelnDecorator)
 
-class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
+class TextTestResult[in out StreamT: _TextTestStream = _WritelnDecorator](unittest.result.TestResult):
     """A test result class that can print formatted text results to a stream.
 
     Used by TextTestRunner.
@@ -51,15 +50,15 @@ class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
     separator1: str
     separator2: str
     showAll: bool  # undocumented
-    stream: _StreamT  # undocumented
+    stream: StreamT  # undocumented
     if sys.version_info >= (3, 12):
         durations: int | None
-        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int, *, durations: int | None = None) -> None:
+        def __init__(self, stream: StreamT, descriptions: bool, verbosity: int, *, durations: int | None = None) -> None:
             """Construct a TextTestResult. Subclasses should accept **kwargs
             to ensure compatibility as the interface changes.
             """
     else:
-        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None
+        def __init__(self, stream: StreamT, descriptions: bool, verbosity: int) -> None
 
     def getDescription(self, test: unittest.case.TestCase) -> str
     def printErrorList(self, flavour: str, errors: Iterable[(unittest.case.TestCase, str)]) -> None

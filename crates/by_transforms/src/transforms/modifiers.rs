@@ -809,6 +809,18 @@ mod tests {
     }
 
     #[test]
+    fn let_as_identifier_is_not_a_declaration() {
+        // `let` only introduces a declaration when shaped like `let NAME =` or
+        // `let NAME :`. as a plain identifier it stays untouched (all valid
+        // python), and crucially the parser must not panic — a tool such as
+        // ERA001 parsing a comment like `# the OS will let us` used to hit a
+        // `bump(Equal)` assertion
+        check("let = 5\n", "let = 5\n");
+        check("let.append(1)\n", "let.append(1)\n");
+        check("print(let)\n", "print(let)\n");
+    }
+
+    #[test]
     fn class_var_decl() {
         check(
             indoc! {"

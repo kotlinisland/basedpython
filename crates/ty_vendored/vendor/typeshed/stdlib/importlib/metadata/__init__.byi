@@ -48,7 +48,7 @@ class PackageNotFoundError(ModuleNotFoundError):
     """The package was not found."""
 
     @property
-    def name(self) -> str: ...  # type: ignore[override]
+    def name(self) -> str  # type: ignore[override]
 
 if sys.version_info >= (3, 15):
     class MetadataNotFound(FileNotFoundError)
@@ -111,11 +111,11 @@ if sys.version_info >= (3, 11):
             """
 
         @property
-        def extras(self) -> list[str]: ...
+        def extras(self) -> list[str]
         @property
-        def module(self) -> str: ...
+        def module(self) -> str
         @property
-        def attr(self) -> str: ...
+        def attr(self) -> str
         dist: ClassVar[Distribution | None]
         def matches(
             self,
@@ -184,11 +184,11 @@ else:
             """
 
         @property
-        def extras(self) -> list[str]: ...
+        def extras(self) -> list[str]
         @property
-        def module(self) -> str: ...
+        def module(self) -> str
         @property
-        def attr(self) -> str: ...
+        def attr(self) -> str
         dist: ClassVar[Distribution | None]
         def matches(
             self,
@@ -385,9 +385,9 @@ if sys.version_info < (3, 12):
         entry_points that fully implements the dict interface.
         """
 
-        class def load(cls, eps: Iterable[EntryPoint]) -> Self: ...
+        class def load(cls, eps: Iterable[EntryPoint]) -> Self
         @property
-        def groups(self) -> set[str]: ...
+        def groups(self) -> set[str]
         @property
         def names(self) -> set[str]:
             """
@@ -556,7 +556,7 @@ class Distribution(_distribution_parent):
         """Return the 'Name' metadata for the distribution package."""
     if sys.version_info >= (3, 13):
         @property
-        def origin(self) -> types.SimpleNamespace | None: ...
+        def origin(self) -> types.SimpleNamespace | None
 
 class DistributionFinder(MetaPathFinder):
     """
@@ -622,7 +622,7 @@ class MetadataPathFinder(DistributionFinder):
         of directories ``context.path``.
         """
     if sys.version_info >= (3, 11):
-        class def invalidate_caches(cls) -> None: ...
+        class def invalidate_caches(cls) -> None
     else:
         # Yes, this is an instance method that has a parameter named "cls"
         def invalidate_caches(cls) -> None

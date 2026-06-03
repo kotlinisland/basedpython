@@ -109,4 +109,4 @@ if sys.version_info >= (3, 12):
     @runtime_checkable
     class Buffer(Protocol):
         __slots__ = ()
-        abstract def __buffer__(self, flags: int, /) -> memoryview: ...
+        abstract def __buffer__(self, flags: int, /) -> memoryview

@@ -62,11 +62,11 @@ class _Compress:
 @type_check_only
 class _Decompress:
     @property
-    def unused_data(self) -> bytes: ...
+    def unused_data(self) -> bytes
     @property
-    def unconsumed_tail(self) -> bytes: ...
+    def unconsumed_tail(self) -> bytes
     @property
-    def eof(self) -> bool: ...
+    def eof(self) -> bool
     def __copy__(self) -> Self
     def __deepcopy__(self, memo: Any, /) -> Self
     def decompress(self, data: ReadableBuffer, /, max_length: int = 0) -> bytes

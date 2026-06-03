@@ -487,12 +487,16 @@ pub fn reverse_transpile(source: &str, config: &Config) -> Result<String, String
     let mut super_kw_rev = reverse_transforms::super_keyword::SuperKeywordReverse::new(src);
     let mut anon_named_tuple_rev =
         reverse_transforms::anon_named_tuple::AnonNamedTupleReverse::new(src, module.suite());
-    let mut empty_decls = reverse_transforms::empty_declarations::EmptyDeclarations::new();
+    let mut empty_decls =
+        reverse_transforms::empty_declarations::EmptyDeclarations::new(config.is_stub);
     let mut literal_types = reverse_transforms::literal_types::LiteralReverse::new(src, &model);
     let mut subscript = reverse_transforms::subscript::SubscriptReverse::new(src, &model);
     let mut indent_string = reverse_transforms::dedent_string::IndentString::new(src);
     let mut constraints = reverse_transforms::constraints::ConstraintsReverse::new();
-    let mut callable = reverse_transforms::callable::CallableReverse::new(src, &model);
+    let mut callable = {
+        let c = reverse_transforms::callable::CallableReverse::new(src, &model);
+        if config.is_stub { c.stub() } else { c }
+    };
     let mut intersection = reverse_transforms::intersection::IntersectionReverse::new(src, &model);
     let mut not_rev = reverse_transforms::not_type::NotTypeReverse::new(src, &model);
     let mut type_is_rev = reverse_transforms::type_is::TypeIsReverse::new(src, &model);
@@ -525,21 +529,24 @@ pub fn reverse_transpile(source: &str, config: &Config) -> Result<String, String
         auto_quote_rev.visit_stmt(stmt);
         compat_rev.visit_stmt(stmt);
         none_chain_rev.visit_stmt(stmt);
+        // `callable` rewrites callable annotations to the arrow form. it runs
+        // for stubs too, but in a restricted "stub" mode (set above) that only
+        // touches the gradual `Callable[..., R]` form — the `Callable[[A, B],
+        // R]` list form is left intact, since ty's native basedpython parser
+        // can't carry `Unpack[Ts]`/`*Ts` through the arrow and stubs would
+        // lose generic callable info
+        callable.visit_stmt(stmt);
         // skip transforms that change runtime/display semantics when
         // rewriting stubs:
         //  - `literal_types` strips `Literal[...]` to bare literals, but a
         //    bare `1 | 2` in a `TypeAlias = ...` RHS evaluates at runtime
         //    as integer OR (= `3`) rather than `Literal[1, 2]`
-        //  - `callable` rewrites `Callable[[A, B], R]` to `(A, B) -> R`;
-        //    ty's native basedpython parser doesn't handle `Unpack[Ts]` and
-        //    `*Ts` inside the arrow form, so stubs lose generic callable info
         //  - `typing_redirect` rewrites `typing_extensions` imports, but
         //    stubs use them deliberately for version-aware re-exports
         //  - `generics` turns `X: TypeAlias = T` into PEP 695 `type X = T`,
         //    which resolves lazily and changes alias display in diagnostics
         if !config.is_stub {
             literal_types.visit_stmt(stmt);
-            callable.visit_stmt(stmt);
             typing_redirect_rev.visit_stmt(stmt);
             generics_rev.visit_stmt(stmt);
         }

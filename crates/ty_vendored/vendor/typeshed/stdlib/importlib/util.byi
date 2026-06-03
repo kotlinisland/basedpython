@@ -90,7 +90,7 @@ class LazyLoader(Loader):
     """A loader that creates a module which defers loading until attribute access."""
 
     def __init__(self, loader: Loader) -> None
-    class def factory(cls, loader: Loader) -> Callable[..., LazyLoader]:
+    class def factory(cls, loader: Loader) -> (...) -> LazyLoader:
         """Construct a callable which returns the eager loader made lazy."""
 
     def exec_module(self, module: types.ModuleType) -> None:
@@ -140,7 +140,7 @@ if sys.version_info >= (3, 12):
             self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
         ) -> None
         @property
-        def override(self) -> Literal[-1, 1]: ...  # undocumented
+        def override(self) -> Literal[-1, 1]  # undocumented
 
 if sys.version_info >= (3, 14):
     __all__ = [

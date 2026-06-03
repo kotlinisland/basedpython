@@ -49,7 +49,7 @@ class BaseBrowser:
     name: str
     basename: str
     def __init__(self, name: str = "") -> None
-    abstract def open(self, url: str, new: int = 0, autoraise: bool = True) -> bool: ...
+    abstract def open(self, url: str, new: int = 0, autoraise: bool = True) -> bool
     def open_new(self, url: str) -> bool
     def open_new_tab(self, url: str) -> bool
 

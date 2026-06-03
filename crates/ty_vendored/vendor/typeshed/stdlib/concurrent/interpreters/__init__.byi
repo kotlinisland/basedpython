@@ -77,11 +77,11 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
         def __hash__(self) -> int
         def __del__(self) -> None
         @property
-        def id(self) -> int: ...
+        def id(self) -> int
         @property
         def whence(
             self,
-        ) -> Literal["unknown", "runtime init", "legacy C-API", "C-API", "cross-interpreter C-API", "_interpreters module"]: ...
+        ) -> Literal["unknown", "runtime init", "legacy C-API", "C-API", "cross-interpreter C-API", "_interpreters module"]
         def is_running(self) -> bool:
             """Return whether or not the identified interpreter is running."""
 

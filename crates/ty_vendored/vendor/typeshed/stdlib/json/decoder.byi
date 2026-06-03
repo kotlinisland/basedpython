@@ -119,7 +119,7 @@ class JSONDecoder:
             including ``'\\t'`` (tab), ``'\\n'``, ``'\\r'`` and ``'\\0'``.
             """
 
-    def decode(self, s: str, _w: Callable[..., Any] = ...) -> Any:  # _w is undocumented
+    def decode(self, s: str, _w: (...) -> Any = ...) -> Any:  # _w is undocumented
         """Return the Python representation of ``s`` (a ``str`` instance
         containing a JSON document).
 

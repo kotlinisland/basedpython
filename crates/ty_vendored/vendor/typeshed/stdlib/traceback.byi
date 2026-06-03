@@ -262,10 +262,10 @@ class TracebackException:
 
     if sys.version_info >= (3, 13):
         @property
-        def exc_type_str(self) -> str: ...
+        def exc_type_str(self) -> str
         @property
         @deprecated("Deprecated since Python 3.13. Use `exc_type_str` instead.")
-        def exc_type(self) -> type[BaseException] | None: ...
+        def exc_type(self) -> type[BaseException] | None
     else:
         exc_type: type[BaseException]
     if sys.version_info >= (3, 13):
@@ -484,7 +484,7 @@ class FrameSummary:
     name: str
     locals: dict[str, str] | None
     @property
-    def line(self) -> str | None: ...
+    def line(self) -> str | None
 
     def __getitem__(self, pos: Literal[0]) -> str
     def __getitem__(self, pos: Literal[1]) -> int

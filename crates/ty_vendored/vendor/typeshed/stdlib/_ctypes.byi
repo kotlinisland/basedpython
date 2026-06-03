@@ -237,7 +237,7 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
 
     def __new__(cls) -> Self
     def __new__(cls, address: int, /) -> Self
-    def __new__(cls, callable: Callable[..., Any], /) -> Self
+    def __new__(cls, callable: (...) -> Any, /) -> Self
     def __new__(cls, func_spec: (str | int, CDLL), paramflags: (*: _PF) | None = ..., /) -> Self
     if sys.platform == "win32":
         def __new__(

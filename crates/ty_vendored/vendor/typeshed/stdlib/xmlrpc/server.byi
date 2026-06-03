@@ -204,7 +204,7 @@ class SimpleXMLRPCDispatcher:  # undocumented
 
         """
 
-    def register_function(self, function: _DispatchProtocol | None = None, name: str | None = None) -> Callable[..., Any]:
+    def register_function(self, function: _DispatchProtocol | None = None, name: str | None = None) -> (...) -> Any:
         """Registers a function to respond to XML-RPC requests.
 
         The optional name argument can be used to set a Unicode name

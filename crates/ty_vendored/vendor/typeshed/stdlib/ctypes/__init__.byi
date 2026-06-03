@@ -229,10 +229,10 @@ def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_w
 
 if sys.version_info < (3, 15):
     @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
-    def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None: ...
+    def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None
 
 @deprecated("Soft deprecated since Python 3.13. Use multiplication instead.")
-def ARRAY[CT: _CData](typ: CT, len: int) -> Array[CT]: ...
+def ARRAY[CT: _CData](typ: CT, len: int) -> Array[CT]
 
 if sys.platform == "win32":
     def DllCanUnloadNow() -> int
@@ -440,11 +440,11 @@ class c_char(_SimpleCData[bytes]):
 class c_char_p(_PointerLike, _SimpleCData[bytes | None]):
     _type_: ClassVar[Literal["z"]]
     def __init__(self, value: int | bytes | None = ...) -> None
-    class def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
+    class def from_param(cls, value: Any, /) -> Self | _CArgObject
 
 class c_void_p(_PointerLike, _SimpleCData[int | None]):
     _type_: ClassVar[Literal["P"]]
-    class def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
+    class def from_param(cls, value: Any, /) -> Self | _CArgObject
 
 c_voidp = c_void_p  # backwards compatibility (to a bug)
 
@@ -454,7 +454,7 @@ class c_wchar(_SimpleCData[str]):
 class c_wchar_p(_PointerLike, _SimpleCData[str | None]):
     _type_: ClassVar[Literal["Z"]]
     def __init__(self, value: int | str | None = ...) -> None
-    class def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
+    class def from_param(cls, value: Any, /) -> Self | _CArgObject
 
 if sys.platform == "win32":
     class HRESULT(_SimpleCData[int]):  # TODO: undocumented

@@ -32,8 +32,8 @@ class async_chat(asyncore.dispatcher):
 
     ac_in_buffer_size: int
     ac_out_buffer_size: int
-    abstract def collect_incoming_data(self, data: bytes) -> None: ...
-    abstract def found_terminator(self) -> None: ...
+    abstract def collect_incoming_data(self, data: bytes) -> None
+    abstract def found_terminator(self) -> None
     def set_terminator(self, term: bytes | int | None) -> None:
         """Set the input delimiter.
 

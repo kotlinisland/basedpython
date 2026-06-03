@@ -69,7 +69,7 @@ class Server(AbstractServer):
     async def start_serving(self) -> None
     async def serve_forever(self) -> None
     @property
-    def sockets(self) -> (*: socket): ...
+    def sockets(self) -> (*: socket)
     def close(self) -> None
     async def wait_closed(self) -> None:
         """Wait until server is closed and all connections are dropped.

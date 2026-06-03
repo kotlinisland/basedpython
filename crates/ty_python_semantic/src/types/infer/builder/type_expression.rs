@@ -1110,6 +1110,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Starred(starred) => self.infer_starred_type_expression(starred),
 
             // basedpython: `(int, str) -> bool` sugar for `Callable[[int, str], bool]`
+            // `(...) -> R` — a single bare ellipsis parameter list is the
+            // gradual "any arguments" callable, equivalent to `Callable[..., R]`
+            ast::Expr::CallableType(callable)
+                if matches!(callable.args.as_slice(), [ast::Expr::EllipsisLiteral(_)]) =>
+            {
+                let db = self.db();
+                let return_type = self.infer_type_expression(&callable.returns);
+                Type::single_callable(db, Signature::new(Parameters::gradual_form(), return_type))
+            }
             ast::Expr::CallableType(callable) => {
                 let db = self.db();
                 let slash = callable.parameter_slash.map(|i| i as usize);

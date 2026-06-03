@@ -27,7 +27,7 @@ if sys.platform == "win32":
         def __enter__(self) -> Self
         def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None
         @property
-        def handle(self) -> int: ...
+        def handle(self) -> int
         def fileno(self) -> int
         def close(self, *, CloseHandle: Callable[[int], object] = ...) -> None
 

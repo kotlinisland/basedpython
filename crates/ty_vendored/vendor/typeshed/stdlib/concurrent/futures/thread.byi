@@ -61,10 +61,10 @@ if sys.version_info >= (3, 14):
 else:
     class _WorkItem[in out Other]:
         future: Future[Other]
-        fn: Callable[..., Other]
+        fn: (...) -> Other
         args: Iterable[Any]
         kwargs: Mapping[str, Any]
-        def __init__(self, future: Future[Other], fn: Callable[..., Other], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None
+        def __init__(self, future: Future[Other], fn: (...) -> Other, args: Iterable[Any], kwargs: Mapping[str, Any]) -> None
         def run(self) -> None
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
@@ -99,7 +99,7 @@ class ThreadPoolExecutor(Executor):
         _create_worker_context: Callable[[], WorkerContext]
         _resolve_work_item_task: _ResolveTaskFunc
     else:
-        _initializer: Callable[..., None] | None
+        _initializer: (...) -> None | None
         _initargs: (*: Any)
     _work_queue: queue.SimpleQueue[_WorkItem[Any]]
 

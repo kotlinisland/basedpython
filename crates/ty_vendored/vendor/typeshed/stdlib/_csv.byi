@@ -64,7 +64,7 @@ class Reader:
     """
 
     @property
-    def dialect(self) -> Dialect: ...
+    def dialect(self) -> Dialect
     line_num: int
     def __iter__(self) -> Self:
         """Implement iter(self)."""
@@ -82,7 +82,7 @@ class Writer:
     """
 
     @property
-    def dialect(self) -> Dialect: ...
+    def dialect(self) -> Dialect
     if sys.version_info >= (3, 13):
         def writerow(self, row: Iterable[Any], /) -> Any:
             """Construct and write a CSV record from an iterable of fields.

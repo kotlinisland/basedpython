@@ -14,11 +14,11 @@ openssl_md_meth_names: frozenset[str]
 @type_check_only
 class _HashObject(Protocol):
     @property
-    def digest_size(self) -> int: ...
+    def digest_size(self) -> int
     @property
-    def block_size(self) -> int: ...
+    def block_size(self) -> int
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
     def copy(self) -> Self
     def digest(self) -> bytes
     def hexdigest(self) -> str
@@ -42,11 +42,11 @@ class HASH:
     """
 
     @property
-    def digest_size(self) -> int: ...
+    def digest_size(self) -> int
     @property
-    def block_size(self) -> int: ...
+    def block_size(self) -> int
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
     def copy(self) -> Self:
         """Return a copy of the hash object."""
 
@@ -100,11 +100,11 @@ final class HMAC:
     """
 
     @property
-    def digest_size(self) -> int: ...
+    def digest_size(self) -> int
     @property
-    def block_size(self) -> int: ...
+    def block_size(self) -> int
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
     def copy(self) -> Self:
         """Return a copy ("clone") of the HMAC object."""
 

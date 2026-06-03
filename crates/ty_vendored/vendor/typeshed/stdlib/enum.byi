@@ -105,7 +105,7 @@ class _EnumDict(dict[str, Any]):
 
     if sys.version_info >= (3, 13):
         @property
-        def member_names(self) -> list[str]: ...
+        def member_names(self) -> list[str]
 
 if sys.version_info >= (3, 13):
     EnumDict = _EnumDict
@@ -132,7 +132,7 @@ class EnumMeta(type):
             metacls: type[_typeshed.Self], cls: str, bases: (*: type), classdict: _EnumDict, **kwds: Any
         ) -> _typeshed.Self
 
-    class def __prepare__(metacls, cls: str, bases: (*: type), **kwds: Any) -> _EnumDict: ...  # type: ignore[override]
+    class def __prepare__(metacls, cls: str, bases: (*: type), **kwds: Any) -> _EnumDict  # type: ignore[override]
     def __iter__[EnumMemberT](self: type[EnumMemberT]) -> Iterator[EnumMemberT]:
         """
         Return members in definition order.
@@ -329,7 +329,7 @@ class EnumMeta(type):
             """
     if sys.version_info >= (3, 14):
         @property
-        def __signature__(cls) -> _Signature: ...
+        def __signature__(cls) -> _Signature
 
     _member_names_: list[str]  # undocumented
     _member_map_: dict[str, Enum]  # undocumented
@@ -409,7 +409,7 @@ class Enum(metaclass=EnumMeta):
     _ignore_: str | list[str]
     _order_: str
     __order__: str
-    class def _missing_(cls, value: object) -> Any: ...
+    class def _missing_(cls, value: object) -> Any
     static def _generate_next_value_(name: str, start: int, count: int, last_values: list[Any]) -> Any:
         """
         Generate the next value when not given.
@@ -441,7 +441,7 @@ class Enum(metaclass=EnumMeta):
         def __copy__(self) -> Self
         def __deepcopy__(self, memo: Any) -> Self
     if sys.version_info >= (3, 12) and sys.version_info < (3, 14):
-        class def __signature__(cls) -> str: ...
+        class def __signature__(cls) -> str
     if sys.version_info >= (3, 13):
         # Value may be any type, even in special enums. Enabling Enum parsing from
         # multiple value types
@@ -682,7 +682,7 @@ class auto:
 
     _value_: Any
     @_magic_enum_attr
-    def value(self) -> Any: ...
+    def value(self) -> Any
     def __new__(cls) -> Self
 
     # These don't exist, but auto is basically immediately replaced with
@@ -703,4 +703,4 @@ class auto:
 
 if sys.version_info >= (3, 11):
     def pickle_by_global_name(self: Enum, proto: int) -> str
-    def pickle_by_enum_name[EnumMemberT](self: EnumMemberT, proto: int) -> (Callable[..., Any], (type[EnumMemberT], str))
+    def pickle_by_enum_name[EnumMemberT](self: EnumMemberT, proto: int) -> tuple[(...) -> Any, tuple[type[EnumMemberT], str]]

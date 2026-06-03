@@ -179,6 +179,8 @@ mod tests {
 
     #[test]
     fn abstract_method() {
+        // non-stub: the modifier reverses but the `: ...` body is kept, since a
+        // bodyless `abstract def` forward-maps to `: raise NotImplementedError`
         check(
             "class A:\n    @abstractmethod\n    def f(self): ...\n",
             "class A:\n    abstract def f(self): ...\n",
@@ -195,7 +197,7 @@ mod tests {
     fn final_method() {
         check(
             "class A:\n    @final\n    def f(self): ...\n",
-            "class A:\n    final def f(self): ...\n",
+            "class A:\n    final def f(self)\n",
         );
     }
 
@@ -203,7 +205,7 @@ mod tests {
     fn override_method() {
         check(
             "class A:\n    @override\n    def f(self): ...\n",
-            "class A:\n    override def f(self): ...\n",
+            "class A:\n    override def f(self)\n",
         );
     }
 
@@ -211,7 +213,7 @@ mod tests {
     fn static_method() {
         check(
             "class A:\n    @staticmethod\n    def f(): ...\n",
-            "class A:\n    static def f(): ...\n",
+            "class A:\n    static def f()\n",
         );
     }
 
@@ -219,7 +221,7 @@ mod tests {
     fn class_method() {
         check(
             "class A:\n    @classmethod\n    def f(cls): ...\n",
-            "class A:\n    class def f(cls): ...\n",
+            "class A:\n    class def f(cls)\n",
         );
     }
 
@@ -266,7 +268,7 @@ mod tests {
         // modifier decorator.
         check(
             "class A:\n    @property\n    @final\n    def f(self) -> int: ...\n",
-            "class A:\n    @property\n    final def f(self) -> int: ...\n",
+            "class A:\n    @property\n    final def f(self) -> int\n",
         );
     }
 

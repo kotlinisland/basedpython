@@ -581,7 +581,7 @@ version_info: _version_info
 Version information as a named tuple.
 """
 
-def call_tracing[Element](func: Callable[..., Element], args: Any, /) -> Element:
+def call_tracing[Element](func: (...) -> Element, args: Any, /) -> Element:
     """Call func(*args), while tracing is enabled.
 
     The tracing state is saved, and restored afterwards.  This is intended
@@ -763,25 +763,25 @@ if sys.platform == "win32":
     @type_check_only
     class _WinVersion(_UninstantiableStructseq, tuple[int, int, int, int, str]):
         @property
-        def major(self) -> int: ...
+        def major(self) -> int
         @property
-        def minor(self) -> int: ...
+        def minor(self) -> int
         @property
-        def build(self) -> int: ...
+        def build(self) -> int
         @property
-        def platform(self) -> int: ...
+        def platform(self) -> int
         @property
-        def service_pack(self) -> str: ...
+        def service_pack(self) -> str
         @property
-        def service_pack_minor(self) -> int: ...
+        def service_pack_minor(self) -> int
         @property
-        def service_pack_major(self) -> int: ...
+        def service_pack_major(self) -> int
         @property
-        def suite_mask(self) -> int: ...
+        def suite_mask(self) -> int
         @property
-        def product_type(self) -> int: ...
+        def product_type(self) -> int
         @property
-        def platform_version(self) -> (int, int, int): ...
+        def platform_version(self) -> (int, int, int)
 
     def getwindowsversion() -> _WinVersion:
         """Return info about the running version of Windows as a named tuple.
@@ -908,9 +908,9 @@ class _asyncgen_hooks(structseq[_AsyncgenHook], tuple[_AsyncgenHook, _AsyncgenHo
     __match_args__: Final = ("firstiter", "finalizer")
 
     @property
-    def firstiter(self) -> _AsyncgenHook: ...
+    def firstiter(self) -> _AsyncgenHook
     @property
-    def finalizer(self) -> _AsyncgenHook: ...
+    def finalizer(self) -> _AsyncgenHook
 
 def get_asyncgen_hooks() -> _asyncgen_hooks:
     """Return the installed asynchronous generators hooks.

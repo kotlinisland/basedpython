@@ -131,9 +131,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/typing.byi:1241:1
+            --> stdlib/typing.byi:1242:1
              |
-        1241 | Generic: type[_Generic]
+        1242 | Generic: type[_Generic]
              | -------
              |
         ");

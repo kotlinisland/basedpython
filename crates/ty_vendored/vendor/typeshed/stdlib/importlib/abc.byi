@@ -296,7 +296,7 @@ if sys.version_info < (3, 11):
             Yield Traversable objects in self
             """
         if sys.version_info >= (3, 11):
-            abstract def joinpath(self, *descendants: str) -> Traversable: ...
+            abstract def joinpath(self, *descendants: str) -> Traversable
         else:
             abstract def joinpath(self, child: str, /) -> Traversable:
                 """

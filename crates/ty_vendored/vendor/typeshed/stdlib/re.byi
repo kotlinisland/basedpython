@@ -255,7 +255,7 @@ final class Match(Generic[AnyStr]):
         """For match object m, return the 2-tuple (m.start(group), m.end(group))."""
 
     @property
-    def regs(self) -> (*: (int, int)): ...  # undocumented
+    def regs(self) -> (*: (int, int))  # undocumented
 
     # __getitem__() returns "AnyStr" or "AnyStr | None", depending on the pattern.
     def __getitem__(self, key: Literal[0], /) -> AnyStr:

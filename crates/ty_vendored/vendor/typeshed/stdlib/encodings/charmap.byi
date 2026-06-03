@@ -16,9 +16,9 @@ from _typeshed import ReadableBuffer
 
 class Codec(codecs.Codec):
     # At runtime, this is codecs.charmap_encode
-    static def encode(str: str, errors: str | None = None, mapping: _CharMap | None = None, /) -> (bytes, int): ...
+    static def encode(str: str, errors: str | None = None, mapping: _CharMap | None = None, /) -> (bytes, int)
     # At runtime, this is codecs.charmap_decode
-    static def decode(data: ReadableBuffer, errors: str | None = None, mapping: _CharMap | None = None, /) -> (str, int): ...
+    static def decode(data: ReadableBuffer, errors: str | None = None, mapping: _CharMap | None = None, /) -> (str, int)
 
 class IncrementalEncoder(codecs.IncrementalEncoder):
     mapping: _CharMap | None

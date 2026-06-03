@@ -7,7 +7,7 @@
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{Expr, ExprSubscript, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::type_info::TypeInfo;
@@ -15,6 +15,12 @@ use crate::type_info::TypeInfo;
 pub(crate) struct CallableReverse<'src> {
     source: &'src str,
     types: &'src dyn TypeInfo,
+    /// in stub mode, the `Callable[[A, B], R]` list form is left intact —
+    /// ty's basedpython parser can't carry `Unpack[Ts]`/`*Ts` through the
+    /// arrow form, so stubs would lose generic callable info. the gradual
+    /// `Callable[..., R]` form has no parameter list to lose and is always
+    /// rewritten to `(...) -> R`
+    stub: bool,
     pub(crate) edits: Vec<Fix>,
 }
 
@@ -23,8 +29,14 @@ impl<'src> CallableReverse<'src> {
         Self {
             source,
             types,
+            stub: false,
             edits: Vec::new(),
         }
+    }
+
+    pub(crate) fn stub(mut self) -> Self {
+        self.stub = true;
+        self
     }
 
     fn src(&self, range: TextRange) -> &str {
@@ -51,9 +63,27 @@ impl<'src> CallableReverse<'src> {
                 if t.parenthesized || t.elts.len() != 2 {
                     return None;
                 }
+                let ret = &t.elts[1];
+                // `Callable[..., R]` — "any arguments" — reverses to `(...) -> R`.
+                // safe in stub mode: there is no parameter list to lose
+                if matches!(&t.elts[0], Expr::EllipsisLiteral(_)) {
+                    let ret_str = self
+                        .rewrite(ret)
+                        .unwrap_or_else(|| self.src(ret.range()).to_owned());
+                    return Some(format!("(...) -> {ret_str}"));
+                }
+                // list form: leave the `Callable[...]` wrapper intact in stub
+                // mode but still recurse so any nested `Callable[..., R]` is
+                // converted
+                if self.stub {
+                    return self.rewrite_subscript_children(s);
+                }
                 let Expr::List(args_list) = &t.elts[0] else {
                     return None;
                 };
+                let ret_str = self
+                    .rewrite(ret)
+                    .unwrap_or_else(|| self.src(ret.range()).to_owned());
                 let args_str = args_list
                     .elts
                     .iter()
@@ -63,10 +93,6 @@ impl<'src> CallableReverse<'src> {
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
-                let ret = &t.elts[1];
-                let ret_str = self
-                    .rewrite(ret)
-                    .unwrap_or_else(|| self.src(ret.range()).to_owned());
                 Some(format!("({args_str}) -> {ret_str}"))
             }
 
@@ -82,29 +108,51 @@ impl<'src> CallableReverse<'src> {
                 }
             }
 
-            Expr::Subscript(s) => {
-                let slice_rewrite = match s.slice.as_ref() {
-                    Expr::Tuple(t) if !t.parenthesized => {
-                        let rewrites: Vec<Option<String>> =
-                            t.elts.iter().map(|e| self.rewrite(e)).collect();
-                        if rewrites.iter().any(Option::is_some) {
-                            let parts: Vec<String> = rewrites
-                                .into_iter()
-                                .zip(t.elts.iter())
-                                .map(|(r, e)| r.unwrap_or_else(|| self.src(e.range()).to_owned()))
-                                .collect();
-                            Some(parts.join(", "))
-                        } else {
-                            None
-                        }
-                    }
-                    slice => self.rewrite(slice),
-                };
-                slice_rewrite.map(|s_text| format!("{}[{s_text}]", self.src(s.value.range())))
+            Expr::Subscript(s) => self.rewrite_subscript_children(s),
+
+            // descend into list literals (e.g. a `Callable[[A, B], R]` left
+            // intact in stub mode) so nested callable forms are still rewritten
+            Expr::List(l) => {
+                let rewrites: Vec<Option<String>> =
+                    l.elts.iter().map(|e| self.rewrite(e)).collect();
+                if rewrites.iter().any(Option::is_some) {
+                    let parts: Vec<String> = rewrites
+                        .into_iter()
+                        .zip(l.elts.iter())
+                        .map(|(r, e)| r.unwrap_or_else(|| self.src(e.range()).to_owned()))
+                        .collect();
+                    Some(format!("[{}]", parts.join(", ")))
+                } else {
+                    None
+                }
             }
 
             _ => None,
         }
+    }
+
+    /// recurse into a subscript's slice, rewriting any nested callable forms
+    /// while keeping the `value[...]` wrapper. returns `None` if nothing in
+    /// the slice changed
+    fn rewrite_subscript_children(&mut self, s: &ExprSubscript) -> Option<String> {
+        let slice_rewrite = match s.slice.as_ref() {
+            Expr::Tuple(t) if !t.parenthesized => {
+                let rewrites: Vec<Option<String>> =
+                    t.elts.iter().map(|e| self.rewrite(e)).collect();
+                if rewrites.iter().any(Option::is_some) {
+                    let parts: Vec<String> = rewrites
+                        .into_iter()
+                        .zip(t.elts.iter())
+                        .map(|(r, e)| r.unwrap_or_else(|| self.src(e.range()).to_owned()))
+                        .collect();
+                    Some(parts.join(", "))
+                } else {
+                    None
+                }
+            }
+            slice => self.rewrite(slice),
+        };
+        slice_rewrite.map(|s_text| format!("{}[{s_text}]", self.src(s.value.range())))
     }
 
     fn visit_annotation(&mut self, ann: &Expr) {
@@ -137,6 +185,33 @@ mod tests {
         );
     }
 
+    fn check_stub(input: &str, expected: &str) {
+        let config = Config {
+            is_stub: true,
+            ..Config::test_default()
+        };
+        assert_eq!(reverse_transpile(input, &config).unwrap(), expected);
+    }
+
+    #[test]
+    fn stub_keeps_list_form_but_rewrites_ellipsis() {
+        // in stub mode the `Callable[[A], R]` list form is preserved (can't
+        // carry `Unpack[Ts]`/`*Ts` through the arrow), but the gradual
+        // `Callable[..., R]` form is still rewritten to `(...) -> R`
+        check_stub(
+            "from typing import Callable\na: Callable[..., int]\nb: Callable[[int], str]\n",
+            "from typing import Callable\na: (...) -> int\nb: Callable[[int], str]\n",
+        );
+    }
+
+    #[test]
+    fn stub_rewrites_nested_ellipsis_inside_list_form() {
+        check_stub(
+            "from typing import Callable\na: Callable[[Callable[..., int]], str]\n",
+            "from typing import Callable\na: Callable[[(...) -> int], str]\n",
+        );
+    }
+
     #[test]
     fn simple_callable() {
         check(
@@ -158,6 +233,22 @@ mod tests {
         check(
             "from typing import Callable\na: Callable[[int, str], bool]\n",
             "from typing import Callable\na: (int, str) -> bool\n",
+        );
+    }
+
+    #[test]
+    fn ellipsis_args() {
+        check(
+            "from typing import Callable\na: Callable[..., int]\n",
+            "from typing import Callable\na: (...) -> int\n",
+        );
+    }
+
+    #[test]
+    fn ellipsis_args_nested_return() {
+        check(
+            "from typing import Callable\na: Callable[..., Callable[[int], str]]\n",
+            "from typing import Callable\na: (...) -> (int) -> str\n",
         );
     }
 

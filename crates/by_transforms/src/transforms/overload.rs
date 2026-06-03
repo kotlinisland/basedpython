@@ -28,11 +28,12 @@ use super::ast_driver::{AstPass, PassContext};
 
 pub(crate) struct Overload<'src> {
     source: &'src str,
+    is_stub: bool,
 }
 
 impl<'src> Overload<'src> {
-    pub(crate) fn new(source: &'src str) -> Self {
-        Self { source }
+    pub(crate) fn new(source: &'src str, is_stub: bool) -> Self {
+        Self { source, is_stub }
     }
 }
 
@@ -40,6 +41,7 @@ impl AstPass for Overload<'_> {
     fn run(&self, module: &mut ModModule, ctx: &mut PassContext) {
         let mut state = State {
             source: self.source,
+            is_stub: self.is_stub,
             edits: RefCell::new(Vec::new()),
             needs_overload: false,
         };
@@ -54,6 +56,7 @@ impl AstPass for Overload<'_> {
 
 struct State<'src> {
     source: &'src str,
+    is_stub: bool,
     edits: RefCell<Vec<(TextRange, String)>>,
     needs_overload: bool,
 }
@@ -85,7 +88,10 @@ impl State<'_> {
             return;
         }
         let end = func.range().end();
-        let body = if self.is_abstract(func) {
+        // in a stub, an abstract method declares no runtime body — `: ...` is
+        // the stub idiom and round-trips with the reverse pass. only a runtime
+        // `.by` file needs the `raise NotImplementedError` body
+        let body = if self.is_abstract(func) && !self.is_stub {
             ": raise NotImplementedError"
         } else {
             ": ..."

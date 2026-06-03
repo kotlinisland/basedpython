@@ -18,65 +18,65 @@ THREAD_STATUS_UNKNOWN: Final[int]
 final class LocationInfo(structseq[int], tuple[int, int, int, int]):
     __match_args__: Final = ("lineno", "end_lineno", "col_offset", "end_col_offset")
     @property
-    def lineno(self) -> int: ...
+    def lineno(self) -> int
     @property
-    def end_lineno(self) -> int: ...
+    def end_lineno(self) -> int
     @property
-    def col_offset(self) -> int: ...
+    def col_offset(self) -> int
     @property
-    def end_col_offset(self) -> int: ...
+    def end_col_offset(self) -> int
 
 final class FrameInfo(structseq[object], tuple[str, _Location, str, int | None]):
     __match_args__: Final = ("filename", "location", "funcname", "opcode")
     @property
-    def filename(self) -> str: ...
+    def filename(self) -> str
     @property
-    def location(self) -> _Location: ...
+    def location(self) -> _Location
     @property
-    def funcname(self) -> str: ...
+    def funcname(self) -> str
     @property
-    def opcode(self) -> int | None: ...
+    def opcode(self) -> int | None
 
 final class CoroInfo(structseq[object], tuple[list[_Frame], int | str]):
     __match_args__: Final = ("call_stack", "task_name")
     @property
-    def call_stack(self) -> list[_Frame]: ...
+    def call_stack(self) -> list[_Frame]
     @property
-    def task_name(self) -> int | str: ...
+    def task_name(self) -> int | str
 
 final class TaskInfo(structseq[object], tuple[int, str, list[CoroInfo], list[CoroInfo]]):
     __match_args__: Final = ("task_id", "task_name", "coroutine_stack", "awaited_by")
     @property
-    def task_id(self) -> int: ...
+    def task_id(self) -> int
     @property
-    def task_name(self) -> str: ...
+    def task_name(self) -> str
     @property
-    def coroutine_stack(self) -> list[CoroInfo]: ...
+    def coroutine_stack(self) -> list[CoroInfo]
     @property
-    def awaited_by(self) -> list[CoroInfo]: ...
+    def awaited_by(self) -> list[CoroInfo]
 
 final class ThreadInfo(structseq[object], tuple[int, int, list[_Frame]]):
     __match_args__: Final = ("thread_id", "status", "frame_info")
     @property
-    def thread_id(self) -> int: ...
+    def thread_id(self) -> int
     @property
-    def status(self) -> int: ...
+    def status(self) -> int
     @property
-    def frame_info(self) -> list[_Frame]: ...
+    def frame_info(self) -> list[_Frame]
 
 final class InterpreterInfo(structseq[object], tuple[int, list[ThreadInfo]]):
     __match_args__: Final = ("interpreter_id", "threads")
     @property
-    def interpreter_id(self) -> int: ...
+    def interpreter_id(self) -> int
     @property
-    def threads(self) -> list[ThreadInfo]: ...
+    def threads(self) -> list[ThreadInfo]
 
 final class AwaitedInfo(structseq[object], tuple[int, list[TaskInfo]]):
     __match_args__: Final = ("thread_id", "awaited_by")
     @property
-    def thread_id(self) -> int: ...
+    def thread_id(self) -> int
     @property
-    def awaited_by(self) -> list[TaskInfo]: ...
+    def awaited_by(self) -> list[TaskInfo]
 
 final class GCStatsInfo(structseq[object], tuple[int, int, int, int, int, int, int, int, int, float]):
     __match_args__: Final = (
@@ -92,25 +92,25 @@ final class GCStatsInfo(structseq[object], tuple[int, int, int, int, int, int, i
         "duration",
     )
     @property
-    def gen(self) -> int: ...
+    def gen(self) -> int
     @property
-    def iid(self) -> int: ...
+    def iid(self) -> int
     @property
-    def ts_start(self) -> int: ...
+    def ts_start(self) -> int
     @property
-    def ts_stop(self) -> int: ...
+    def ts_stop(self) -> int
     @property
-    def collections(self) -> int: ...
+    def collections(self) -> int
     @property
-    def collected(self) -> int: ...
+    def collected(self) -> int
     @property
-    def uncollectable(self) -> int: ...
+    def uncollectable(self) -> int
     @property
-    def candidates(self) -> int: ...
+    def candidates(self) -> int
     @property
-    def heap_size(self) -> int: ...
+    def heap_size(self) -> int
     @property
-    def duration(self) -> float: ...
+    def duration(self) -> float
 
 final class RemoteUnwinder:
     def __init__(
@@ -144,7 +144,7 @@ final class BinaryWriter:
         self, filename: StrOrBytesPath, sample_interval_us: int, start_time_us: int, *, compression: int = 0
     ) -> None
     @property
-    def total_samples(self) -> int: ...
+    def total_samples(self) -> int
     def write_sample(self, stack_frames: list[InterpreterInfo], timestamp_us: int) -> None
     def finalize(self) -> None
     def close(self) -> None
@@ -155,9 +155,9 @@ final class BinaryWriter:
 final class BinaryReader:
     def __init__(self, filename: StrOrBytesPath) -> None
     @property
-    def sample_count(self) -> int: ...
+    def sample_count(self) -> int
     @property
-    def sample_interval_us(self) -> int: ...
+    def sample_interval_us(self) -> int
     def replay(self, collector: object, progress_callback: Callable[[int, int], object] | None = None) -> int
     def get_info(self) -> dict[str, object]
     def get_stats(self) -> _Stats

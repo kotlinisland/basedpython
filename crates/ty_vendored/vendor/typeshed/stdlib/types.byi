@@ -92,12 +92,12 @@ final class FunctionType:
     """
 
     @property
-    def __closure__(self) -> (*: CellType) | None: ...
+    def __closure__(self) -> (*: CellType) | None
     __code__: CodeType
     __defaults__: (*: Any) | None
     __dict__: dict[str, Any]
     @property
-    def __globals__(self) -> dict[str, Any]: ...
+    def __globals__(self) -> dict[str, Any]
     __name__: str
     __qualname__: str
     __annotations__: dict[str, AnnotationForm]
@@ -109,7 +109,7 @@ final class FunctionType:
 
     __kwdefaults__: dict[str, Any] | None
     @property
-    def __builtins__(self) -> dict[str, Any]: ...
+    def __builtins__(self) -> dict[str, Any]
     if sys.version_info >= (3, 12):
         __type_params__: (*: TypeVar | ParamSpec | TypeVarTuple)
         """Get the declared type parameters for a function."""
@@ -150,48 +150,48 @@ final class CodeType:
     def __eq__(self, value: object, /) -> bool
     def __hash__(self) -> int
     @property
-    def co_argcount(self) -> int: ...
+    def co_argcount(self) -> int
     @property
-    def co_posonlyargcount(self) -> int: ...
+    def co_posonlyargcount(self) -> int
     @property
-    def co_kwonlyargcount(self) -> int: ...
+    def co_kwonlyargcount(self) -> int
     @property
-    def co_nlocals(self) -> int: ...
+    def co_nlocals(self) -> int
     @property
-    def co_stacksize(self) -> int: ...
+    def co_stacksize(self) -> int
     @property
-    def co_flags(self) -> int: ...
+    def co_flags(self) -> int
     @property
-    def co_code(self) -> bytes: ...
+    def co_code(self) -> bytes
     @property
-    def co_consts(self) -> (*: Any): ...
+    def co_consts(self) -> (*: Any)
     @property
-    def co_names(self) -> (*: str): ...
+    def co_names(self) -> (*: str)
     @property
-    def co_varnames(self) -> (*: str): ...
+    def co_varnames(self) -> (*: str)
     @property
-    def co_filename(self) -> str: ...
+    def co_filename(self) -> str
     @property
-    def co_name(self) -> str: ...
+    def co_name(self) -> str
     @property
-    def co_firstlineno(self) -> int: ...
+    def co_firstlineno(self) -> int
     if sys.version_info < (3, 15):
         @property
         @deprecated("Deprecated since Python 3.10; will be removed in Python 3.15. Use `CodeType.co_lines()` instead.")
-        def co_lnotab(self) -> bytes: ...
+        def co_lnotab(self) -> bytes
 
     @property
-    def co_freevars(self) -> (*: str): ...
+    def co_freevars(self) -> (*: str)
     @property
-    def co_cellvars(self) -> (*: str): ...
+    def co_cellvars(self) -> (*: str)
     @property
-    def co_linetable(self) -> bytes: ...
+    def co_linetable(self) -> bytes
     def co_lines(self) -> Iterator[(int, int, int | None)]
     if sys.version_info >= (3, 11):
         @property
-        def co_exceptiontable(self) -> bytes: ...
+        def co_exceptiontable(self) -> bytes
         @property
-        def co_qualname(self) -> str: ...
+        def co_qualname(self) -> str
         def co_positions(self) -> Iterable[(int | None, int | None, int | None, int | None)]
     if sys.version_info >= (3, 14):
         def co_branches(self) -> Iterator[(int, int, int)]
@@ -381,7 +381,7 @@ class ModuleType:
     __name__: str
     __file__: str | None
     @property
-    def __dict__(self) -> dict[str, Any]: ...  # type: ignore[override]
+    def __dict__(self) -> dict[str, Any]  # type: ignore[override]
     __loader__: LoaderProtocol | None
     __package__: str | None
     __path__: MutableSequence[str]
@@ -420,20 +420,20 @@ final class CellType:
 
 final class GeneratorType[out Element, in Sent = None, out Return = None](Generator[Element, Sent, Return]):
     @property
-    def gi_code(self) -> CodeType: ...
+    def gi_code(self) -> CodeType
     @property
-    def gi_frame(self) -> FrameType | None: ...
+    def gi_frame(self) -> FrameType | None
     @property
-    def gi_running(self) -> bool: ...
+    def gi_running(self) -> bool
     @property
     def gi_yieldfrom(self) -> Iterator[Element] | None:
         """object being iterated by yield from, or None"""
     if sys.version_info >= (3, 11):
         @property
-        def gi_suspended(self) -> bool: ...
+        def gi_suspended(self) -> bool
     if sys.version_info >= (3, 15):
         @property
-        def gi_state(self) -> Literal["GEN_CREATED", "GEN_SUSPENDED", "GEN_RUNNING", "GEN_CLOSED"]: ...
+        def gi_state(self) -> Literal["GEN_CREATED", "GEN_SUSPENDED", "GEN_RUNNING", "GEN_CLOSED"]
     __name__: str
     """name of the generator"""
 
@@ -472,11 +472,11 @@ final class AsyncGeneratorType[out Element, in Sent = None](AsyncGenerator[Eleme
         """object being awaited on, or None"""
 
     @property
-    def ag_code(self) -> CodeType: ...
+    def ag_code(self) -> CodeType
     @property
-    def ag_frame(self) -> FrameType | None: ...
+    def ag_frame(self) -> FrameType | None
     @property
-    def ag_running(self) -> bool: ...
+    def ag_running(self) -> bool
     __name__: str
     """name of the async generator"""
 
@@ -485,10 +485,10 @@ final class AsyncGeneratorType[out Element, in Sent = None](AsyncGenerator[Eleme
 
     if sys.version_info >= (3, 12):
         @property
-        def ag_suspended(self) -> bool: ...
+        def ag_suspended(self) -> bool
     if sys.version_info >= (3, 15):
         @property
-        def ag_state(self) -> Literal["AGEN_CREATED", "AGEN_SUSPENDED", "AGEN_RUNNING", "AGEN_CLOSED"]: ...
+        def ag_state(self) -> Literal["AGEN_CREATED", "AGEN_SUSPENDED", "AGEN_RUNNING", "AGEN_CLOSED"]
 
     def __aiter__(self) -> Self:
         """Return an awaitable, that resolves in asynchronous iterator."""
@@ -531,19 +531,19 @@ final class CoroutineType[out Element, in SendT_nd, out ReturnT_nd](Coroutine[El
         """object being awaited on, or None"""
 
     @property
-    def cr_code(self) -> CodeType: ...
+    def cr_code(self) -> CodeType
     @property
-    def cr_frame(self) -> FrameType | None: ...
+    def cr_frame(self) -> FrameType | None
     @property
-    def cr_running(self) -> bool: ...
+    def cr_running(self) -> bool
     @property
-    def cr_origin(self) -> (*: (str, int, str)) | None: ...
+    def cr_origin(self) -> (*: (str, int, str)) | None
     if sys.version_info >= (3, 11):
         @property
-        def cr_suspended(self) -> bool: ...
+        def cr_suspended(self) -> bool
     if sys.version_info >= (3, 15):
         @property
-        def cr_state(self) -> Literal["CORO_CREATED", "CORO_SUSPENDED", "CORO_RUNNING", "CORO_CLOSED"]: ...
+        def cr_state(self) -> Literal["CORO_CREATED", "CORO_SUSPENDED", "CORO_RUNNING", "CORO_CLOSED"]
 
     def close(self) -> None:
         """close() -> raise GeneratorExit inside coroutine."""
@@ -575,13 +575,13 @@ final class MethodType:
     """Create a bound instance method object."""
 
     @property
-    def __closure__(self) -> (*: CellType) | None: ...  # inherited from the added function
+    def __closure__(self) -> (*: CellType) | None  # inherited from the added function
     @property
-    def __code__(self) -> CodeType: ...  # inherited from the added function
+    def __code__(self) -> CodeType  # inherited from the added function
     @property
-    def __defaults__(self) -> (*: Any) | None: ...  # inherited from the added function
+    def __defaults__(self) -> (*: Any) | None  # inherited from the added function
     @property
-    def __func__(self) -> Callable[..., Any]:
+    def __func__(self) -> (...) -> Any:
         """the function (or other callable) implementing a method"""
 
     @property
@@ -589,10 +589,10 @@ final class MethodType:
         """the instance to which a method is bound"""
 
     @property
-    def __name__(self) -> str: ...  # inherited from the added function
+    def __name__(self) -> str  # inherited from the added function
     @property
-    def __qualname__(self) -> str: ...  # inherited from the added function
-    def __new__(cls, func: Callable[..., Any], instance: object, /) -> Self
+    def __qualname__(self) -> str  # inherited from the added function
+    def __new__(cls, func: (...) -> Any, instance: object, /) -> Self
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
     if sys.version_info >= (3, 13):
@@ -604,11 +604,11 @@ final class MethodType:
 
 final class BuiltinFunctionType:
     @property
-    def __self__(self) -> object | ModuleType: ...
+    def __self__(self) -> object | ModuleType
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
 
@@ -619,11 +619,11 @@ BuiltinMethodType = BuiltinFunctionType
 
 final class WrapperDescriptorType:
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     @property
-    def __objclass__(self) -> type: ...
+    def __objclass__(self) -> type
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
 
@@ -632,13 +632,13 @@ final class WrapperDescriptorType:
 
 final class MethodWrapperType:
     @property
-    def __self__(self) -> object: ...
+    def __self__(self) -> object
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     @property
-    def __objclass__(self) -> type: ...
+    def __objclass__(self) -> type
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
 
@@ -648,11 +648,11 @@ final class MethodWrapperType:
 
 final class MethodDescriptorType:
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     @property
-    def __objclass__(self) -> type: ...
+    def __objclass__(self) -> type
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
 
@@ -661,11 +661,11 @@ final class MethodDescriptorType:
 
 final class ClassMethodDescriptorType:
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     @property
-    def __objclass__(self) -> type: ...
+    def __objclass__(self) -> type
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
 
@@ -679,15 +679,15 @@ final class TracebackType:
     tb_next: TracebackType | None
     # the rest are read-only
     @property
-    def tb_frame(self) -> FrameType: ...
+    def tb_frame(self) -> FrameType
     @property
-    def tb_lasti(self) -> int: ...
+    def tb_lasti(self) -> int
     @property
-    def tb_lineno(self) -> int: ...
+    def tb_lineno(self) -> int
 
 final class FrameType:
     @property
-    def f_back(self) -> FrameType | None: ...
+    def f_back(self) -> FrameType | None
     @property
     def f_builtins(self) -> dict[str, Any]:
         """Return the built-in variables in the frame."""
@@ -711,7 +711,7 @@ final class FrameType:
         """Return the current line number in the frame."""
     if sys.version_info >= (3, 15):
         @property
-        def f_locals(self) -> FrameLocalsProxyType | dict[str, Any]: ...
+        def f_locals(self) -> FrameLocalsProxyType | dict[str, Any]
     else:
         @property
         def f_locals(self) -> dict[str, Any]:
@@ -748,16 +748,16 @@ if sys.version_info >= (3, 15):
 
     final class LazyImportType:
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         def resolve(self) -> Any
 
 final class GetSetDescriptorType:
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     @property
-    def __objclass__(self) -> type: ...
+    def __objclass__(self) -> type
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
         """Return an attribute of instance, which is of type owner."""
 
@@ -769,11 +769,11 @@ final class GetSetDescriptorType:
 
 final class MemberDescriptorType:
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __qualname__(self) -> str: ...
+    def __qualname__(self) -> str
     @property
-    def __objclass__(self) -> type: ...
+    def __objclass__(self) -> type
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
         """Return an attribute of instance, which is of type owner."""
 
@@ -883,9 +883,9 @@ class GenericAlias:
     """
 
     @property
-    def __origin__(self) -> type | TypeAliasType: ...
+    def __origin__(self) -> type | TypeAliasType
     @property
-    def __args__(self) -> (*: Any): ...
+    def __args__(self) -> (*: Any)
     @property
     def __parameters__(self) -> (*: Any):
         """Type variables in the GenericAlias."""
@@ -899,9 +899,9 @@ class GenericAlias:
     def __mro_entries__(self, bases: Iterable[object], /) -> (*: type)
     if sys.version_info >= (3, 11):
         @property
-        def __unpacked__(self) -> bool: ...
+        def __unpacked__(self) -> bool
         @property
-        def __typing_unpacked_tuple_args__(self) -> (*: Any) | None: ...
+        def __typing_unpacked_tuple_args__(self) -> (*: Any) | None
 
     def __or__(self, value: Any, /) -> UnionType:
         """Return self|value."""
@@ -930,7 +930,7 @@ final class UnionType:
     """
 
     @property
-    def __args__(self) -> (*: Any): ...
+    def __args__(self) -> (*: Any)
     @property
     def __parameters__(self) -> (*: Any):
         """Type variables in the types.UnionType."""

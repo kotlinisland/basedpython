@@ -23,14 +23,14 @@ class BaseFilter:
 
 class DomainFilter(BaseFilter):
     @property
-    def domain(self) -> int: ...
+    def domain(self) -> int
     def __init__(self, inclusive: bool, domain: int) -> None
 
 class Filter(BaseFilter):
     domain: int | None
     lineno: int | None
     @property
-    def filename_pattern(self) -> str: ...
+    def filename_pattern(self) -> str
     all_frames: bool
     def __init__(
         self,
@@ -79,9 +79,9 @@ class Frame:
 
     __slots__ = ("_frame",)
     @property
-    def filename(self) -> str: ...
+    def filename(self) -> str
     @property
-    def lineno(self) -> int: ...
+    def lineno(self) -> int
     def __init__(self, frame: _FrameTuple) -> None
     def __eq__(self, other: object) -> bool
     def __hash__(self) -> int
@@ -114,11 +114,11 @@ class Trace:
 
     __slots__ = ("_trace",)
     @property
-    def domain(self) -> int: ...
+    def domain(self) -> int
     @property
-    def size(self) -> int: ...
+    def size(self) -> int
     @property
-    def traceback(self) -> Traceback: ...
+    def traceback(self) -> Traceback
     def __init__(self, trace: _TraceTuple) -> None
     def __eq__(self, other: object) -> bool
     def __hash__(self) -> int
@@ -131,7 +131,7 @@ class Traceback(Sequence[Frame]):
 
     __slots__ = ("_frames", "_total_nframe")
     @property
-    def total_nframe(self) -> int | None: ...
+    def total_nframe(self) -> int | None
     def __init__(self, frames: Sequence[_FrameTuple], total_nframe: int | None = None) -> None
     def format(self, limit: int | None = None, most_recent_first: bool = False) -> list[str]
 

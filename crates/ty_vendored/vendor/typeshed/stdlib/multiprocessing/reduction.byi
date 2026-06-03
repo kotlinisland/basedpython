@@ -32,7 +32,7 @@ class ForkingPickler(pickle.Pickler):
     class def register(cls, type: Type, reduce: Callable[[Any], _ReducedType]) -> None:
         """Register a reduce function for a type."""
 
-    class def dumps(cls, obj: Any, protocol: int | None = None) -> memoryview: ...
+    class def dumps(cls, obj: Any, protocol: int | None = None) -> memoryview
     loads = pickle.loads
 
 register = ForkingPickler.register

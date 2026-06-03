@@ -278,16 +278,16 @@ if sys.version_info >= (3, 12):
         Decorator to ensure callable is recognised as a coroutine function.
         """
 
-def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
+def isgeneratorfunction(obj: (...) -> Generator[Any, Any, Any]) -> bool:
     """Return true if the object is a user-defined generator function.
 
     Generator function objects provide the same attributes as functions.
     See help(isfunction) for a list of attributes.
     """
 def isgeneratorfunction[**P](obj: Callable[P, Any]) -> TypeGuard[Callable[P, GeneratorType[Any, Any, Any]]]
-def isgeneratorfunction(obj: object) -> TypeGuard[Callable[..., GeneratorType[Any, Any, Any]]]
+def isgeneratorfunction(obj: object) -> TypeGuard[(...) -> GeneratorType[Any, Any, Any]]
 
-def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
+def iscoroutinefunction(obj: (...) -> Coroutine[Any, Any, Any]) -> bool:
     """Return true if the object is a coroutine function.
 
     Coroutine functions are normally defined with "async def" syntax, but may
@@ -295,7 +295,7 @@ def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     """
 def iscoroutinefunction[**P, Element](obj: Callable[P, Awaitable[Element]]) -> TypeGuard[Callable[P, CoroutineType[Any, Any, Element]]]
 def iscoroutinefunction[**P](obj: Callable[P, object]) -> TypeGuard[Callable[P, CoroutineType[Any, Any, Any]]]
-def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., CoroutineType[Any, Any, Any]]]
+def iscoroutinefunction(obj: object) -> TypeGuard[(...) -> CoroutineType[Any, Any, Any]]
 
 def isgenerator(object: object) -> object is GeneratorType[Any, Any, Any]:
     """Return true if the object is a generator.
@@ -322,14 +322,14 @@ def iscoroutine(object: object) -> object is CoroutineType[Any, Any, Any]:
 def isawaitable(object: object) -> object is Awaitable[Any]:
     """Return true if object can be passed to an ``await`` expression."""
 
-def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
+def isasyncgenfunction(obj: (...) -> AsyncGenerator[Any, Any]) -> bool:
     """Return true if the object is an asynchronous generator function.
 
     Asynchronous generator functions are defined with "async def"
     syntax and have "yield" expressions in their body.
     """
 def isasyncgenfunction[**P](obj: Callable[P, Any]) -> TypeGuard[Callable[P, AsyncGeneratorType[Any, Any]]]
-def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]
+def isasyncgenfunction(obj: object) -> TypeGuard[(...) -> AsyncGeneratorType[Any, Any]]
 
 @type_check_only
 class _SupportsSet[in Input, in V](Protocol):
@@ -623,9 +623,9 @@ class Signature:
         """
     empty = _empty
     @property
-    def parameters(self) -> types.MappingProxyType[str, Parameter]: ...
+    def parameters(self) -> types.MappingProxyType[str, Parameter]
     @property
-    def return_annotation(self) -> Any: ...
+    def return_annotation(self) -> Any
     def bind(self, *args: Any, **kwargs: Any) -> BoundArguments:
         """Get a BoundArguments object, that maps the passed `args`
         and `kwargs` to the function's signature.  Raises `TypeError`
@@ -699,7 +699,7 @@ if sys.version_info >= (3, 14):
     from annotationlib import get_annotations as get_annotations
 else:
     def get_annotations(
-        obj: Callable[..., object] | type[object] | ModuleType,  # any callable, class, or module
+        obj: (...) -> object | type[object] | ModuleType,  # any callable, class, or module
         *,
         globals: Mapping[str, Any] | None = None,  # value types depend on the key
         locals: Mapping[str, Any] | None = None,  # value types depend on the key
@@ -761,7 +761,7 @@ class _ParameterKind(enum.IntEnum):
     VAR_KEYWORD = 4
 
     @property
-    def description(self) -> str: ...
+    def description(self) -> str
 
 if sys.version_info >= (3, 12):
     AGEN_CREATED: Final = "AGEN_CREATED"
@@ -823,13 +823,13 @@ class Parameter:
     KEYWORD_ONLY: ClassVar[Literal[_ParameterKind.KEYWORD_ONLY]]
     VAR_KEYWORD: ClassVar[Literal[_ParameterKind.VAR_KEYWORD]]
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
     @property
-    def default(self) -> Any: ...
+    def default(self) -> Any
     @property
-    def kind(self) -> _ParameterKind: ...
+    def kind(self) -> _ParameterKind
     @property
-    def annotation(self) -> Any: ...
+    def annotation(self) -> Any
     def replace(
         self,
         *,
@@ -865,11 +865,11 @@ class BoundArguments:
     __slots__ = ("arguments", "_signature", "__weakref__")
     arguments: OrderedDict[str, Any]
     @property
-    def args(self) -> (*: Any): ...
+    def args(self) -> (*: Any)
     @property
-    def kwargs(self) -> dict[str, Any]: ...
+    def kwargs(self) -> dict[str, Any]
     @property
-    def signature(self) -> Signature: ...
+    def signature(self) -> Signature
     def __init__(self, signature: Signature, arguments: OrderedDict[str, Any]) -> None
     def apply_defaults(self) -> None:
         """Set default values for missing arguments.
@@ -1087,7 +1087,7 @@ def getclosurevars(func: _IntrospectableCallable) -> ClosureVars:
     set of unbound names that could not be resolved is also provided.
     """
 
-def unwrap(func: Callable[..., Any], *, stop: Callable[[Callable[..., Any]], Any] | None = None) -> Any:
+def unwrap(func: (...) -> Any, *, stop: Callable[[(...) -> Any], Any] | None = None) -> Any:
     """Get the object wrapped by *func*.
 
     Follows the chain of :attr:`__wrapped__` attributes returning the last

@@ -80,7 +80,7 @@ class SMTPChannel(asynchat.async_chat):
 
     enable_SMTPUTF8: bool
     @property
-    def max_command_size_limit(self) -> int: ...
+    def max_command_size_limit(self) -> int
     def __init__(
         self,
         server: SMTPServer,

@@ -138,13 +138,13 @@ class _TokenInfo(NamedTuple):
 if sys.version_info >= (3, 12):
     class TokenInfo(_TokenInfo):
         @property
-        def exact_type(self) -> int: ...
+        def exact_type(self) -> int
 
 else:
     @disjoint_base
     class TokenInfo(_TokenInfo):
         @property
-        def exact_type(self) -> int: ...
+        def exact_type(self) -> int
 
 # Backwards compatible tokens can be sequences of a shorter length too
 _Token: TypeAlias = TokenInfo | Sequence[int | str | _Position]

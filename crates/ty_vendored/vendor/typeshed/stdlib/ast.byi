@@ -2659,15 +2659,15 @@ class NodeVisitor:
 
     if sys.version_info < (3, 14):
         @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
-        def visit_Num(self, node: Num) -> Any: ...  # type: ignore[deprecated]
+        def visit_Num(self, node: Num) -> Any  # type: ignore[deprecated]
         @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
-        def visit_Str(self, node: Str) -> Any: ...  # type: ignore[deprecated]
+        def visit_Str(self, node: Str) -> Any  # type: ignore[deprecated]
         @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
-        def visit_Bytes(self, node: Bytes) -> Any: ...  # type: ignore[deprecated]
+        def visit_Bytes(self, node: Bytes) -> Any  # type: ignore[deprecated]
         @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
-        def visit_NameConstant(self, node: NameConstant) -> Any: ...  # type: ignore[deprecated]
+        def visit_NameConstant(self, node: NameConstant) -> Any  # type: ignore[deprecated]
         @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
-        def visit_Ellipsis(self, node: Ellipsis) -> Any: ...  # type: ignore[deprecated]
+        def visit_Ellipsis(self, node: Ellipsis) -> Any  # type: ignore[deprecated]
 
 class NodeTransformer(NodeVisitor):
     """

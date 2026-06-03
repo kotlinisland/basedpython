@@ -47,8 +47,8 @@ class _ncurses_version(structseq[int], tuple[int, int, int]):
     __match_args__: Final = ("major", "minor", "patch")
 
     @property
-    def major(self) -> int: ...
+    def major(self) -> int
     @property
-    def minor(self) -> int: ...
+    def minor(self) -> int
     @property
-    def patch(self) -> int: ...
+    def patch(self) -> int

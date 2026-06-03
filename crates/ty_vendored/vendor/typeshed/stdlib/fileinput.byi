@@ -264,4 +264,4 @@ def hook_compressed(
     filename: StrOrBytesPath, mode: str, *, encoding: str | None = None, errors: str | None = None
 ) -> IO[Any]
 @deprecated("Deprecated since Python 3.10. Use `fileinput.input` or `fileinput.FileInput` instead.")
-def hook_encoded(encoding: str, errors: str | None = None) -> Callable[[StrOrBytesPath, str], IO[Any]]: ...
+def hook_encoded(encoding: str, errors: str | None = None) -> Callable[[StrOrBytesPath, str], IO[Any]]

@@ -431,7 +431,7 @@ class Counter[in out Element](dict[Element, int]):
 
         """
 
-    class def fromkeys(cls, iterable: Any, v: int | None = None) -> NoReturn: ...  # type: ignore[override]
+    class def fromkeys(cls, iterable: Any, v: int | None = None) -> NoReturn  # type: ignore[override]
 
     def subtract(self, iterable: None = None, /) -> None:
         """Like dict.update() but subtracts counts instead of replacing them.

@@ -137,17 +137,17 @@ if sys.version_info >= (3, 12):
 
         _is_text_encoding: bool
         @property
-        def encode(self) -> _Encoder: ...
+        def encode(self) -> _Encoder
         @property
-        def decode(self) -> _Decoder: ...
+        def decode(self) -> _Decoder
         @property
-        def streamreader(self) -> _StreamReader: ...
+        def streamreader(self) -> _StreamReader
         @property
-        def streamwriter(self) -> _StreamWriter: ...
+        def streamwriter(self) -> _StreamWriter
         @property
-        def incrementalencoder(self) -> _IncrementalEncoder: ...
+        def incrementalencoder(self) -> _IncrementalEncoder
         @property
-        def incrementaldecoder(self) -> _IncrementalDecoder: ...
+        def incrementaldecoder(self) -> _IncrementalDecoder
         name: str
         def __new__(
             cls,
@@ -169,17 +169,17 @@ else:
 
         _is_text_encoding: bool
         @property
-        def encode(self) -> _Encoder: ...
+        def encode(self) -> _Encoder
         @property
-        def decode(self) -> _Decoder: ...
+        def decode(self) -> _Decoder
         @property
-        def streamreader(self) -> _StreamReader: ...
+        def streamreader(self) -> _StreamReader
         @property
-        def streamwriter(self) -> _StreamWriter: ...
+        def streamwriter(self) -> _StreamWriter
         @property
-        def incrementalencoder(self) -> _IncrementalEncoder: ...
+        def incrementalencoder(self) -> _IncrementalEncoder
         @property
-        def incrementaldecoder(self) -> _IncrementalDecoder: ...
+        def incrementaldecoder(self) -> _IncrementalDecoder
         name: str
         def __new__(
             cls,
@@ -512,7 +512,7 @@ class BufferedIncrementalEncoder(IncrementalEncoder):
 
     buffer: str
     def __init__(self, errors: str = "strict") -> None
-    abstract def _buffer_encode(self, input: str, errors: str, final: bool) -> (bytes, int): ...
+    abstract def _buffer_encode(self, input: str, errors: str, final: bool) -> (bytes, int)
     def encode(self, input: str, final: bool = False) -> bytes
 
 class BufferedIncrementalDecoder(IncrementalDecoder):
@@ -524,7 +524,7 @@ class BufferedIncrementalDecoder(IncrementalDecoder):
 
     buffer: bytes
     def __init__(self, errors: str = "strict") -> None
-    abstract def _buffer_decode(self, input: ReadableBuffer, errors: str, final: bool) -> (str, int): ...
+    abstract def _buffer_decode(self, input: ReadableBuffer, errors: str, final: bool) -> (str, int)
     def decode(self, input: ReadableBuffer, final: bool = False) -> str
 
 # TODO: it is not possible to specify the requirement that all other

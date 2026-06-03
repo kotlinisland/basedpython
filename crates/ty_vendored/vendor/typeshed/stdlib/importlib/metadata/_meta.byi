@@ -36,7 +36,7 @@ if sys.version_info >= (3, 13):
         def __truediv__(self, other: StrPath, /) -> SimplePath
         # Incorrect at runtime
         @property
-        def parent(self) -> PathLike[str]: ...
+        def parent(self) -> PathLike[str]
         def read_text(self, encoding: str | None = None) -> str
         def read_bytes(self) -> bytes
         def exists(self) -> bool
@@ -51,7 +51,7 @@ elif sys.version_info >= (3, 12):
         # See #11436.
         def joinpath(self, other: str, /) -> Element
         @property
-        def parent(self) -> Element: ...
+        def parent(self) -> Element
         def read_text(self) -> str
         # As with joinpath(), this is annotated as taking `str | _T` at runtime.
         def __truediv__(self, other: str, /) -> Element
@@ -66,7 +66,7 @@ else:
         def joinpath(self, other: Any, /) -> SimplePath
         # Not defined as a property at runtime, but it should be
         @property
-        def parent(self) -> Any: ...
+        def parent(self) -> Any
         def read_text(self) -> str
         # There was a bug in `SimplePath` definition in cpython, see #8451
         #  Strictly speaking `__div__` was defined in 3.10, not __truediv__,

@@ -338,7 +338,7 @@ pub(crate) fn run_against_source<'a>(
     let init_method_pass = init_method::InitMethod::new(source_ref);
     let modifiers_pass = modifiers::ModifiersPass::new(source_ref);
     let empty_declarations_pass = empty_declarations::EmptyDeclarations::new();
-    let overload_pass = overload::Overload::new(source_ref);
+    let overload_pass = overload::Overload::new(source_ref, config.is_stub);
     let decorator_keyword_pass = decorator_keyword::DecoratorKeyword::new(source_ref);
     let unpack_pass = unpack::UnpackSyntax::new(config.clone());
     let typed_dict_literal_pass = typed_dict_literal::TypedDictLiteralPass::new(source_ref);

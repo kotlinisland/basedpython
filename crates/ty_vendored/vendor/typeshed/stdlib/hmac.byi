@@ -47,7 +47,7 @@ class HMAC:
     digest_size: int
     block_size: int
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
     def __init__(self, key: bytes | bytearray, msg: ReadableBuffer | None = None, digestmod: _DigestMod = "") -> None:
         """Create a new HMAC object.
 

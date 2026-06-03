@@ -100,9 +100,9 @@ class Listener:
         """
 
     @property
-    def address(self) -> _Address: ...
+    def address(self) -> _Address
     @property
-    def last_accepted(self) -> _Address | None: ...
+    def last_accepted(self) -> _Address | None
     def __enter__(self) -> Self
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: TracebackType | None

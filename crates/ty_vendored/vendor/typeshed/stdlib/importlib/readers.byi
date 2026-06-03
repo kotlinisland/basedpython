@@ -84,7 +84,7 @@ class MultiplexedPath(abc.Traversable):
 
     def open(self, *args: Never, **kwargs: Never) -> NoReturn  # type: ignore[override]
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
 
 class NamespaceReader(abc.TraversableResources):
     path: MultiplexedPath

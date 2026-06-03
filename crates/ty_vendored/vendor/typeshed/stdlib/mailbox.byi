@@ -65,7 +65,7 @@ class _GetFileReturn(Protocol):
     def seekable(self) -> bool
     def flush(self) -> object
     @property
-    def closed(self) -> bool: ...
+    def closed(self) -> bool
 
 class Mailbox[out MessageT: Message = Message]:
     """A group of messages in a particular place."""
@@ -553,7 +553,7 @@ class _ProxyFile:
     def seekable(self) -> bool
     def flush(self) -> None
     @property
-    def closed(self) -> bool: ...
+    def closed(self) -> bool
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 

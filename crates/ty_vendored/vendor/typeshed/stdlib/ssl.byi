@@ -544,7 +544,7 @@ if sys.version_info < (3, 12):
         do_handshake_on_connect: bool = True,
         suppress_ragged_eofs: bool = True,
         ciphers: str | None = None,
-    ) -> SSLSocket: ...
+    ) -> SSLSocket
     @deprecated("Deprecated since Python 3.7; removed in Python 3.12.")
     def match_hostname(cert: _PeerCertRetDictType, hostname: str) -> None:
         """Verify that *cert* (in decoded format as returned by
@@ -611,7 +611,7 @@ class SSLContext(_SSLContext):
     verify_flags: VerifyFlags
     verify_mode: VerifyMode
     @property
-    def protocol(self) -> _SSLMethod: ...  # type: ignore[override]
+    def protocol(self) -> _SSLMethod  # type: ignore[override]
     hostname_checks_common_name: bool
     maximum_version: TLSVersion
     minimum_version: TLSVersion
@@ -661,7 +661,7 @@ class SSLContext(_SSLContext):
     def set_ciphers(self, cipherlist: str, /) -> None
     def set_alpn_protocols(self, alpn_protocols: Iterable[str]) -> None
     @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
-    def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None: ...
+    def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None
     def set_servername_callback(self, server_name_callback: _SrvnmeCbType | None) -> None
     def load_dh_params(self, path: str, /) -> None
     def set_ecdh_curve(self, name: str, /) -> None

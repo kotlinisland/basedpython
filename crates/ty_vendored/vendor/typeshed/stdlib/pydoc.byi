@@ -510,9 +510,9 @@ class Helper:
     topics: dict[str, str | (*: str)]
     def __init__(self, input: IO[str] | None = None, output: IO[str] | None = None) -> None
     @property
-    def input(self) -> IO[str]: ...
+    def input(self) -> IO[str]
     @property
-    def output(self) -> IO[str]: ...
+    def output(self) -> IO[str]
     def __call__(self, request: str | Helper | object = ...) -> None
     def interact(self) -> None
     def getline(self, prompt: str) -> str:

@@ -157,12 +157,12 @@ class HelpFormatter:
     def expand_default(self, option: Option) -> str
     def format_description(self, description: str | None) -> str
     def format_epilog(self, epilog: str | None) -> str
-    abstract def format_heading(self, heading: str) -> str: ...
+    abstract def format_heading(self, heading: str) -> str
     def format_option(self, option: Option) -> str
     def format_option_strings(self, option: Option) -> str:
         """Return a comma-separated list of option strings & metavariables."""
 
-    abstract def format_usage(self, usage: str) -> str: ...
+    abstract def format_usage(self, usage: str) -> str
     def indent(self) -> None
     def set_long_opt_delimiter(self, delim: str) -> None
     def set_parser(self, parser: OptionParser) -> None
@@ -235,7 +235,7 @@ class Option:
     choices: list[str] | (*: str) | None
     # Callback args and kwargs cannot be expressed in Python's type system.
     # Revisit if ParamSpec is ever changed to work with packed args/kwargs.
-    callback: Callable[..., object] | None
+    callback: (...) -> object | None
     callback_args: (*: Any) | None
     callback_kwargs: dict[str, Any] | None
     help: str | None
@@ -252,7 +252,7 @@ class Option:
         nargs: int | None = None,
         const: Any | None = None,
         choices: list[str] | (*: str) | None = None,
-        callback: Callable[..., object] | None = None,
+        callback: (...) -> object | None = None,
         callback_args: (*: Any) | None = None,
         callback_kwargs: dict[str, Any] | None = None,
         help: str | None = None,
@@ -338,7 +338,7 @@ class OptionContainer:
         nargs: int | None = None,
         const: Any | None = None,
         choices: list[str] | (*: str) | None = None,
-        callback: Callable[..., object] | None = None,
+        callback: (...) -> object | None = None,
         callback_args: (*: Any) | None = None,
         callback_kwargs: dict[str, Any] | None = None,
         help: str | None = None,

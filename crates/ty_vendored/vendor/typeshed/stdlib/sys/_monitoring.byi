@@ -7,7 +7,6 @@
 # and exists in the `sys`-module namespace despite `sys` not being a package.
 
 import sys
-from collections.abc import Callable
 from types import CodeType
 from typing import Any, Final, type_check_only
 from typing_extensions import deprecated
@@ -52,7 +51,7 @@ class _events:
 
         @property
         @deprecated("Deprecated since Python 3.14. Use `BRANCH_LEFT` or `BRANCH_RIGHT` instead.")
-        def BRANCH(self) -> int: ...
+        def BRANCH(self) -> int
 
     else:
         BRANCH: Final[int]
@@ -66,4 +65,4 @@ def restart_events() -> None
 DISABLE: Final[object]
 MISSING: Final[object]
 
-def register_callback(tool_id: int, event: int, func: Callable[..., object] | None, /) -> Callable[..., Any] | None
+def register_callback(tool_id: int, event: int, func: (...) -> object | None, /) -> (...) -> Any | None

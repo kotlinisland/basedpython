@@ -11,6 +11,8 @@ i: (int, *, name: str) -> bool
 j: (*: int) -> int
 k: (**: str) -> int
 l: (int, /, name: str, *args: bool, **kwargs: int) -> None
+m: (...) -> int
+n: (...) -> (int) -> str
 
 
 def takes(cb: (int) -> str) -> str:
@@ -26,6 +28,8 @@ i: (int, *, name: str) -> bool
 j: (*: int) -> int
 k: (**: str) -> int
 l: (int, /, name: str, *args: bool, **kwargs: int) -> None
+m: (...) -> int
+n: (...) -> (int) -> str
 
 
 def takes(cb: (int) -> str) -> str:

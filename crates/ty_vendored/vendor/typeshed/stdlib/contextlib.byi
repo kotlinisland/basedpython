@@ -84,9 +84,9 @@ class _GeneratorContextManagerBase[out G: Generator[Any, Any, Any] | AsyncGenera
     """Shared functionality for @contextmanager and @asynccontextmanager."""
 
     # Ideally this would use ParamSpec, but that requires (*args, **kwargs), which this isn't. see #6676
-    def __init__(self, func: Callable[..., G], args: (*: Any), kwds: dict[str, Any]) -> None
+    def __init__(self, func: (...) -> G, args: (*: Any), kwds: dict[str, Any]) -> None
     gen: G
-    func: Callable[..., G]
+    func: (...) -> G
     args: (*: Any)
     kwds: dict[str, Any]
 

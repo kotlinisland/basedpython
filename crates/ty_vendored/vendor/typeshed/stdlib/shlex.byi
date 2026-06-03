@@ -51,7 +51,7 @@ class shlex:
     filestack: deque[(str | None, _ShlexInstream, int)]
     eof: str | None
     @property
-    def punctuation_chars(self) -> str: ...
+    def punctuation_chars(self) -> str
     def __init__(
         self,
         instream: str | _ShlexInstream | None = None,

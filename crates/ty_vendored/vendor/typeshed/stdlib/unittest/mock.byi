@@ -110,9 +110,9 @@ if sys.version_info >= (3, 12):
         def __getattr__(self, attr: str) -> Any
         def __getattribute__(self, attr: str) -> Any
         @property
-        def args(self) -> (*: Any): ...
+        def args(self) -> (*: Any)
         @property
-        def kwargs(self) -> Mapping[str, Any]: ...
+        def kwargs(self) -> Mapping[str, Any]
         def call_list(self) -> Any:
             """For a call object that represents multiple calls, `call_list`
             returns a list of all the intermediate calls as well as the
@@ -164,9 +164,9 @@ else:
         def __getattr__(self, attr: str) -> Any
         def __getattribute__(self, attr: str) -> Any
         @property
-        def args(self) -> (*: Any): ...
+        def args(self) -> (*: Any)
         @property
-        def kwargs(self) -> Mapping[str, Any]: ...
+        def kwargs(self) -> Mapping[str, Any]
         def call_list(self) -> Any:
             """For a call object that represents multiple calls, `call_list`
             returns a list of all the intermediate calls as well as the
@@ -473,8 +473,8 @@ class _patch[in out Element]:
         self, patched: _patch[Any], args: Sequence[Any], keywargs: Any
     ) -> _GeneratorContextManager[(Sequence[Any], Any)]
     def decorate_class[TT: type[Any]](self, klass: TT) -> TT
-    def decorate_callable[R](self, func: Callable[..., R]) -> Callable[..., R]
-    def decorate_async_callable[R](self, func: Callable[..., Awaitable[R]]) -> Callable[..., Awaitable[R]]
+    def decorate_callable[R](self, func: (...) -> R) -> (...) -> R
+    def decorate_async_callable[R](self, func: (...) -> Awaitable[R]) -> (...) -> Awaitable[R]
     def get_original(self) -> (Any, bool)
     target: Any
     temp_original: Any
@@ -501,7 +501,7 @@ class _patch_pass_arg[in out Element](_patch[Element]):
     def __call__[TT: type[Any]](self, func: TT) -> TT
     # Can't use the following as ParamSpec is only allowed as last parameter:
     #   def __call__(self, func: Callable[_P, _R]) -> Callable[Concatenate[_P, MagicMock], _R]: ...
-    def __call__[R](self, func: Callable[..., R]) -> Callable[..., R]
+    def __call__[R](self, func: (...) -> R) -> (...) -> R
 
 class _patch_dict:
     """
@@ -585,7 +585,7 @@ class _patcher:
         # If not False or None, this is passed to new_callable
         spec_set: Any | Literal[False] | None = None,
         autospec: Literal[False] | None = None,
-        new_callable: Callable[..., Element],
+        new_callable: (...) -> Element,
         unsafe: bool = False,
         # kwargs are passed to new_callable
         **kwargs: Any,
@@ -629,7 +629,7 @@ class _patcher:
         # If not False or None, this is passed to new_callable
         spec_set: Any | Literal[False] | None = None,
         autospec: Literal[False] | None = None,
-        new_callable: Callable[..., Element],
+        new_callable: (...) -> Element,
         unsafe: bool = False,
         # kwargs are passed to new_callable
         **kwargs: Any,
@@ -657,7 +657,7 @@ class _patcher:
         spec_set: Any | Literal[False] | None = None,
         autospec: Literal[False] | None = None,
         *,
-        new_callable: Callable[..., Element],
+        new_callable: (...) -> Element,
         # The kwargs must be DEFAULT
         **kwargs: Any,
     ) -> _patch_pass_arg[Element]
@@ -669,7 +669,7 @@ class _patcher:
         # If not False or None, this is passed to new_callable
         spec_set: Any | Literal[False] | None,
         autospec: Literal[False] | None,
-        new_callable: Callable[..., Element],
+        new_callable: (...) -> Element,
         # The kwargs must be DEFAULT
         **kwargs: Any,
     ) -> _patch_pass_arg[Element]
@@ -684,7 +684,7 @@ class _patcher:
         **kwargs: Any,
     ) -> _patch[Any]
 
-    static def stopall() -> None: ...
+    static def stopall() -> None
 
 patch: _patcher
 """

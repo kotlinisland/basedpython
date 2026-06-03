@@ -63,11 +63,11 @@ if sys.version_info >= (3, 11):
 @type_check_only
 class _IsoCalendarDate(tuple[int, int, int]):
     @property
-    def year(self) -> int: ...
+    def year(self) -> int
     @property
-    def week(self) -> int: ...
+    def week(self) -> int
     @property
-    def weekday(self) -> int: ...
+    def weekday(self) -> int
 
 @disjoint_base
 class date:
@@ -90,7 +90,7 @@ class date:
     class def fromordinal(cls, n: int, /) -> Self:
         """int -> date corresponding to a proleptic Gregorian ordinal."""
     if sys.version_info >= (3, 15):
-        class def fromisoformat(cls, string: str, /) -> Self: ...
+        class def fromisoformat(cls, string: str, /) -> Self
     else:
         class def fromisoformat(cls, date_string: str, /) -> Self:
             """str -> Construct a date from a string in ISO 8601 format."""
@@ -102,16 +102,16 @@ class date:
         """
 
     @property
-    def year(self) -> int: ...
+    def year(self) -> int
     @property
-    def month(self) -> int: ...
+    def month(self) -> int
     @property
-    def day(self) -> int: ...
+    def day(self) -> int
     def ctime(self) -> str:
         """Return ctime() style string."""
     if sys.version_info >= (3, 14):
         if sys.version_info >= (3, 15):
-            class def strptime(cls, string: str, format: str, /) -> Self: ...
+            class def strptime(cls, string: str, format: str, /) -> Self
         else:
             class def strptime(cls, date_string: str, format: str, /) -> Self:
                 """string, format -> new date parsed from a string (like time.strptime())."""
@@ -195,17 +195,17 @@ class time:
         fold: int = 0,
     ) -> Self
     @property
-    def hour(self) -> int: ...
+    def hour(self) -> int
     @property
-    def minute(self) -> int: ...
+    def minute(self) -> int
     @property
-    def second(self) -> int: ...
+    def second(self) -> int
     @property
-    def microsecond(self) -> int: ...
+    def microsecond(self) -> int
     @property
-    def tzinfo(self) -> _TzInfo | None: ...
+    def tzinfo(self) -> _TzInfo | None
     @property
-    def fold(self) -> int: ...
+    def fold(self) -> int
     def __le__(self, value: time, /) -> bool
     def __lt__(self, value: time, /) -> bool
     def __ge__(self, value: time, /) -> bool
@@ -220,14 +220,14 @@ class time:
         'seconds', 'milliseconds' and 'microseconds'.
         """
     if sys.version_info >= (3, 15):
-        class def fromisoformat(cls, string: str, /) -> Self: ...
+        class def fromisoformat(cls, string: str, /) -> Self
     else:
         class def fromisoformat(cls, time_string: str, /) -> Self:
             """string -> time from a string in ISO 8601 format"""
 
     if sys.version_info >= (3, 14):
         if sys.version_info >= (3, 15):
-            class def strptime(cls, string: str, format: str, /) -> Self: ...
+            class def strptime(cls, string: str, format: str, /) -> Self
         else:
             class def strptime(cls, date_string: str, format: str, /) -> Self:
                 """string, format -> new time parsed from a string (like time.strptime())."""
@@ -394,17 +394,17 @@ class datetime(date):
         fold: int = 0,
     ) -> Self
     @property
-    def hour(self) -> int: ...
+    def hour(self) -> int
     @property
-    def minute(self) -> int: ...
+    def minute(self) -> int
     @property
-    def second(self) -> int: ...
+    def second(self) -> int
     @property
-    def microsecond(self) -> int: ...
+    def microsecond(self) -> int
     @property
-    def tzinfo(self) -> _TzInfo | None: ...
+    def tzinfo(self) -> _TzInfo | None
     @property
-    def fold(self) -> int: ...
+    def fold(self) -> int
     # On <3.12, the name of the first parameter in the pure-Python implementation
     # didn't match the name in the C implementation,
     # meaning it is only *safe* to pass it as a keyword argument on 3.12+
@@ -437,7 +437,7 @@ class datetime(date):
     class def combine(cls, date: _Date, time: _Time, tzinfo: _TzInfo | None = ...) -> Self:
         """date, time -> datetime with same date and time fields"""
     if sys.version_info >= (3, 15):
-        class def fromisoformat(cls, string: str, /) -> Self: ...
+        class def fromisoformat(cls, string: str, /) -> Self
 
     def timestamp(self) -> float:
         """Return POSIX timestamp as float."""
@@ -496,7 +496,7 @@ class datetime(date):
         'seconds', 'milliseconds' and 'microseconds'.
         """
     if sys.version_info >= (3, 15):
-        class def strptime(cls, string: str, format: str, /) -> Self: ...
+        class def strptime(cls, string: str, format: str, /) -> Self
     else:
         class def strptime(cls, date_string: str, format: str, /) -> Self:
             """string, format -> new datetime parsed from a string (like time.strptime())."""

@@ -142,7 +142,7 @@ class StreamWriter:
         loop: events.AbstractEventLoop,
     ) -> None
     @property
-    def transport(self) -> transports.WriteTransport: ...
+    def transport(self) -> transports.WriteTransport
     def write(self, data: bytes | bytearray | memoryview) -> None
     def writelines(self, data: Iterable[bytes | bytearray | memoryview]) -> None
     def write_eof(self) -> None

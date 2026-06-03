@@ -35,11 +35,15 @@ env:
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
 
 jobs:
-  roundtrip:
-    name: Round-trip primer projects
-    runs-on: ${{ github.repository == 'KotlinIsland/basedpython' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+  build:
+    name: Build by (base + head)
+    # re-enable when we have depot support
+    # runs-on: ${{ github.repository == 'KotlinIsland/basedpython' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: "ubuntu-latest"
     # max (6h) so the round-trip over the primer project set isn't cut short
     timeout-minutes: 360
+    outputs:
+      merge-base: ${{ steps.build.outputs.merge-base }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -53,42 +57,149 @@ jobs:
       - name: Install mold
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
+      - name: Build by for both commits
+        id: build
+        run: |
+          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+          git fetch --no-tags --filter=blob:none --unshallow origin
+
+          MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+          echo "merge-base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
+          echo "Merge base: ${MERGE_BASE}"
+          echo "PR commit: ${GITHUB_SHA}"
+
+          git checkout "${MERGE_BASE}"
+          cargo build --bin by --profile profiling
+          cp target/profiling/by by-base
+
+          git checkout "${GITHUB_SHA}"
+          cargo build --bin by --profile profiling
+          cp target/profiling/by by-pr
+
+      - name: Upload by binaries
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: by-builds
+          compression-level: 1
+          path: |
+            by-base
+            by-pr
+
+  roundtrip-shards:
+    name: Round-trip shard ${{ matrix.shard }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    # re-enable when we have depot support
+    # runs-on: ${{ github.repository == 'KotlinIsland/basedpython' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: "ubuntu-latest"
+    # max (6h): the per-file round-trip over the corpus is slow on the fork's
+    # ubuntu-latest runners, so give each shard the whole budget
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
           version: "0.11.7"
 
-      - name: Build by
-        run: cargo build --bin by --profile profiling
+      - name: Download by binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: by-builds
 
-      - name: Run round-trip ecosystem check
+      - name: Round-trip shard ${{ matrix.shard }}
         env:
-          BY_BIN: ${{ github.workspace }}/target/profiling/by
-          PRIMER_LIMIT: ${{ vars.BY_ROUNDTRIP_PRIMER_LIMIT || '20' }}
+          SHARD: ${{ matrix.shard }}
+          # opt-in cap for quick runs; empty (the default) means the whole corpus
+          PRIMER_LIMIT: ${{ vars.BY_ROUNDTRIP_PRIMER_LIMIT }}
         run: |
-          chmod +x "$BY_BIN"
+          chmod +x by-base by-pr
 
+          limit_arg=()
+          if [[ -n "$PRIMER_LIMIT" ]]; then
+            limit_arg=(--limit "$PRIMER_LIMIT")
+          fi
+
+          # the harness round-trips each project with two `by` processes
+          # (`transpile --reverse <dir>` then `by build`), not per file. each
+          # `by build` holds a whole project's db in memory, so build one
+          # project at a time — two concurrent builds OOM the runner on the big
+          # projects
+          uv run scripts/check_ecosystem_roundtrip.py \
+            by-pr \
+            --baseline by-base \
+            --shard "$SHARD" \
+            --num-shards 8 \
+            "${limit_arg[@]}" \
+            --project-concurrency 1 \
+            --json-out "roundtrip-${SHARD}.json"
+
+      - name: Upload shard results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: roundtrip-shard-${{ matrix.shard }}
+          path: roundtrip-${{ matrix.shard }}.json
+
+  report:
+    name: Generate round-trip report
+    needs: [build, roundtrip-shards]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          version: "0.11.7"
+
+      - name: Download shard results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: roundtrip-shard-*
+          merge-multiple: true
+
+      - name: Render report
+        id: check
+        env:
+          MERGE_BASE: ${{ needs.build.outputs.merge-base }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
           set +e
           uv run scripts/check_ecosystem_roundtrip.py \
-            "$BY_BIN" \
-            --limit "$PRIMER_LIMIT" \
-            --project-concurrency 4 \
-            --file-concurrency 8 \
-            > report.md
+            --render roundtrip-*.json \
+            --old-label "${MERGE_BASE} (merge base)" \
+            --new-label "${REF_NAME}" \
+            > comment.md
           ROUNDTRIP_EXIT=$?
           set -e
 
-          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
           echo "exit_code=$ROUNDTRIP_EXIT" >> "$GITHUB_OUTPUT"
-        id: check
 
-      - name: Upload report
+      - name: Record PR number for the comment workflow
+        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
+
+      # NOTE: the by-ecosystem-roundtrip_comment workflow consumes this artifact
+      # to post the PR comment. Update that workflow if you rename it.
+      - name: Upload comment
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: by-roundtrip-report
-          path: report.md
+          name: comment.md
+          path: |
+            comment.md
+            pr-number.txt
 
-      - name: Fail on round-trip divergence
+      - name: Fail on round-trip regression
         if: steps.check.outputs.exit_code != '0'
         run: exit 1

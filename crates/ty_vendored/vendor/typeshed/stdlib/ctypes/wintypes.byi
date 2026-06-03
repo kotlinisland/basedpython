@@ -260,12 +260,12 @@ PBOOLEAN = PBYTE
 # LP_c_char
 class PCHAR(_Pointer[CHAR]):
     # this is inherited from ctypes.c_char_p, kind of.
-    class def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
+    class def from_param(cls, value: Any, /) -> Self | _CArgObject
 
 # LP_c_wchar
 class PWCHAR(_Pointer[WCHAR]):
     # inherited from ctypes.c_wchar_p, kind of
-    class def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
+    class def from_param(cls, value: Any, /) -> Self | _CArgObject
 
 # LP_c_void_p
 class PHANDLE(_Pointer[HANDLE])

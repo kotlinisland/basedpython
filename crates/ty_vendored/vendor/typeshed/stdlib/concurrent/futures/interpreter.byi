@@ -17,7 +17,7 @@ if sys.version_info >= (3, 14):
     from concurrent.futures.thread import BrokenThreadPool, WorkerContext as ThreadWorkerContext
     from concurrent.interpreters import Interpreter, Queue
 
-    def do_call[R](results: Queue, func: Callable[..., R], args: (*: Any), kwargs: dict[str, Any]) -> R
+    def do_call[R](results: Queue, func: (...) -> R, args: (*: Any), kwargs: dict[str, Any]) -> R
 
     class WorkerContext(ThreadWorkerContext):
         interp: Interpreter | None

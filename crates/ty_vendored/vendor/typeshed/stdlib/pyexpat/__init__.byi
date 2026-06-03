@@ -97,7 +97,7 @@ final class XMLParserType:
         def SetBillionLaughsAttackProtectionMaximumAmplification(self, max_factor: float, /) -> None
 
     @property
-    def intern(self) -> dict[str, str]: ...
+    def intern(self) -> dict[str, str]
     buffer_size: int
     buffer_text: bool
     buffer_used: int

@@ -1,7 +1,7 @@
 import ctypes
 import sys
 from _ctypes import _CData
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from ctypes import _SimpleCData, c_char
 from logging import Logger, _Level as _LoggingLevel
 from multiprocessing import popen_fork, popen_forkserver, popen_spawn_posix, popen_spawn_win32, queues, synchronize
@@ -71,7 +71,7 @@ class BaseContext:
             """Returns two connection object connected by a pipe"""
 
     def Barrier(
-        self, parties: int, action: Callable[..., object] | None = None, timeout: float | None = None
+        self, parties: int, action: (...) -> object | None = None, timeout: float | None = None
     ) -> synchronize.Barrier:
         """Returns a barrier object"""
 
@@ -105,7 +105,7 @@ class BaseContext:
     def Pool(
         self,
         processes: int | None = None,
-        initializer: Callable[..., object] | None = None,
+        initializer: (...) -> object | None = None,
         initargs: Iterable[Any] = (),
         maxtasksperchild: int | None = None,
     ) -> _Pool:
@@ -207,7 +207,7 @@ class BaseContext:
 
 class Process(BaseProcess):
     _start_method: str | None
-    static def _Popen(process_obj: BaseProcess) -> DefaultContext: ...
+    static def _Popen(process_obj: BaseProcess) -> DefaultContext
 
 class DefaultContext(BaseContext):
     Process: ClassVar[type[Process]]
@@ -221,9 +221,9 @@ _default_context: DefaultContext
 class SpawnProcess(BaseProcess):
     _start_method: str
     if sys.platform != "win32":
-        static def _Popen(process_obj: BaseProcess) -> popen_spawn_posix.Popen: ...
+        static def _Popen(process_obj: BaseProcess) -> popen_spawn_posix.Popen
     else:
-        static def _Popen(process_obj: BaseProcess) -> popen_spawn_win32.Popen: ...
+        static def _Popen(process_obj: BaseProcess) -> popen_spawn_win32.Popen
 
 class SpawnContext(BaseContext):
     _name: str
@@ -232,11 +232,11 @@ class SpawnContext(BaseContext):
 if sys.platform != "win32":
     class ForkProcess(BaseProcess):
         _start_method: str
-        static def _Popen(process_obj: BaseProcess) -> popen_fork.Popen: ...
+        static def _Popen(process_obj: BaseProcess) -> popen_fork.Popen
 
     class ForkServerProcess(BaseProcess):
         _start_method: str
-        static def _Popen(process_obj: BaseProcess) -> popen_forkserver.Popen: ...
+        static def _Popen(process_obj: BaseProcess) -> popen_forkserver.Popen
 
     class ForkContext(BaseContext):
         _name: str

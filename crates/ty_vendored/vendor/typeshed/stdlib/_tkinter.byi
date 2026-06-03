@@ -59,12 +59,12 @@ final class TkappType:
     def adderrorinfo(self, msg: str, /) -> None
     def call(self, command: Any, /, *args: Any) -> Any
     # TODO: Figure out what arguments the following `func` callbacks should accept
-    def createcommand(self, name: str, func: Callable[..., object], /) -> None
+    def createcommand(self, name: str, func: (...) -> object, /) -> None
     if sys.platform != "win32":
-        def createfilehandler(self, file: FileDescriptorLike, mask: int, func: Callable[..., object], /) -> None
+        def createfilehandler(self, file: FileDescriptorLike, mask: int, func: (...) -> object, /) -> None
         def deletefilehandler(self, file: FileDescriptorLike, /) -> None
 
-    def createtimerhandler(self, milliseconds: int, func: Callable[..., object], /)
+    def createtimerhandler(self, milliseconds: int, func: (...) -> object, /)
     def deletecommand(self, name: str, /) -> None
     def dooneevent(self, flags: int = 0, /) -> int
     def eval(self, script: str, /) -> str
@@ -88,7 +88,7 @@ final class TkappType:
     def setvar(self, *ags, **kwargs)
     if sys.version_info < (3, 11):
         @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
-        def split(self, arg, /): ...
+        def split(self, arg, /)
 
     def splitlist(self, arg, /) -> (*: Incomplete)
     def unsetvar(self, *args, **kwargs)

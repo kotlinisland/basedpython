@@ -72,19 +72,19 @@ class Finalize[out R = Any]:
     def __init__(
         self,
         obj: None,
-        callback: Callable[..., R],
+        callback: (...) -> R,
         *,
         args: Sequence[Any] = (),
         kwargs: Mapping[str, Any] | None = None,
         exitpriority: int,
     ) -> None
     def __init__(
-        self, obj: None, callback: Callable[..., R], args: Sequence[Any], kwargs: Mapping[str, Any] | None, exitpriority: int
+        self, obj: None, callback: (...) -> R, args: Sequence[Any], kwargs: Mapping[str, Any] | None, exitpriority: int
     ) -> None
     def __init__(
         self,
         obj: Any,
-        callback: Callable[..., R],
+        callback: (...) -> R,
         args: Sequence[Any] = (),
         kwargs: Mapping[str, Any] | None = None,
         exitpriority: int | None = None,
@@ -94,7 +94,7 @@ class Finalize[out R = Any]:
         self,
         wr: Unused = None,
         _finalizer_registry: MutableMapping[Incomplete, Incomplete] = {},
-        sub_debug: Callable[..., object] = ...,
+        sub_debug: (...) -> object = ...,
         getpid: Callable[[], int] = ...,
     ) -> R:
         """

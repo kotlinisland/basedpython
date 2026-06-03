@@ -155,9 +155,9 @@ class ZstdFile(_streams.BaseStream):
         """
 
     @property
-    def name(self) -> str | bytes: ...
+    def name(self) -> str | bytes
     @property
-    def mode(self) -> Literal["rb", "wb"]: ...
+    def mode(self) -> Literal["rb", "wb"]
 
 def open(
     file: StrOrBytesPath | _FileBinaryRead,

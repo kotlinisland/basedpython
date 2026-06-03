@@ -30,9 +30,9 @@ class HTTPStatus(IntEnum):
     """
 
     @property
-    def phrase(self) -> str: ...
+    def phrase(self) -> str
     @property
-    def description(self) -> str: ...
+    def description(self) -> str
 
     # Keep these synced with the global constants in http/client.pyi.
     CONTINUE = 100
@@ -112,15 +112,15 @@ class HTTPStatus(IntEnum):
 
     if sys.version_info >= (3, 12):
         @property
-        def is_informational(self) -> bool: ...
+        def is_informational(self) -> bool
         @property
-        def is_success(self) -> bool: ...
+        def is_success(self) -> bool
         @property
-        def is_redirection(self) -> bool: ...
+        def is_redirection(self) -> bool
         @property
-        def is_client_error(self) -> bool: ...
+        def is_client_error(self) -> bool
         @property
-        def is_server_error(self) -> bool: ...
+        def is_server_error(self) -> bool
 
 if sys.version_info >= (3, 11):
     class HTTPMethod(StrEnum):
@@ -133,7 +133,7 @@ if sys.version_info >= (3, 11):
         """
 
         @property
-        def description(self) -> str: ...
+        def description(self) -> str
         CONNECT = "CONNECT"
         DELETE = "DELETE"
         GET = "GET"

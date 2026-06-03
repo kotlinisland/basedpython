@@ -135,9 +135,9 @@ class Fraction(Rational):
             """Return True if the Fraction is an integer."""
 
     @property
-    def numerator(a) -> int: ...
+    def numerator(a) -> int
     @property
-    def denominator(a) -> int: ...
+    def denominator(a) -> int
 
     def __add__(a, b: int | Fraction) -> Fraction:
         """a + b"""

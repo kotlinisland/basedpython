@@ -61,7 +61,7 @@ class Bdb:
         """Set values of attributes as ready to start debugging."""
     if sys.version_info >= (3, 12):
         @contextmanager
-        def set_enterframe(self, frame: FrameType) -> Iterator[None]: ...
+        def set_enterframe(self, frame: FrameType) -> Iterator[None]
 
     def trace_dispatch(self, frame: FrameType, event: str, arg: Any) -> TraceFunction:
         """Dispatch a trace function for debugged frames based on the event.
@@ -355,7 +355,7 @@ class Breakpoint:
         self, file: str, line: int, temporary: bool = False, cond: str | None = None, funcname: str | None = None
     ) -> None
     if sys.version_info >= (3, 11):
-        static def clearBreakpoints() -> None: ...
+        static def clearBreakpoints() -> None
 
     def deleteMe(self) -> None:
         """Delete the breakpoint from the list associated to a file:line.

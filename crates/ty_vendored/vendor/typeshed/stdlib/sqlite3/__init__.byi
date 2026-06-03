@@ -266,8 +266,8 @@ class _AnyParamWindowAggregateClass(Protocol):
 
 @type_check_only
 class _WindowAggregateClass(Protocol):
-    step: Callable[..., object]
-    inverse: Callable[..., object]
+    step: (...) -> object
+    inverse: (...) -> object
     def value(self) -> _SqliteData
     def finalize(self) -> _SqliteData
 
@@ -307,30 +307,30 @@ class Connection:
     """SQLite database connection object."""
 
     @property
-    def DataError(self) -> type[DataError]: ...
+    def DataError(self) -> type[DataError]
     @property
-    def DatabaseError(self) -> type[DatabaseError]: ...
+    def DatabaseError(self) -> type[DatabaseError]
     @property
-    def Error(self) -> type[Error]: ...
+    def Error(self) -> type[Error]
     @property
-    def IntegrityError(self) -> type[IntegrityError]: ...
+    def IntegrityError(self) -> type[IntegrityError]
     @property
-    def InterfaceError(self) -> type[InterfaceError]: ...
+    def InterfaceError(self) -> type[InterfaceError]
     @property
-    def InternalError(self) -> type[InternalError]: ...
+    def InternalError(self) -> type[InternalError]
     @property
-    def NotSupportedError(self) -> type[NotSupportedError]: ...
+    def NotSupportedError(self) -> type[NotSupportedError]
     @property
-    def OperationalError(self) -> type[OperationalError]: ...
+    def OperationalError(self) -> type[OperationalError]
     @property
-    def ProgrammingError(self) -> type[ProgrammingError]: ...
+    def ProgrammingError(self) -> type[ProgrammingError]
     @property
-    def Warning(self) -> type[Warning]: ...
+    def Warning(self) -> type[Warning]
     @property
-    def in_transaction(self) -> bool: ...
+    def in_transaction(self) -> bool
     isolation_level: _IsolationLevel
     @property
-    def total_changes(self) -> int: ...
+    def total_changes(self) -> int
     if sys.version_info >= (3, 12):
         @property
         def autocommit(self) -> int: ...
@@ -431,11 +431,11 @@ class Connection:
         """Creates a collation function."""
     if sys.version_info >= (3, 15):
         def create_function(
-            self, name: str, narg: int, func: Callable[..., _SqliteData] | None, /, *, deterministic: bool = False
+            self, name: str, narg: int, func: (...) -> _SqliteData | None, /, *, deterministic: bool = False
         ) -> None
     else:
         def create_function(
-            self, name: str, narg: int, func: Callable[..., _SqliteData] | None, *, deterministic: bool = False
+            self, name: str, narg: int, func: (...) -> _SqliteData | None, *, deterministic: bool = False
         ) -> None:
             """Creates a new function.
 
@@ -625,15 +625,15 @@ class Cursor:
 
     arraysize: int
     @property
-    def connection(self) -> Connection: ...
+    def connection(self) -> Connection
     # May be None, but using `| MaybeNone` (`| Any`) instead to avoid slightly annoying false positives.
     @property
-    def description(self) -> (*: (str, None, None, None, None, None, None)) | MaybeNone: ...
+    def description(self) -> (*: (str, None, None, None, None, None, None)) | MaybeNone
     @property
-    def lastrowid(self) -> int | None: ...
+    def lastrowid(self) -> int | None
     row_factory: _RowFactoryOptions
     @property
-    def rowcount(self) -> int: ...
+    def rowcount(self) -> int
     def __init__(self, cursor: Connection, /) -> None
     def close(self) -> None:
         """Closes the cursor."""

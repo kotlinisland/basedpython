@@ -178,7 +178,7 @@ if sys.version_info >= (3, 12):
                 label: int | None = None,
                 positions: Positions | None = None,
                 cache_info: list[(str, int, Any)] | None = None,
-            ) -> Instruction: ...
+            ) -> Instruction
 
 else:
     @disjoint_base

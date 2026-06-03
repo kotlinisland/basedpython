@@ -64,7 +64,7 @@ class NamedTupleFallback(tuple[Any, ...]):
     )
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None
 
-    class def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
+    class def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self
     def _asdict(self) -> dict[str, Any]
     def _replace(self, **kwargs: Any) -> typing_extensions.Self
     if sys.version_info >= (3, 13):

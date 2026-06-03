@@ -89,13 +89,13 @@ class _NetlocResultMixinBase(Generic[AnyStr]):
 
     __slots__ = ()
     @property
-    def username(self) -> AnyStr | None: ...
+    def username(self) -> AnyStr | None
     @property
-    def password(self) -> AnyStr | None: ...
+    def password(self) -> AnyStr | None
     @property
-    def hostname(self) -> AnyStr | None: ...
+    def hostname(self) -> AnyStr | None
     @property
-    def port(self) -> int | None: ...
+    def port(self) -> int | None
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 

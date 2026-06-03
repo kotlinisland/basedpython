@@ -130,7 +130,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
 
     class def find_spec(
         cls, fullname: str, path: Sequence[str] | None = None, target: types.ModuleType | None = None
-    ) -> ModuleSpec | None: ...
+    ) -> ModuleSpec | None
     # InspectLoader
     class def is_package(cls, fullname: str) -> bool:
         """Return False as built-in modules are never packages."""
@@ -188,7 +188,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
 
     class def find_spec(
         cls, fullname: str, path: Sequence[str] | None = None, target: types.ModuleType | None = None
-    ) -> ModuleSpec | None: ...
+    ) -> ModuleSpec | None
     # InspectLoader
     class def is_package(cls, fullname: str) -> bool:
         """Return True if the frozen module is a package."""
@@ -222,4 +222,4 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     static def create_module(spec: ModuleSpec) -> types.ModuleType | None:
         """Set __file__, if able."""
 
-    static def exec_module(module: types.ModuleType) -> None: ...
+    static def exec_module(module: types.ModuleType) -> None

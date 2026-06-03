@@ -24,11 +24,11 @@ class TransportSocket:
     __slots__ = ("_sock",)
     def __init__(self, sock: socket.socket) -> None
     @property
-    def family(self) -> int: ...
+    def family(self) -> int
     @property
-    def type(self) -> int: ...
+    def type(self) -> int
     @property
-    def proto(self) -> int: ...
+    def proto(self) -> int
     def __getstate__(self) -> NoReturn
     def fileno(self) -> int
     def dup(self) -> socket.socket
@@ -50,42 +50,42 @@ class TransportSocket:
     if sys.version_info < (3, 11):
         def _na(self, what: str) -> None
         @deprecated("Removed in Python 3.11")
-        def accept(self) -> (socket.socket, _RetAddress): ...
+        def accept(self) -> (socket.socket, _RetAddress)
         @deprecated("Removed in Python 3.11")
-        def connect(self, address: _Address) -> None: ...
+        def connect(self, address: _Address) -> None
         @deprecated("Removed in Python 3.11")
-        def connect_ex(self, address: _Address) -> int: ...
+        def connect_ex(self, address: _Address) -> int
         @deprecated("Removed in Python 3.11")
-        def bind(self, address: _Address) -> None: ...
+        def bind(self, address: _Address) -> None
 
         if sys.platform == "win32":
             @deprecated("Removed in Python 3.11")
-            def ioctl(self, control: int, option: int | (int, int, int) | bool) -> None: ...
+            def ioctl(self, control: int, option: int | (int, int, int) | bool) -> None
         else:
             @deprecated("Removed in Python 3.11")
-            def ioctl(self, control: int, option: int | (int, int, int) | bool) -> NoReturn: ...
+            def ioctl(self, control: int, option: int | (int, int, int) | bool) -> NoReturn
 
         @deprecated("Removed in Python 3.11")
-        def listen(self, backlog: int = ..., /) -> None: ...
+        def listen(self, backlog: int = ..., /) -> None
         @deprecated("Removed in Python 3.11")
-        def makefile(self) -> BinaryIO: ...
+        def makefile(self) -> BinaryIO
         @deprecated("Removed in Python 3.11")
-        def sendfile(self, file: BinaryIO, offset: int = 0, count: int | None = None) -> int: ...
+        def sendfile(self, file: BinaryIO, offset: int = 0, count: int | None = None) -> int
         @deprecated("Removed in Python 3.11")
-        def close(self) -> None: ...
+        def close(self) -> None
         @deprecated("Removed in Python 3.11")
-        def detach(self) -> int: ...
+        def detach(self) -> int
 
         if sys.platform == "linux":
             @deprecated("Removed in Python 3.11")
             def sendmsg_afalg(
                 self, msg: Iterable[ReadableBuffer] = ..., *, op: int, iv: Any = ..., assoclen: int = ..., flags: int = 0
-            ) -> int: ...
+            ) -> int
         else:
             @deprecated("Removed in Python 3.11.")
             def sendmsg_afalg(
                 self, msg: Iterable[ReadableBuffer] = ..., *, op: int, iv: Any = ..., assoclen: int = ..., flags: int = 0
-            ) -> NoReturn: ...
+            ) -> NoReturn
 
         @deprecated("Removed in Python 3.11.")
         def sendmsg(
@@ -95,7 +95,7 @@ class TransportSocket:
             flags: int = 0,
             address: _Address | None = None,
             /,
-        ) -> int: ...
+        ) -> int
 
         @deprecated("Removed in Python 3.11.")
         def sendto(self, data: ReadableBuffer, address: _Address) -> int
@@ -103,36 +103,36 @@ class TransportSocket:
         def sendto(self, data: ReadableBuffer, flags: int, address: _Address) -> int
 
         @deprecated("Removed in Python 3.11.")
-        def send(self, data: ReadableBuffer, flags: int = 0) -> int: ...
+        def send(self, data: ReadableBuffer, flags: int = 0) -> int
         @deprecated("Removed in Python 3.11.")
-        def sendall(self, data: ReadableBuffer, flags: int = 0) -> None: ...
+        def sendall(self, data: ReadableBuffer, flags: int = 0) -> None
         @deprecated("Removed in Python 3.11.")
-        def set_inheritable(self, inheritable: bool) -> None: ...
+        def set_inheritable(self, inheritable: bool) -> None
 
         if sys.platform == "win32":
             @deprecated("Removed in Python 3.11.")
-            def share(self, process_id: int) -> bytes: ...
+            def share(self, process_id: int) -> bytes
         else:
             @deprecated("Removed in Python 3.11.")
-            def share(self, process_id: int) -> NoReturn: ...
+            def share(self, process_id: int) -> NoReturn
 
         @deprecated("Removed in Python 3.11.")
-        def recv_into(self, buffer: _WriteBuffer, nbytes: int = 0, flags: int = 0) -> int: ...
+        def recv_into(self, buffer: _WriteBuffer, nbytes: int = 0, flags: int = 0) -> int
         @deprecated("Removed in Python 3.11.")
-        def recvfrom_into(self, buffer: _WriteBuffer, nbytes: int = 0, flags: int = 0) -> (int, _RetAddress): ...
+        def recvfrom_into(self, buffer: _WriteBuffer, nbytes: int = 0, flags: int = 0) -> (int, _RetAddress)
         @deprecated("Removed in Python 3.11.")
         def recvmsg_into(
             self, buffers: Iterable[_WriteBuffer], ancbufsize: int = 0, flags: int = 0, /
-        ) -> (int, list[_CMSG], int, Any): ...
+        ) -> (int, list[_CMSG], int, Any)
         @deprecated("Removed in Python 3.11.")
-        def recvmsg(self, bufsize: int, ancbufsize: int = 0, flags: int = 0, /) -> (bytes, list[_CMSG], int, Any): ...
+        def recvmsg(self, bufsize: int, ancbufsize: int = 0, flags: int = 0, /) -> (bytes, list[_CMSG], int, Any)
         @deprecated("Removed in Python 3.11.")
-        def recvfrom(self, bufsize: int, flags: int = 0) -> (bytes, _RetAddress): ...
+        def recvfrom(self, bufsize: int, flags: int = 0) -> (bytes, _RetAddress)
         @deprecated("Removed in Python 3.11.")
-        def recv(self, bufsize: int, flags: int = 0) -> bytes: ...
+        def recv(self, bufsize: int, flags: int = 0) -> bytes
         @deprecated("Removed in Python 3.11.")
-        def __enter__(self) -> socket.socket: ...
+        def __enter__(self) -> socket.socket
         @deprecated("Removed in Python 3.11.")
         def __exit__(
             self, exc_type: Type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
-        ) -> None: ...
+        ) -> None

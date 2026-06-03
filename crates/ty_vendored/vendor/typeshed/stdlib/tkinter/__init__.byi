@@ -1318,7 +1318,7 @@ class Misc:
         """
 
     def register(
-        self, func: Callable[..., object], subst: Callable[..., Sequence[Any]] | None = None, needcleanup: int = 1
+        self, func: (...) -> object, subst: (...) -> Sequence[Any] | None = None, needcleanup: int = 1
     ) -> str:
         """Return a newly created Tcl function. If this
         function is called, the Python function FUNC will
@@ -2188,12 +2188,12 @@ class Tk(Misc, Wm):
     def adderrorinfo(self, msg: str, /) -> None
     def call(self, command: Any, /, *args: Any) -> Any
     # TODO: Figure out what arguments the following `func` callbacks should accept
-    def createcommand(self, name: str, func: Callable[..., object], /) -> None
+    def createcommand(self, name: str, func: (...) -> object, /) -> None
     if sys.platform != "win32":
-        def createfilehandler(self, file: FileDescriptorLike, mask: int, func: Callable[..., object], /) -> None
+        def createfilehandler(self, file: FileDescriptorLike, mask: int, func: (...) -> object, /) -> None
         def deletefilehandler(self, file: FileDescriptorLike, /) -> None
 
-    def createtimerhandler(self, milliseconds: int, func: Callable[..., object], /)
+    def createtimerhandler(self, milliseconds: int, func: (...) -> object, /)
     def dooneevent(self, flags: int = 0, /) -> int
     def eval(self, script: str, /) -> str
     def evalfile(self, fileName: str, /) -> str
@@ -2209,7 +2209,7 @@ class Tk(Misc, Wm):
     def record(self, script: str, /) -> str
     if sys.version_info < (3, 11):
         @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
-        def split(self, arg, /): ...
+        def split(self, arg, /)
 
     def splitlist(self, arg, /) -> (*: Incomplete)
     def unsetvar(self, *args, **kwargs)
@@ -5018,7 +5018,7 @@ class Scrollbar(Widget):
         # 'SCROLLING COMMANDS' in scrollbar man page. There doesn't seem to
         # be any way to specify an overloaded callback function, so we say
         # that it can take any args while it can't in reality.
-        command: Callable[..., (float, float) | None] | str = "",
+        command: (...) -> tuple[float, float] | None | str = "",
         cursor: _Cursor = "",
         elementborderwidth: float | str = -1,
         highlightbackground: str = ...,
@@ -5055,7 +5055,7 @@ class Scrollbar(Widget):
         bg: str = ...,
         border: float | str = ...,
         borderwidth: float | str = ...,
-        command: Callable[..., (float, float) | None] | str = ...,
+        command: (...) -> tuple[float, float] | None | str = ...,
         cursor: _Cursor = ...,
         elementborderwidth: float | str = ...,
         highlightbackground: str = ...,

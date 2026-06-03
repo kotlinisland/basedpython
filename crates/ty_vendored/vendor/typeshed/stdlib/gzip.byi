@@ -208,7 +208,7 @@ class GzipFile(BaseStream):
     if sys.version_info < (3, 12):
         @property
         @deprecated("Deprecated since Python 2.6; removed in Python 3.12. Use `name` attribute instead.")
-        def filename(self) -> str: ...
+        def filename(self) -> str
 
     @property
     def mtime(self) -> int | None:

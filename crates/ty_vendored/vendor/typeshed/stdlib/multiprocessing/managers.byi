@@ -257,7 +257,7 @@ class Server:
     # Registry values are (callable, exposed, method_to_typeid, proxytype)
     def __init__(
         self,
-        registry: dict[str, (Callable[..., Any], Iterable[str], dict[str, str], Any)],
+        registry: dict[str, tuple[(...) -> Any, Iterable[str], dict[str, str], Any]],
         address: _Address | None,
         authkey: bytes,
         serializer: str,
@@ -349,7 +349,7 @@ class BaseManager:
         Connect manager object to the server process
         """
 
-    def start(self, initializer: Callable[..., object] | None = None, initargs: Iterable[Any] = ()) -> None:
+    def start(self, initializer: (...) -> object | None = None, initargs: Iterable[Any] = ()) -> None:
         """
         Spawn a server process for this manager object
         """
@@ -360,11 +360,11 @@ class BaseManager:
         """
 
     @property
-    def address(self) -> _Address | None: ...
+    def address(self) -> _Address | None
     class def register(
         cls,
         typeid: str,
-        callable: Callable[..., object] | None = None,
+        callable: (...) -> object | None = None,
         proxytype: Any = None,
         exposed: Sequence[str] | None = None,
         method_to_typeid: Mapping[str, str] | None = None,
@@ -401,7 +401,7 @@ class SyncManager(BaseManager):
     def Pool(
         self,
         processes: int | None = None,
-        initializer: Callable[..., object] | None = None,
+        initializer: (...) -> object | None = None,
         initargs: Iterable[Any] = (),
         maxtasksperchild: int | None = None,
         context: Any | None = None,

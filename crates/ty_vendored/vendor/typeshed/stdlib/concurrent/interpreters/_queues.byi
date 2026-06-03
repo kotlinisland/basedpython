@@ -63,11 +63,11 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
         def __hash__(self) -> int
         def __reduce__(self) -> (type[Self], int)
         @property
-        def id(self) -> int: ...
+        def id(self) -> int
         @property
-        def unbounditems(self) -> _AnyUnbound: ...
+        def unbounditems(self) -> _AnyUnbound
         @property
-        def maxsize(self) -> int: ...
+        def maxsize(self) -> int
         def empty(self) -> bool
         def full(self) -> bool
         def qsize(self) -> int

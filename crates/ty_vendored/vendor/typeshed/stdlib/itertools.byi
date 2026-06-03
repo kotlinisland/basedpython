@@ -219,7 +219,7 @@ class islice[in out Element]:
 class starmap[out Element]:
     """Return an iterator whose values are returned from the function evaluated with an argument tuple taken from the given sequence."""
 
-    def __new__[T](cls, function: Callable[..., T], iterable: Iterable[Iterable[Any]], /) -> starmap[T]
+    def __new__[T](cls, function: (...) -> T, iterable: Iterable[Iterable[Any]], /) -> starmap[T]
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 

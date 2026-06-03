@@ -108,7 +108,7 @@ class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
 
     class def find_spec(
         cls, fullname: str, path: Sequence[str] | None = None, target: types.ModuleType | None = None
-    ) -> ModuleSpec | None: ...
+    ) -> ModuleSpec | None
 
 class PathFinder(importlib.abc.MetaPathFinder):
     """Meta path finder for sys.path and package __path__ attributes."""

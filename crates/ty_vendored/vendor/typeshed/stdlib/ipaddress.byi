@@ -101,7 +101,7 @@ class _IPAddressBase:
         """
     if sys.version_info < (3, 14):
         @property
-        def version(self) -> int: ...
+        def version(self) -> int
 
 class _BaseAddress(_IPAddressBase):
     """A generic IP object.
@@ -221,7 +221,7 @@ class _BaseNetwork[in out A: constraints (IPv4Address, IPv6Address)](_IPAddressB
         """
 
     @property
-    def broadcast_address(self) -> A: ...
+    def broadcast_address(self) -> A
     def compare_networks(self, other: Self) -> int:
         """Compare two IP objects.
 
@@ -340,7 +340,7 @@ class _BaseNetwork[in out A: constraints (IPv4Address, IPv6Address)](_IPAddressB
         """Tell if self is partly contained in other."""
 
     @property
-    def prefixlen(self) -> int: ...
+    def prefixlen(self) -> int
     def subnet_of(self, other: Self) -> bool:
         """Return True if this network is a subnet of other."""
 
@@ -397,13 +397,13 @@ class _BaseNetwork[in out A: constraints (IPv4Address, IPv6Address)](_IPAddressB
         """
 
     @property
-    def with_hostmask(self) -> str: ...
+    def with_hostmask(self) -> str
     @property
-    def with_netmask(self) -> str: ...
+    def with_netmask(self) -> str
     @property
-    def with_prefixlen(self) -> str: ...
+    def with_prefixlen(self) -> str
     @property
-    def hostmask(self) -> A: ...
+    def hostmask(self) -> A
 
 class _BaseV4:
     """Base IPv4 object.
@@ -419,9 +419,9 @@ class _BaseV4:
         max_prefixlen: Final = 32
     else:
         @property
-        def version(self) -> Literal[4]: ...
+        def version(self) -> Literal[4]
         @property
-        def max_prefixlen(self) -> Literal[32]: ...
+        def max_prefixlen(self) -> Literal[32]
 
 class IPv4Address(_BaseV4, _BaseAddress):
     """Represent and manipulate single IPv4 Addresses."""
@@ -591,15 +591,15 @@ class IPv4Interface(IPv4Address):
     def __eq__(self, other: object) -> bool
     def __hash__(self) -> int
     @property
-    def hostmask(self) -> IPv4Address: ...
+    def hostmask(self) -> IPv4Address
     @property
-    def ip(self) -> IPv4Address: ...
+    def ip(self) -> IPv4Address
     @property
-    def with_hostmask(self) -> str: ...
+    def with_hostmask(self) -> str
     @property
-    def with_netmask(self) -> str: ...
+    def with_netmask(self) -> str
     @property
-    def with_prefixlen(self) -> str: ...
+    def with_prefixlen(self) -> str
 
 class _BaseV6:
     """Base IPv6 object.
@@ -615,9 +615,9 @@ class _BaseV6:
         max_prefixlen: Final = 128
     else:
         @property
-        def version(self) -> Literal[6]: ...
+        def version(self) -> Literal[6]
         @property
-        def max_prefixlen(self) -> Literal[128]: ...
+        def max_prefixlen(self) -> Literal[128]
 
 class IPv6Address(_BaseV6, _BaseAddress):
     """Represent and manipulate single IPv6 Addresses."""
@@ -848,15 +848,15 @@ class IPv6Interface(IPv6Address):
     def __eq__(self, other: object) -> bool
     def __hash__(self) -> int
     @property
-    def hostmask(self) -> IPv6Address: ...
+    def hostmask(self) -> IPv6Address
     @property
-    def ip(self) -> IPv6Address: ...
+    def ip(self) -> IPv6Address
     @property
-    def with_hostmask(self) -> str: ...
+    def with_hostmask(self) -> str
     @property
-    def with_netmask(self) -> str: ...
+    def with_netmask(self) -> str
     @property
-    def with_prefixlen(self) -> str: ...
+    def with_prefixlen(self) -> str
 
 def v4_int_to_packed(address: int) -> bytes:
     """Represent an address as 4 packed bytes in network (big-endian) order.

@@ -20,12 +20,29 @@ use ruff_python_ast::{Expr, Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub(crate) struct EmptyDeclarations {
+    /// when reversing a non-stub `.py`, an abstract method keeps its `: ...`
+    /// body: the forward pass maps a bodyless `abstract def` to `: raise
+    /// NotImplementedError`, so stripping the body would not round-trip. in a
+    /// stub the body is dropped — bodyless is the stub idiom and the forward
+    /// pass re-emits `: ...` there
+    is_stub: bool,
     pub(crate) edits: Vec<Fix>,
 }
 
 impl EmptyDeclarations {
-    pub(crate) fn new() -> Self {
-        Self { edits: Vec::new() }
+    pub(crate) fn new(is_stub: bool) -> Self {
+        Self {
+            is_stub,
+            edits: Vec::new(),
+        }
+    }
+
+    fn is_abstract(func: &StmtFunctionDef) -> bool {
+        func.decorator_list.iter().any(|d| match &d.expression {
+            Expr::Name(n) => n.id.as_str() == "abstractmethod",
+            Expr::Attribute(a) => a.attr.id.as_str() == "abstractmethod",
+            _ => false,
+        })
     }
 
     fn is_ellipsis_body(body: &[Stmt]) -> bool {
@@ -58,9 +75,22 @@ impl EmptyDeclarations {
     }
 
     fn process_function(&mut self, func: &StmtFunctionDef) {
-        // Decorated functions belong to specialized reverse passes (e.g.
-        // overload) that know how to handle the whole group atomically.
-        if !func.decorator_list.is_empty() {
+        // `@overload`-decorated functions belong to the overload reverse pass,
+        // which strips the decorator and the `: ...` body together. other
+        // decorators (`@property`, `@deprecated`, modifier-backed ones like
+        // `@abstractmethod`/`@final`) are fine to strip the body from — the
+        // decorator/modifier survives in front of the now-bodyless def
+        if func
+            .decorator_list
+            .iter()
+            .any(|d| matches!(&d.expression, Expr::Name(n) if n.id.as_str() == "overload"))
+        {
+            return;
+        }
+        // outside a stub, an abstract method's `: ...` body must survive: the
+        // forward pass turns a bodyless `abstract def` into `: raise
+        // NotImplementedError`, so dropping it here would not round-trip
+        if !self.is_stub && Self::is_abstract(func) {
             return;
         }
         if !Self::is_ellipsis_body(&func.body) {
@@ -247,6 +277,71 @@ mod tests {
             indoc! {"
                 def f():
                     pass
+            "},
+        );
+    }
+
+    #[test]
+    fn property_decorated_function_stripped() {
+        // non-`@overload` decorators don't defer to the overload pass; the
+        // `: ...` body is stripped and the decorator survives in front
+        check(
+            indoc! {"
+                class A:
+                    @property
+                    def x(self) -> int: ...
+            "},
+            indoc! {"
+                class A:
+                    @property
+                    def x(self) -> int
+            "},
+        );
+    }
+
+    #[test]
+    fn abstract_function_keeps_body_in_non_stub() {
+        // non-stub: `@abstractmethod` reverses to `abstract` but the `: ...`
+        // body is kept — a bodyless `abstract def` forward-maps to `: raise
+        // NotImplementedError`, so stripping would not round-trip
+        check(
+            indoc! {"
+                from abc import abstractmethod
+                class A:
+                    @abstractmethod
+                    def f(self) -> None: ...
+            "},
+            indoc! {"
+                from abc import abstractmethod
+                class A:
+                    abstract def f(self) -> None: ...
+            "},
+        );
+    }
+
+    #[test]
+    fn abstract_function_stripped_in_stub() {
+        // stub: bodyless is the idiom and the forward pass re-emits `: ...`
+        // for an abstract method in a stub, so the body is dropped here
+        let config = Config {
+            is_stub: true,
+            ..Config::test_default()
+        };
+        assert_eq!(
+            reverse_transpile(
+                indoc! {"
+                    from abc import abstractmethod
+                    class A:
+                        @abstractmethod
+                        def f(self) -> None: ...
+                "},
+                &config,
+            )
+            .unwrap(),
+            indoc! {"
+                from abc import abstractmethod
+                class A:
+                    abstract def f(self) -> None
             "},
         );
     }

@@ -73,7 +73,7 @@ class Number(metaclass=ABCMeta):
     """
 
     __slots__ = ()
-    abstract def __hash__(self) -> int: ...
+    abstract def __hash__(self) -> int
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague

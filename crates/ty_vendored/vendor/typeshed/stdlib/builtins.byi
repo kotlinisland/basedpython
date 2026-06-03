@@ -106,7 +106,7 @@ class object:
 
     def __dir__(self) -> Iterable[str]
     def __init_subclass__(cls) -> None
-    class def __subclasshook__(cls, subclass: type, /) -> bool: ...
+    class def __subclasshook__(cls, subclass: type, /) -> bool
 
 @disjoint_base
 class staticmethod[**P, out R]:
@@ -131,9 +131,9 @@ class staticmethod[**P, out R]:
     __name__: str
     __qualname__: str
     @property
-    def __func__(self) -> Callable[P, R]: ...
+    def __func__(self) -> Callable[P, R]
     @property
-    def __isabstractmethod__(self) -> bool: ...
+    def __isabstractmethod__(self) -> bool
     def __init__(self, f: Callable[P, R], /) -> None
 
     def __get__(self, instance: None, owner: type, /) -> Callable[P, R]:
@@ -141,7 +141,7 @@ class staticmethod[**P, out R]:
     def __get__[Element](self, instance: Element, owner: type[Element] | None = None, /) -> Callable[P, R]
 
     @property
-    def __wrapped__(self) -> Callable[P, R]: ...
+    def __wrapped__(self) -> Callable[P, R]
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """Call self as a function."""
     if sys.version_info >= (3, 14):
@@ -173,9 +173,9 @@ class classmethod[in out Element, **P, out R]:
     __name__: str
     __qualname__: str
     @property
-    def __func__(self) -> Callable[Concatenate[type[Element], P], R]: ...
+    def __func__(self) -> Callable[Concatenate[type[Element], P], R]
     @property
-    def __isabstractmethod__(self) -> bool: ...
+    def __isabstractmethod__(self) -> bool
     def __init__(self, f: Callable[Concatenate[type[Element], P], R], /) -> None
 
     def __get__(self, instance: Element, owner: type[Element] | None = None, /) -> Callable[P, R]:
@@ -183,7 +183,7 @@ class classmethod[in out Element, **P, out R]:
     def __get__(self, instance: None, owner: type[Element], /) -> Callable[P, R]
 
     @property
-    def __wrapped__(self) -> Callable[Concatenate[type[Element], P], R]: ...
+    def __wrapped__(self) -> Callable[Concatenate[type[Element], P], R]
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias
         __annotate__: AnnotateFunc | None
@@ -196,28 +196,28 @@ class type:
 
     # object.__base__ is None. Otherwise, it would be a type.
     @property
-    def __base__(self) -> type | None: ...
+    def __base__(self) -> type | None
     __bases__: (*: type)
     @property
-    def __basicsize__(self) -> int: ...
+    def __basicsize__(self) -> int
     # type.__dict__ is read-only at runtime, but that can't be expressed currently.
     # See https://github.com/python/typeshed/issues/11033 for a discussion.
     __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
     @property
-    def __dictoffset__(self) -> int: ...
+    def __dictoffset__(self) -> int
     @property
-    def __flags__(self) -> int: ...
+    def __flags__(self) -> int
     @property
-    def __itemsize__(self) -> int: ...
+    def __itemsize__(self) -> int
     __module__: str
     @property
-    def __mro__(self) -> (*: type): ...
+    def __mro__(self) -> (*: type)
     __name__: str
     __qualname__: str
     @property
-    def __text_signature__(self) -> str | None: ...
+    def __text_signature__(self) -> str | None
     @property
-    def __weakrefoffset__(self) -> int: ...
+    def __weakrefoffset__(self) -> int
 
     def __init__(self, o: object, /) -> None
     def __init__(self, name: str, bases: (*: type), dict: dict[str, Any], /, **kwds: Any) -> None
@@ -2517,11 +2517,11 @@ final class slice[out StartT = Any, out StopT = StartT, out StepT = StartT | Sto
     """
 
     @property
-    def start(self) -> StartT: ...
+    def start(self) -> StartT
     @property
-    def step(self) -> StepT: ...
+    def step(self) -> StepT
     @property
-    def stop(self) -> StopT: ...
+    def stop(self) -> StopT
 
     # Note: __new__ overloads map `None` to `Any`, since users expect slice(x, None)
     #  to be compatible with slice(None, x).
@@ -2618,12 +2618,12 @@ class tuple[out Element](Sequence[Element]):
 class function:
     # Make sure this class definition stays roughly in line with `types.FunctionType`
     @property
-    def __closure__(self) -> (*: CellType) | None: ...
+    def __closure__(self) -> (*: CellType) | None
     __code__: CodeType
     __defaults__: (*: Any) | None
     __dict__: dict[str, Any]
     @property
-    def __globals__(self) -> dict[str, Any]: ...
+    def __globals__(self) -> dict[str, Any]
     __name__: str
     __qualname__: str
     __annotations__: dict[str, AnnotationForm]
@@ -2631,7 +2631,7 @@ class function:
         __annotate__: AnnotateFunc | None
     __kwdefaults__: dict[str, Any] | None
     @property
-    def __builtins__(self) -> dict[str, Any]: ...
+    def __builtins__(self) -> dict[str, Any]
     if sys.version_info >= (3, 12):
         __type_params__: (*: TypeVar | ParamSpec | TypeVarTuple)
 
@@ -3122,11 +3122,11 @@ final class range(Sequence[int]):
     """
 
     @property
-    def start(self) -> int: ...
+    def start(self) -> int
     @property
-    def stop(self) -> int: ...
+    def stop(self) -> int
     @property
-    def step(self) -> int: ...
+    def step(self) -> int
 
     def __new__(cls, stop: SupportsIndex, /) -> Self
     def __new__(cls, start: SupportsIndex, stop: SupportsIndex, step: SupportsIndex = 1, /) -> Self
@@ -3268,7 +3268,7 @@ def breakpoint(*args: Any, **kws: Any) -> None:
     By default, this drops you into the pdb debugger.
     """
 
-def callable(obj: object, /) -> obj is Callable[..., object]:
+def callable(obj: object, /) -> TypeIs[(...) -> object]:
     """Return whether the object is callable (i.e., some kind of function).
 
     Note that classes are callable, as are instances of classes with a
@@ -3727,7 +3727,7 @@ class map[in out Other]:
         ) -> Self
         def __new__(
             cls,
-            func: Callable[..., Other],
+            func: (...) -> Other,
             iterable: Iterable[Any],
             iter2: Iterable[Any],
             iter3: Iterable[Any],
@@ -3765,7 +3765,7 @@ class map[in out Other]:
         ) -> Self
         def __new__(
             cls,
-            func: Callable[..., Other],
+            func: (...) -> Other,
             iterable: Iterable[Any],
             iter2: Iterable[Any],
             iter3: Iterable[Any],

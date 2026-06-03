@@ -164,7 +164,7 @@ class BaseConfigurator:
     INDEX_PATTERN: Pattern[str]
     DIGIT_PATTERN: Pattern[str]
     value_converters: dict[str, str]
-    importer: Callable[..., Any]
+    importer: (...) -> Any
 
     config: dict[str, Any]  # undocumented
 

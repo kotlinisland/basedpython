@@ -17,6 +17,6 @@ def iter_async_frames(awaited_info_list: Sequence[AwaitedInfo]) -> object
 class Collector(ABC):
     abstract def collect(
         self, stack_frames: Sequence[InterpreterInfo] | Sequence[AwaitedInfo], timestamps_us: _Timestamps = None
-    ) -> None: ...
+    ) -> None
     def collect_failed_sample(self) -> None
-    abstract def export(self, filename: StrOrBytesPath) -> None: ...
+    abstract def export(self, filename: StrOrBytesPath) -> None

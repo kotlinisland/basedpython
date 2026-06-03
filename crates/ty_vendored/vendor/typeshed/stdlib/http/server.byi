@@ -64,7 +64,7 @@ if sys.version_info >= (3, 14):
             cafile: StrOrBytesPath | None = None,
             capath: StrOrBytesPath | None = None,
             cadata: str | ReadableBuffer | None = None,
-        ) -> SSLContext: ...
+        ) -> SSLContext
 
     class HTTPSServer(HTTPServer):
         ssl: _SSLModule

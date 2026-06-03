@@ -30,7 +30,7 @@ def register[**P, Element](func: Callable[P, Element], /, *args: P.args, **kwarg
     func is returned to facilitate usage as a decorator.
     """
 
-def unregister(func: Callable[..., object], /) -> None:
+def unregister(func: (...) -> object, /) -> None:
     """Unregister an exit function which was previously registered using
     atexit.register
 

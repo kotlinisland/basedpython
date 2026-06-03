@@ -110,16 +110,16 @@ class TokenList(list[TokenList | Terminal]):
     defects: list[MessageDefect]
     def __init__(self, *args: Any, **kw: Any) -> None
     @property
-    def value(self) -> str: ...
+    def value(self) -> str
     @property
-    def all_defects(self) -> list[MessageDefect]: ...
+    def all_defects(self) -> list[MessageDefect]
     def startswith_fws(self) -> bool
     @property
     def as_ew_allowed(self) -> bool:
         """True if all top level tokens of this part may be RFC2047 encoded."""
 
     @property
-    def comments(self) -> list[str]: ...
+    def comments(self) -> list[str]
     def fold(self, *, policy: Policy) -> str
     def pprint(self, indent: str = "") -> None
     def ppstr(self, indent: str = "") -> str
@@ -154,11 +154,11 @@ class EncodedWord(TokenList):
 class QuotedString(TokenList):
     token_type: str
     @property
-    def content(self) -> str: ...
+    def content(self) -> str
     @property
-    def quoted_value(self) -> str: ...
+    def quoted_value(self) -> str
     @property
-    def stripped_value(self) -> str: ...
+    def stripped_value(self) -> str
 
 class BareQuotedString(QuotedString):
     token_type: str
@@ -167,109 +167,109 @@ class Comment(WhiteSpaceTokenList):
     token_type: str
     def quote(self, value: Any) -> str
     @property
-    def content(self) -> str: ...
+    def content(self) -> str
 
 class AddressList(TokenList):
     token_type: str
     @property
-    def addresses(self) -> list[Address]: ...
+    def addresses(self) -> list[Address]
     @property
-    def mailboxes(self) -> list[Mailbox]: ...
+    def mailboxes(self) -> list[Mailbox]
     @property
-    def all_mailboxes(self) -> list[Mailbox]: ...
+    def all_mailboxes(self) -> list[Mailbox]
 
 class Address(TokenList):
     token_type: str
     @property
-    def display_name(self) -> str: ...
+    def display_name(self) -> str
     @property
-    def mailboxes(self) -> list[Mailbox]: ...
+    def mailboxes(self) -> list[Mailbox]
     @property
-    def all_mailboxes(self) -> list[Mailbox]: ...
+    def all_mailboxes(self) -> list[Mailbox]
 
 class MailboxList(TokenList):
     token_type: str
     @property
-    def mailboxes(self) -> list[Mailbox]: ...
+    def mailboxes(self) -> list[Mailbox]
     @property
-    def all_mailboxes(self) -> list[Mailbox]: ...
+    def all_mailboxes(self) -> list[Mailbox]
 
 class GroupList(TokenList):
     token_type: str
     @property
-    def mailboxes(self) -> list[Mailbox]: ...
+    def mailboxes(self) -> list[Mailbox]
     @property
-    def all_mailboxes(self) -> list[Mailbox]: ...
+    def all_mailboxes(self) -> list[Mailbox]
 
 class Group(TokenList):
     token_type: str
     @property
-    def mailboxes(self) -> list[Mailbox]: ...
+    def mailboxes(self) -> list[Mailbox]
     @property
-    def all_mailboxes(self) -> list[Mailbox]: ...
+    def all_mailboxes(self) -> list[Mailbox]
     @property
-    def display_name(self) -> str: ...
+    def display_name(self) -> str
 
 class NameAddr(TokenList):
     token_type: str
     @property
-    def display_name(self) -> str: ...
+    def display_name(self) -> str
     @property
-    def local_part(self) -> str: ...
+    def local_part(self) -> str
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
     @property
-    def route(self) -> list[Domain] | None: ...
+    def route(self) -> list[Domain] | None
     @property
-    def addr_spec(self) -> str: ...
+    def addr_spec(self) -> str
 
 class AngleAddr(TokenList):
     token_type: str
     @property
-    def local_part(self) -> str: ...
+    def local_part(self) -> str
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
     @property
-    def route(self) -> list[Domain] | None: ...
+    def route(self) -> list[Domain] | None
     @property
-    def addr_spec(self) -> str: ...
+    def addr_spec(self) -> str
 
 class ObsRoute(TokenList):
     token_type: str
     @property
-    def domains(self) -> list[Domain]: ...
+    def domains(self) -> list[Domain]
 
 class Mailbox(TokenList):
     token_type: str
     @property
-    def display_name(self) -> str: ...
+    def display_name(self) -> str
     @property
-    def local_part(self) -> str: ...
+    def local_part(self) -> str
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
     @property
-    def route(self) -> list[str]: ...
+    def route(self) -> list[str]
     @property
-    def addr_spec(self) -> str: ...
+    def addr_spec(self) -> str
 
 class InvalidMailbox(TokenList):
     token_type: str
     @property
-    def display_name(self) -> None: ...
+    def display_name(self) -> None
     @property
-    def local_part(self) -> None: ...
+    def local_part(self) -> None
     @property
-    def domain(self) -> None: ...
+    def domain(self) -> None
     @property
-    def route(self) -> None: ...
+    def route(self) -> None
     @property
-    def addr_spec(self) -> None: ...
+    def addr_spec(self) -> None
 
 class Domain(TokenList):
     token_type: str
     as_ew_allowed: bool
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
 
 class DotAtom(TokenList):
     token_type: str
@@ -286,11 +286,11 @@ class AddrSpec(TokenList):
     token_type: str
     as_ew_allowed: bool
     @property
-    def local_part(self) -> str: ...
+    def local_part(self) -> str
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
     @property
-    def addr_spec(self) -> str: ...
+    def addr_spec(self) -> str
 
 class ObsLocalPart(TokenList):
     token_type: str
@@ -299,21 +299,21 @@ class ObsLocalPart(TokenList):
 class DisplayName(Phrase):
     token_type: str
     @property
-    def display_name(self) -> str: ...
+    def display_name(self) -> str
 
 class LocalPart(TokenList):
     token_type: str
     as_ew_allowed: bool
     @property
-    def local_part(self) -> str: ...
+    def local_part(self) -> str
 
 class DomainLiteral(TokenList):
     token_type: str
     as_ew_allowed: bool
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
     @property
-    def ip(self) -> str: ...
+    def ip(self) -> str
 
 class MIMEVersion(TokenList):
     token_type: str
@@ -326,9 +326,9 @@ class Parameter(TokenList):
     extended: bool
     charset: str
     @property
-    def section_number(self) -> int: ...
+    def section_number(self) -> int
     @property
-    def param_value(self) -> str: ...
+    def param_value(self) -> str
 
 class InvalidParameter(Parameter):
     token_type: str
@@ -336,7 +336,7 @@ class InvalidParameter(Parameter):
 class Attribute(TokenList):
     token_type: str
     @property
-    def stripped_value(self) -> str: ...
+    def stripped_value(self) -> str
 
 class Section(TokenList):
     token_type: str
@@ -345,18 +345,18 @@ class Section(TokenList):
 class Value(TokenList):
     token_type: str
     @property
-    def stripped_value(self) -> str: ...
+    def stripped_value(self) -> str
 
 class MimeParameters(TokenList):
     token_type: str
     syntactic_break: bool
     @property
-    def params(self) -> Iterator[(str, str)]: ...
+    def params(self) -> Iterator[(str, str)]
 
 class ParameterizedHeaderValue(TokenList):
     syntactic_break: bool
     @property
-    def params(self) -> Iterable[(str, str)]: ...
+    def params(self) -> Iterable[(str, str)]
 
 class ContentType(ParameterizedHeaderValue):
     token_type: str
@@ -394,7 +394,7 @@ if sys.version_info >= (3, 13):
     class MessageIDList(TokenList):
         token_type: str
         @property
-        def message_ids(self) -> list[MsgID | Terminal]: ...
+        def message_ids(self) -> list[MsgID | Terminal]
 
 class Header(TokenList):
     token_type: str
@@ -408,20 +408,20 @@ class Terminal(str):
     def __new__(cls, value: str, token_type: str) -> Self
     def pprint(self) -> None
     @property
-    def all_defects(self) -> list[MessageDefect]: ...
+    def all_defects(self) -> list[MessageDefect]
     def pop_trailing_ws(self) -> None
     @property
-    def comments(self) -> list[str]: ...
+    def comments(self) -> list[str]
     def __getnewargs__(self) -> (str, str)  # type: ignore[override]
 
 class WhiteSpaceTerminal(Terminal):
     @property
-    def value(self) -> str: ...
+    def value(self) -> str
     def startswith_fws(self) -> bool
 
 class ValueTerminal(Terminal):
     @property
-    def value(self) -> ValueTerminal: ...
+    def value(self) -> ValueTerminal
     def startswith_fws(self) -> bool
 
 class EWWhiteSpaceTerminal(WhiteSpaceTerminal)

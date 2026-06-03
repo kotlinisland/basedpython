@@ -167,7 +167,7 @@ class Executor:
     if sys.version_info >= (3, 14):
         def map[Element](
             self,
-            fn: Callable[..., Element],
+            fn: (...) -> Element,
             *iterables: Iterable[Any],
             timeout: float | None = None,
             chunksize: int = 1,
@@ -201,7 +201,7 @@ class Executor:
             """
     else:
         def map[Element](
-            self, fn: Callable[..., Element], *iterables: Iterable[Any], timeout: float | None = None, chunksize: int = 1
+            self, fn: (...) -> Element, *iterables: Iterable[Any], timeout: float | None = None, chunksize: int = 1
         ) -> Iterator[Element]:
             """Returns an iterator equivalent to map(fn, iter).
 

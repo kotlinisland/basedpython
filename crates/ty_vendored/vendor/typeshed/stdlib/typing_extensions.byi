@@ -646,7 +646,7 @@ else:
     def clear_overloads() -> None:
         """Clear all overloads in the registry."""
 
-    def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
+    def get_overloads(func: (...) -> object) -> Sequence[(...) -> object]:
         """Return all defined overloads for *func* as a sequence."""
     Required: _SpecialForm
     """A special typing construct to mark a key of a total=False TypedDict
@@ -743,7 +743,7 @@ else:
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,
-        field_specifiers: (*: type[Any] | Callable[..., Any]) = (),
+        field_specifiers: tuple[type[Any] | (...) -> Any, ...] = (),
         **kwargs: object,
     ) -> IdentityFunction:
         """Decorator that marks a function, class, or metaclass as providing
@@ -836,7 +836,7 @@ else:
         def __init__(self, typename: str, fields: Iterable[(str, Any)] = ...) -> None
         def __init__(self, typename: str, fields: None = None, **kwargs: Any) -> None
 
-        class def _make(cls, iterable: Iterable[Any]) -> Self: ...
+        class def _make(cls, iterable: Iterable[Any]) -> Self
         def _asdict(self) -> dict[str, Any]
         def _replace(self, **kwargs: Any) -> Self
 
@@ -957,7 +957,7 @@ else:
 
         __slots__ = ()
         @abc.abstractmethod
-        def __int__(self) -> int: ...
+        def __int__(self) -> int
 
     @runtime_checkable
     class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
@@ -965,7 +965,7 @@ else:
 
         __slots__ = ()
         @abc.abstractmethod
-        def __float__(self) -> float: ...
+        def __float__(self) -> float
 
     @runtime_checkable
     class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
@@ -973,7 +973,7 @@ else:
 
         __slots__ = ()
         @abc.abstractmethod
-        def __complex__(self) -> complex: ...
+        def __complex__(self) -> complex
 
     @runtime_checkable
     class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
@@ -981,13 +981,13 @@ else:
 
         __slots__ = ()
         @abc.abstractmethod
-        def __bytes__(self) -> bytes: ...
+        def __bytes__(self) -> bytes
 
     @runtime_checkable
     class SupportsIndex(Protocol, metaclass=abc.ABCMeta):
         __slots__ = ()
         @abc.abstractmethod
-        def __index__(self) -> int: ...
+        def __index__(self) -> int
 
     @runtime_checkable
     class SupportsAbs(Protocol[_T_co]):
@@ -997,7 +997,7 @@ else:
 
         __slots__ = ()
         @abc.abstractmethod
-        def __abs__(self) -> _T_co: ...
+        def __abs__(self) -> _T_co
 
     @runtime_checkable
     class SupportsRound(Protocol[_T_co]):
@@ -1156,19 +1156,19 @@ else:
         """Type variable."""
 
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         @property
-        def __bound__(self) -> AnnotationForm | None: ...
+        def __bound__(self) -> AnnotationForm | None
         @property
-        def __constraints__(self) -> (*: AnnotationForm): ...
+        def __constraints__(self) -> (*: AnnotationForm)
         @property
-        def __covariant__(self) -> bool: ...
+        def __covariant__(self) -> bool
         @property
-        def __contravariant__(self) -> bool: ...
+        def __contravariant__(self) -> bool
         @property
-        def __infer_variance__(self) -> bool: ...
+        def __infer_variance__(self) -> bool
         @property
-        def __default__(self) -> AnnotationForm: ...
+        def __default__(self) -> AnnotationForm
         def __init__(
             self,
             name: str,
@@ -1193,17 +1193,17 @@ else:
         """Parameter specification."""
 
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         @property
-        def __bound__(self) -> AnnotationForm | None: ...
+        def __bound__(self) -> AnnotationForm | None
         @property
-        def __covariant__(self) -> bool: ...
+        def __covariant__(self) -> bool
         @property
-        def __contravariant__(self) -> bool: ...
+        def __contravariant__(self) -> bool
         @property
-        def __infer_variance__(self) -> bool: ...
+        def __infer_variance__(self) -> bool
         @property
-        def __default__(self) -> AnnotationForm: ...
+        def __default__(self) -> AnnotationForm
         def __init__(
             self,
             name: str,
@@ -1220,9 +1220,9 @@ else:
             """Return value|self."""
 
         @property
-        def args(self) -> ParamSpecArgs: ...
+        def args(self) -> ParamSpecArgs
         @property
-        def kwargs(self) -> ParamSpecKwargs: ...
+        def kwargs(self) -> ParamSpecKwargs
         def has_default(self) -> bool
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> (*: Any)
 
@@ -1230,9 +1230,9 @@ else:
         """Type variable tuple."""
 
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         @property
-        def __default__(self) -> AnnotationForm: ...
+        def __default__(self) -> AnnotationForm
         def __init__(self, name: str, *, default: AnnotationForm = ...) -> None
         def __iter__(self) -> Any  # Unpack[Self]
         def has_default(self) -> bool
@@ -1328,18 +1328,18 @@ else:
             self, name: str, value: AnnotationForm, *, type_params: (*: TypeVar | ParamSpec | TypeVarTuple) = ()
         ) -> None
         @property
-        def __value__(self) -> AnnotationForm: ...
+        def __value__(self) -> AnnotationForm
         @property
-        def __type_params__(self) -> (*: TypeVar | ParamSpec | TypeVarTuple): ...
+        def __type_params__(self) -> (*: TypeVar | ParamSpec | TypeVarTuple)
         @property
         # `__parameters__` can include special forms if a `TypeVarTuple` was
         # passed as a `type_params` element to the constructor method.
-        def __parameters__(self) -> (*: TypeVar | ParamSpec | AnnotationForm): ...
+        def __parameters__(self) -> (*: TypeVar | ParamSpec | AnnotationForm)
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         # It's writable on types, but not on instances of TypeAliasType.
         @property
-        def __module__(self) -> str | None: ...  # type: ignore[override]
+        def __module__(self) -> str | None  # type: ignore[override]
         # Returns typing._GenericAlias, which isn't stubbed.
         def __getitem__(self, parameters: Incomplete | (*: Incomplete)) -> AnnotationForm
         def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn
@@ -1473,7 +1473,7 @@ else:
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
         *,
-        owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
+        owner: (...) -> object | type[object] | ModuleType | None = None,  # any callable, class, or module
         globals: Mapping[str, Any] | None = None,  # value types depend on the key
         locals: Mapping[str, Any] | None = None,  # value types depend on the key
         type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
@@ -1505,7 +1505,7 @@ else:
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
         *,
-        owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
+        owner: (...) -> object | type[object] | ModuleType | None = None,  # any callable, class, or module
         globals: Mapping[str, Any] | None = None,  # value types depend on the key
         locals: Mapping[str, Any] | None = None,  # value types depend on the key
         type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
@@ -1515,7 +1515,7 @@ else:
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
         *,
-        owner: Callable[..., object] | type[object] | ModuleType | None = None,  # any callable, class, or module
+        owner: (...) -> object | type[object] | ModuleType | None = None,  # any callable, class, or module
         globals: Mapping[str, Any] | None = None,  # value types depend on the key
         locals: Mapping[str, Any] | None = None,  # value types depend on the key
         type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,

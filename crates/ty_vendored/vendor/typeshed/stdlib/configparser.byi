@@ -581,7 +581,7 @@ class RawConfigParser(_Parser):
 
     def optionxform(self, optionstr: str) -> str
     @property
-    def converters(self) -> ConverterMapping: ...
+    def converters(self) -> ConverterMapping
 
 class ConfigParser(RawConfigParser):
     """ConfigParser implementing interpolation."""
@@ -624,9 +624,9 @@ class SectionProxy(MutableMapping[str, str]):
     def __len__(self) -> int
     def __iter__(self) -> Iterator[str]
     @property
-    def parser(self) -> RawConfigParser: ...
+    def parser(self) -> RawConfigParser
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
 
     # This is incompatible with MutableMapping so we ignore the type
     def get(
@@ -668,7 +668,7 @@ class SectionProxy(MutableMapping[str, str]):
     def getboolean[Element](self, option: str, fallback: Element = ..., *, raw: bool = False, vars: _Section | None = None) -> bool | Element
 
     # SectionProxy can have arbitrary attributes when custom converters are used
-    def __getattr__(self, key: str) -> Callable[..., Any]
+    def __getattr__(self, key: str) -> (...) -> Any
 
 class ConverterMapping(MutableMapping[str, _ConverterCallback | None]):
     """Enables reuse of get*() methods between the parser and section proxies.

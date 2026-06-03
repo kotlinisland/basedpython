@@ -334,7 +334,7 @@ class _TemporaryFileWrapper(IO[AnyStr]):
     def writelines(self, lines: Iterable[AnyStr]) -> None
 
     @property
-    def closed(self) -> bool: ...
+    def closed(self) -> bool
 
 if sys.version_info >= (3, 11):
     _SpooledTemporaryFileBase = io.IOBase
@@ -351,9 +351,9 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
 
     _file: IO[AnyStr]
     @property
-    def encoding(self) -> str: ...  # undocumented
+    def encoding(self) -> str  # undocumented
     @property
-    def newlines(self) -> str | (*: str) | None: ...  # undocumented
+    def newlines(self) -> str | (*: str) | None  # undocumented
 
     # bytes needs to go first, as default mode is to open as bytes
     def __init__(
@@ -423,7 +423,7 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
     ) -> None
 
     @property
-    def errors(self) -> str | None: ...
+    def errors(self) -> str | None
     def rollover(self) -> None
     def __enter__(self) -> Self
     def __exit__(self, exc: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> None

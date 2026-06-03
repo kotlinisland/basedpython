@@ -120,11 +120,11 @@ class Morsel[in out Element](dict[str, Any]):
     """
 
     @property
-    def value(self) -> str | MaybeNone: ...
+    def value(self) -> str | MaybeNone
     @property
-    def coded_value(self) -> Element | MaybeNone: ...
+    def coded_value(self) -> Element | MaybeNone
     @property
-    def key(self) -> str | MaybeNone: ...
+    def key(self) -> str | MaybeNone
     def __init__(self) -> None
     def set(self, key: str, val: str, coded_val: Element) -> None
     def setdefault(self, key: str, val: str | None = None) -> str

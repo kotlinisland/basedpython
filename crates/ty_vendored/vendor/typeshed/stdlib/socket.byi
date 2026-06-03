@@ -1630,9 +1630,9 @@ class SocketIO(RawIOBase):
         """
 
     @property
-    def name(self) -> int: ...  # return value is really "int"
+    def name(self) -> int  # return value is really "int"
     @property
-    def mode(self) -> Literal["rb", "wb", "rwb"]: ...
+    def mode(self) -> Literal["rb", "wb", "rwb"]
 
 def getfqdn(name: str = "") -> str:
     """Get fully qualified domain name from name.

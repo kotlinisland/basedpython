@@ -229,7 +229,7 @@ class TestCase:
     def assertRaises(
         self,
         expected_exception: type[BaseException] | (*: type[BaseException]),
-        callable: Callable[..., object],
+        callable: (...) -> object,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -266,7 +266,7 @@ class TestCase:
         self,
         expected_exception: type[BaseException] | (*: type[BaseException]),
         expected_regex: str | Pattern[str],
-        callable: Callable[..., object],
+        callable: (...) -> object,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -472,7 +472,7 @@ class TestCase:
 
         """
 
-    def addTypeEqualityFunc(self, typeobj: type[Any], function: Callable[..., None]) -> None:
+    def addTypeEqualityFunc(self, typeobj: type[Any], function: (...) -> None) -> None:
         """Add a type specific assertEqual style function to compare a type.
 
         This method is for use by TestCase subclasses that need to register
@@ -601,7 +601,7 @@ class TestCase:
         * If an explicit message is provided, plus ' : ' and the explicit message
         """
 
-    def _getAssertEqualityFunc(self, first: Any, second: Any) -> Callable[..., None]:  # undocumented
+    def _getAssertEqualityFunc(self, first: Any, second: Any) -> (...) -> None:  # undocumented
         """Get a detailed comparison function for the types of the two args.
 
         Returns: A callable accepting (first, second, msg=None) that will

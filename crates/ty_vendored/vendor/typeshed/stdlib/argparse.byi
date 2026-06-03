@@ -430,7 +430,7 @@ class HelpFormatter:
         formatter: HelpFormatter
         heading: str | None
         parent: Self | None
-        items: list[(Callable[..., str], Iterable[Any])]
+        items: list[tuple[(...) -> str, Iterable[Any]]]
         def __init__(self, formatter: HelpFormatter, parent: Self | None, heading: str | None = None) -> None
         def format_help(self) -> str
 
@@ -450,7 +450,7 @@ class HelpFormatter:
 
     def _indent(self) -> None
     def _dedent(self) -> None
-    def _add_item(self, func: Callable[..., str], args: Iterable[Any]) -> None
+    def _add_item(self, func: (...) -> str, args: Iterable[Any]) -> None
     def start_section(self, heading: str | None) -> None
     def end_section(self) -> None
     def add_text(self, text: str | None) -> None

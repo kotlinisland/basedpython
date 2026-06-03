@@ -29,7 +29,7 @@ class Future[in out Element](Awaitable[Element]):
 
     _state: str
     @property
-    def _exception(self) -> BaseException | None: ...
+    def _exception(self) -> BaseException | None
     _blocking: bool
 
     @property
@@ -46,7 +46,7 @@ class Future[in out Element](Awaitable[Element]):
         """Return the event loop the Future is bound to."""
 
     @property
-    def _callbacks(self) -> list[(Callable[[Self], Any], Context)]: ...
+    def _callbacks(self) -> list[(Callable[[Self], Any], Context)]
     def add_done_callback(self, fn: Callable[[Self], object], /, *, context: Context | None = None) -> None:
         """Add a callback to be run when the future becomes done.
 
@@ -117,7 +117,7 @@ class Future[in out Element](Awaitable[Element]):
         """Return an iterator to be used in await expression."""
 
     @property
-    def _loop(self) -> AbstractEventLoop: ...
+    def _loop(self) -> AbstractEventLoop
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 

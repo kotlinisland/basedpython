@@ -327,9 +327,9 @@ class Decimal:
 
     def __trunc__(self) -> int
     @property
-    def real(self) -> Decimal: ...
+    def real(self) -> Decimal
     @property
-    def imag(self) -> Decimal: ...
+    def imag(self) -> Decimal
     def conjugate(self) -> Decimal:
         """Return self."""
 

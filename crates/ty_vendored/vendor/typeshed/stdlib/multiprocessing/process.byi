@@ -1,5 +1,5 @@
 import sys
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 __all__ = ["BaseProcess", "current_process", "active_children", "parent_process"]
@@ -22,7 +22,7 @@ class BaseProcess:
     def __init__(
         self,
         group: None = None,
-        target: Callable[..., object] | None = None,
+        target: (...) -> object | None = None,
         name: str | None = None,
         args: Iterable[Any] = (),
         kwargs: Mapping[str, Any] = {},

@@ -13,7 +13,7 @@ final class ContextVar[in out Element]:
 
     def __hash__(self) -> int
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
 
     def get(self) -> Element:
         """Return a value for the context variable for the current context.
@@ -48,9 +48,9 @@ final class ContextVar[in out Element]:
 
 final class Token[in out Element]:
     @property
-    def var(self) -> ContextVar[Element]: ...
+    def var(self) -> ContextVar[Element]
     @property
-    def old_value(self) -> Any: ...  # returns either _T or MISSING, but that's hard to express
+    def old_value(self) -> Any  # returns either _T or MISSING, but that's hard to express
     MISSING: ClassVar[object]
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:

@@ -5873,9 +5873,9 @@ Source with applied edits:
         b[: Sequence[str]] = S('x', 'y')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.byi:1492:7
+            --> stdlib/typing.byi:1493:7
              |
-        1492 | class Sequence[out Element](Reversible[Element], Collection[Element]):
+        1493 | class Sequence[out Element](Reversible[Element], Collection[Element]):
              |       ^^^^^^^^
              |
         info: Source
@@ -6928,9 +6928,9 @@ Source with applied edits:
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.byi:2396:26
+            --> stdlib/typing.byi:2397:26
              |
-        2396 |         def __new__(cls, name: str, value: Any, *, type_params: (*: _TypeParameter) = ()) -> Self
+        2397 |         def __new__(cls, name: str, value: Any, *, type_params: (*: _TypeParameter) = ()) -> Self
              |                          ^^^^
              |
         info: Source
@@ -6941,9 +6941,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.byi:2396:37
+            --> stdlib/typing.byi:2397:37
              |
-        2396 |         def __new__(cls, name: str, value: Any, *, type_params: (*: _TypeParameter) = ()) -> Self
+        2397 |         def __new__(cls, name: str, value: Any, *, type_params: (*: _TypeParameter) = ()) -> Self
              |                                     ^^^^^
              |
         info: Source

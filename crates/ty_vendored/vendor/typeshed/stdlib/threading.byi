@@ -152,7 +152,7 @@ if sys.version_info >= (3, 15):
         def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ...) -> Element
         def close(self) -> None
 
-    def synchronized_iterator[Element](func: Callable[..., Iterable[Element]]) -> Callable[..., Iterator[Element]]
+    def synchronized_iterator[Element](func: (...) -> Iterable[Element]) -> (...) -> Iterator[Element]
     def concurrent_tee[Element](iterable: Iterable[Element], n: int = 2) -> (*: Iterator[Element])
 
 def stack_size(size: int = 0, /) -> int:
@@ -221,7 +221,7 @@ class Thread:
         def __init__(
             self,
             group: None = None,
-            target: Callable[..., object] | None = None,
+            target: (...) -> object | None = None,
             name: str | None = None,
             args: Iterable[Any] = (),
             kwargs: Mapping[str, Any] | None = None,
@@ -262,7 +262,7 @@ class Thread:
         def __init__(
             self,
             group: None = None,
-            target: Callable[..., object] | None = None,
+            target: (...) -> object | None = None,
             name: str | None = None,
             args: Iterable[Any] = (),
             kwargs: Mapping[str, Any] | None = None,
@@ -695,14 +695,14 @@ class Timer(Thread):
 
     args: Iterable[Any]  # undocumented
     finished: Event  # undocumented
-    function: Callable[..., Any]  # undocumented
+    function: (...) -> Any  # undocumented
     interval: float  # undocumented
     kwargs: Mapping[str, Any]  # undocumented
 
     def __init__(
         self,
         interval: float,
-        function: Callable[..., object],
+        function: (...) -> object,
         args: Iterable[Any] | None = None,
         kwargs: Mapping[str, Any] | None = None,
     ) -> None

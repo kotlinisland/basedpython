@@ -32,10 +32,10 @@ class Version:
     def __le__(self, other: Self | str) -> bool
     def __gt__(self, other: Self | str) -> bool
     def __ge__(self, other: Self | str) -> bool
-    abstract def __init__(self, vstring: str | None = None) -> None: ...
-    abstract def parse(self, vstring: str) -> Self: ...
-    abstract def __str__(self) -> str: ...
-    abstract def _cmp(self, other: Self | str) -> bool: ...
+    abstract def __init__(self, vstring: str | None = None) -> None
+    abstract def parse(self, vstring: str) -> Self
+    abstract def __str__(self) -> str
+    abstract def _cmp(self, other: Self | str) -> bool
 
 class StrictVersion(Version):
     """Version numbering for anal retentives and software idealists.

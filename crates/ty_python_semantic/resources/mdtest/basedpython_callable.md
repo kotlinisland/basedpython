@@ -21,6 +21,26 @@ reveal_type(f)  # revealed: (a: int, b: str) -> True
 reveal_type(f(1, "x"))  # revealed: True
 ```
 
+## gradual `(...)` parameter list
+
+a single bare ellipsis parameter list is the gradual "any arguments" callable, equivalent to
+`Callable[..., R]`: it accepts any arguments
+
+```by
+def call_it(f: (...) -> int) -> None:
+    reveal_type(f)  # revealed: (...) -> int
+    reveal_type(f(1, "x", c=3))  # revealed: int
+```
+
+## gradual `(...)` in return-type position
+
+```by
+def make() -> (...) -> str:
+    return lambda: "x"
+
+reveal_type(make())  # revealed: (...) -> str
+```
+
 ## named parameter — non-denotable
 
 ```by

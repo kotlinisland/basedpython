@@ -599,18 +599,18 @@ else:
             """
 
         @property
-        def name(self) -> str: ...
+        def name(self) -> str
         @property
-        def parent(self) -> PathLike[str]: ...  # undocumented
+        def parent(self) -> PathLike[str]  # undocumented
         @property
-        def filename(self) -> PathLike[str]: ...  # undocumented
+        def filename(self) -> PathLike[str]  # undocumented
         if sys.version_info >= (3, 11):
             @property
-            def suffix(self) -> str: ...
+            def suffix(self) -> str
             @property
-            def suffixes(self) -> list[str]: ...
+            def suffixes(self) -> list[str]
             @property
-            def stem(self) -> str: ...
+            def stem(self) -> str
 
         def open(
             self,

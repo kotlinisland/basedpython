@@ -59,9 +59,9 @@ class BaseHeader(str):
     # max_count is actually more of an abstract ClassVar (not defined on the base class, but expected to be defined in subclasses)
     max_count: ClassVar[Literal[1] | None]
     @property
-    def name(self) -> str: ...
+    def name(self) -> str
     @property
-    def defects(self) -> (*: MessageDefect): ...
+    def defects(self) -> (*: MessageDefect)
     def __new__(cls, name: str, value: Any) -> Self
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect]) -> None
     def fold(self, *, policy: Policy) -> str:
@@ -103,7 +103,7 @@ class UnstructuredHeader:
 
         """
 
-    class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    class def parse(cls, value: str, kwds: dict[str, Any]) -> None
 
 class UniqueUnstructuredHeader(UnstructuredHeader):
     max_count: ClassVar[Literal[1]]
@@ -121,7 +121,7 @@ class DateHeader:
     max_count: ClassVar[Literal[1] | None]
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect], datetime: _datetime) -> None
     @property
-    def datetime(self) -> _datetime | None: ...
+    def datetime(self) -> _datetime | None
     static def value_parser(value: str) -> UnstructuredTokenList:
         """unstructured = (*([FWS] vchar) *WSP) / obs-unstruct
            obs-unstruct = *((*LF *CR *(obs-utext) *LF *CR)) / FWS)
@@ -142,7 +142,7 @@ class DateHeader:
 
         """
 
-    class def parse(cls, value: str | _datetime, kwds: dict[str, Any]) -> None: ...
+    class def parse(cls, value: str | _datetime, kwds: dict[str, Any]) -> None
 
 class UniqueDateHeader(DateHeader):
     max_count: ClassVar[Literal[1]]
@@ -151,18 +151,18 @@ class AddressHeader:
     max_count: ClassVar[Literal[1] | None]
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect], groups: Iterable[Group]) -> None
     @property
-    def groups(self) -> (*: Group): ...
+    def groups(self) -> (*: Group)
     @property
-    def addresses(self) -> (*: Address): ...
-    static def value_parser(value: str) -> AddressList: ...
-    class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def addresses(self) -> (*: Address)
+    static def value_parser(value: str) -> AddressList
+    class def parse(cls, value: str, kwds: dict[str, Any]) -> None
 
 class UniqueAddressHeader(AddressHeader):
     max_count: ClassVar[Literal[1]]
 
 class SingleAddressHeader(AddressHeader):
     @property
-    def address(self) -> Address: ...
+    def address(self) -> Address
 
 class UniqueSingleAddressHeader(SingleAddressHeader):
     max_count: ClassVar[Literal[1]]
@@ -180,30 +180,30 @@ class MIMEVersionHeader:
         minor: int | None,
     ) -> None
     @property
-    def version(self) -> str | None: ...
+    def version(self) -> str | None
     @property
-    def major(self) -> int | None: ...
+    def major(self) -> int | None
     @property
-    def minor(self) -> int | None: ...
+    def minor(self) -> int | None
     static def value_parser(value: str) -> MIMEVersion:
         """mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]"""
 
-    class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    class def parse(cls, value: str, kwds: dict[str, Any]) -> None
 
 class ParameterizedMIMEHeader:
     max_count: ClassVar[Literal[1]]
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect], params: Mapping[str, Any]) -> None
     @property
-    def params(self) -> types.MappingProxyType[str, Any]: ...
-    class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def params(self) -> types.MappingProxyType[str, Any]
+    class def parse(cls, value: str, kwds: dict[str, Any]) -> None
 
 class ContentTypeHeader(ParameterizedMIMEHeader):
     @property
-    def content_type(self) -> str: ...
+    def content_type(self) -> str
     @property
-    def maintype(self) -> str: ...
+    def maintype(self) -> str
     @property
-    def subtype(self) -> str: ...
+    def subtype(self) -> str
     static def value_parser(value: str) -> ContentType:
         """maintype "/" subtype *( ";" parameter )
 
@@ -215,7 +215,7 @@ class ContentTypeHeader(ParameterizedMIMEHeader):
 class ContentDispositionHeader(ParameterizedMIMEHeader):
     # init is redefined but has the same signature as parent class, so is omitted from the stub
     @property
-    def content_disposition(self) -> str | None: ...
+    def content_disposition(self) -> str | None
     static def value_parser(value: str) -> ContentDisposition:
         """disposition-type *( ";" parameter )"""
 
@@ -223,14 +223,14 @@ class ContentTransferEncodingHeader:
     max_count: ClassVar[Literal[1]]
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect]) -> None
     @property
-    def cte(self) -> str: ...
-    class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def cte(self) -> str
+    class def parse(cls, value: str, kwds: dict[str, Any]) -> None
     static def value_parser(value: str) -> ContentTransferEncoding:
         """mechanism"""
 
 class MessageIDHeader:
     max_count: ClassVar[Literal[1]]
-    class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    class def parse(cls, value: str, kwds: dict[str, Any]) -> None
     static def value_parser(value: str) -> MessageID:
         """message-id      =   "Message-ID:" msg-id CRLF"""
 
@@ -240,7 +240,7 @@ if sys.version_info >= (3, 13):
     # Added in Python 3.13.12, 3.14.3
     class ReferencesHeader:
         max_count: ClassVar[Literal[1]]
-        class def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+        class def parse(cls, value: str, kwds: dict[str, Any]) -> None
         static def value_parser(value: str) -> MessageIDList:
             """in-reply-to     =   "In-Reply-To:" 1*msg-id CRLF
             references      =   "References:" 1*msg-id CRLF
@@ -249,8 +249,8 @@ if sys.version_info >= (3, 13):
 @type_check_only
 class _HeaderParser(Protocol):
     max_count: ClassVar[Literal[1] | None]
-    static def value_parser(value: str, /) -> TokenList: ...
-    class def parse(cls, value: str, kwds: dict[str, Any], /) -> None: ...
+    static def value_parser(value: str, /) -> TokenList
+    class def parse(cls, value: str, kwds: dict[str, Any], /) -> None
 
 class HeaderRegistry:
     """A header_factory and header registry."""
@@ -289,11 +289,11 @@ class HeaderRegistry:
 
 class Address:
     @property
-    def display_name(self) -> str: ...
+    def display_name(self) -> str
     @property
-    def username(self) -> str: ...
+    def username(self) -> str
     @property
-    def domain(self) -> str: ...
+    def domain(self) -> str
     @property
     def addr_spec(self) -> str:
         """The addr_spec (username@domain) portion of the address, quoted
@@ -323,9 +323,9 @@ class Address:
 
 class Group:
     @property
-    def display_name(self) -> str | None: ...
+    def display_name(self) -> str | None
     @property
-    def addresses(self) -> (*: Address): ...
+    def addresses(self) -> (*: Address)
     def __init__(self, display_name: str | None = None, addresses: Iterable[Address] | None = None) -> None:
         """Create an object representing an address group.
 

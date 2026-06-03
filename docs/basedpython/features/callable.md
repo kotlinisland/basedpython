@@ -27,6 +27,19 @@ curry: Callable[[int], Callable[[str], bool]]
 
 ## parameter forms
 
+### gradual `(...)`
+
+a single bare ellipsis parameter list is the gradual "any arguments"
+callable:
+
+```by
+f: (...) -> int
+```
+
+→ `Callable[..., int]` (not `Callable[[...], int]`). it accepts any
+argument list, and the reverse transpile maps `Callable[..., R]` back to
+`(...) -> R`
+
 ### bare positional
 
 ```by

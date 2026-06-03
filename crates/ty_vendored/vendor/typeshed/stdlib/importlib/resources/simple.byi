@@ -46,7 +46,7 @@ if sys.version_info >= (3, 11):
             """
 
         @property
-        def name(self) -> str: ...
+        def name(self) -> str
 
     class ResourceHandle(Traversable, metaclass=abc.ABCMeta):
         """

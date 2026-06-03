@@ -233,6 +233,19 @@ impl<'src> CallableSyntax<'src> {
                 let shape = ProtocolShape { params, returns };
                 Some(self.class_name_for(shape))
             }
+            // `(...) -> R` — a single bare ellipsis parameter list is python's
+            // "any arguments" callable: `Callable[..., R]`, not the
+            // single-`...`-argument `Callable[[...], R]`
+            Expr::CallableType(ExprCallableType { args, returns, .. })
+                if matches!(args.as_slice(), [Expr::EllipsisLiteral(_)]) =>
+            {
+                self.needs_import = true;
+                let ret_str = self
+                    .rewrite(returns)
+                    .unwrap_or_else(|| self.src(returns.range()).to_owned());
+                Some(format!("Callable[..., {ret_str}]"))
+            }
+
             Expr::CallableType(ExprCallableType { args, returns, .. }) => {
                 self.needs_import = true;
                 let args_str = args
@@ -528,6 +541,30 @@ mod tests {
             indoc! {"
                 from typing import Callable
                 a: Callable[[], None]
+            "},
+        );
+    }
+
+    #[test]
+    fn ellipsis_args() {
+        // `(...) -> R` is the "any arguments" callable: `Callable[..., R]`,
+        // not the single-`...`-argument `Callable[[...], R]`
+        check(
+            "a: (...) -> int\n",
+            indoc! {"
+                from typing import Callable
+                a: Callable[..., int]
+            "},
+        );
+    }
+
+    #[test]
+    fn ellipsis_args_nested_return() {
+        check(
+            "a: (...) -> (int) -> str\n",
+            indoc! {"
+                from typing import Callable
+                a: Callable[..., Callable[[int], str]]
             "},
         );
     }

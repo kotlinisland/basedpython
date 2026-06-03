@@ -18,9 +18,9 @@ class DBAPIConnection(Protocol):
 
 class DBAPICursor(Protocol):
     @property
-    def description(self) -> Sequence[DBAPIColumnDescription] | None: ...
+    def description(self) -> Sequence[DBAPIColumnDescription] | None
     @property
-    def rowcount(self) -> int: ...
+    def rowcount(self) -> int
     # optional:
     # def callproc(self, procname: str, parameters: Sequence[Any] = ..., /) -> Sequence[Any]: ...
     def close(self) -> object

@@ -26,7 +26,7 @@ class Connection:
 class Listener:
     _backlog_queue: Queue[Any] | None
     @property
-    def address(self) -> Queue[Any] | None: ...
+    def address(self) -> Queue[Any] | None
     def __enter__(self) -> Self
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: TracebackType | None

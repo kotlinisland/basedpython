@@ -260,21 +260,21 @@ final class TypeVar:
     """
 
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __bound__(self) -> Any | None: ...  # AnnotationForm
+    def __bound__(self) -> Any | None  # AnnotationForm
     @property
-    def __constraints__(self) -> (*: Any): ...  # AnnotationForm
+    def __constraints__(self) -> (*: Any)  # AnnotationForm
     @property
-    def __covariant__(self) -> bool: ...
+    def __covariant__(self) -> bool
     @property
-    def __contravariant__(self) -> bool: ...
+    def __contravariant__(self) -> bool
     if sys.version_info >= (3, 12):
         @property
-        def __infer_variance__(self) -> bool: ...
+        def __infer_variance__(self) -> bool
     if sys.version_info >= (3, 13):
         @property
-        def __default__(self) -> Any: ...  # AnnotationForm
+        def __default__(self) -> Any  # AnnotationForm
     if sys.version_info >= (3, 13):
         def __new__(
             cls,
@@ -327,11 +327,11 @@ final class TypeVar:
         def has_default(self) -> bool
     if sys.version_info >= (3, 14):
         @property
-        def evaluate_bound(self) -> EvaluateFunc | None: ...
+        def evaluate_bound(self) -> EvaluateFunc | None
         @property
-        def evaluate_constraints(self) -> EvaluateFunc | None: ...
+        def evaluate_constraints(self) -> EvaluateFunc | None
         @property
-        def evaluate_default(self) -> EvaluateFunc | None: ...
+        def evaluate_default(self) -> EvaluateFunc | None
 
 # N.B. Keep this definition in sync with typing_extensions._SpecialForm
 final class _SpecialForm(_Final):
@@ -752,16 +752,16 @@ if sys.version_info >= (3, 11):
         """
 
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         if sys.version_info >= (3, 15):
             @property
-            def __bound__(self) -> Any | None: ...  # AnnotationForm
+            def __bound__(self) -> Any | None  # AnnotationForm
             @property
-            def __covariant__(self) -> bool: ...
+            def __covariant__(self) -> bool
             @property
-            def __contravariant__(self) -> bool: ...
+            def __contravariant__(self) -> bool
             @property
-            def __infer_variance__(self) -> bool: ...
+            def __infer_variance__(self) -> bool
         if sys.version_info >= (3, 13):
             @property
             def __default__(self) -> Any:  # AnnotationForm
@@ -793,7 +793,7 @@ if sys.version_info >= (3, 11):
         def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> (*: Any)
         if sys.version_info >= (3, 14):
             @property
-            def evaluate_default(self) -> EvaluateFunc | None: ...
+            def evaluate_default(self) -> EvaluateFunc | None
 
 final class ParamSpecArgs:
     """The args for a ParamSpec object.
@@ -811,7 +811,7 @@ final class ParamSpecArgs:
     """
 
     @property
-    def __origin__(self) -> ParamSpec: ...
+    def __origin__(self) -> ParamSpec
     if sys.version_info >= (3, 12):
         def __new__(cls, origin: ParamSpec) -> Self
     else:
@@ -836,7 +836,7 @@ final class ParamSpecKwargs:
     """
 
     @property
-    def __origin__(self) -> ParamSpec: ...
+    def __origin__(self) -> ParamSpec
     if sys.version_info >= (3, 12):
         def __new__(cls, origin: ParamSpec) -> Self
     else:
@@ -899,16 +899,16 @@ final class ParamSpec:
     """
 
     @property
-    def __name__(self) -> str: ...
+    def __name__(self) -> str
     @property
-    def __bound__(self) -> Any | None: ...  # AnnotationForm
+    def __bound__(self) -> Any | None  # AnnotationForm
     @property
-    def __covariant__(self) -> bool: ...
+    def __covariant__(self) -> bool
     @property
-    def __contravariant__(self) -> bool: ...
+    def __contravariant__(self) -> bool
     if sys.version_info >= (3, 12):
         @property
-        def __infer_variance__(self) -> bool: ...
+        def __infer_variance__(self) -> bool
     if sys.version_info >= (3, 13):
         @property
         def __default__(self) -> Any:  # AnnotationForm
@@ -963,7 +963,7 @@ final class ParamSpec:
         def has_default(self) -> bool
     if sys.version_info >= (3, 14):
         @property
-        def evaluate_default(self) -> EvaluateFunc | None: ...
+        def evaluate_default(self) -> EvaluateFunc | None
 
 Concatenate: _SpecialForm
 """Special form for annotating higher-order functions.
@@ -1069,7 +1069,7 @@ class NewType:
 
     def __init__(self, name: str, tp: Any) -> None  # AnnotationForm
     if sys.version_info >= (3, 11):
-        static def __call__[Element](x: Element, /) -> Element: ...
+        static def __call__[Element](x: Element, /) -> Element
     else:
         def __call__[Element](self, x: Element) -> Element
 
@@ -1081,6 +1081,7 @@ class NewType:
 
 
 # These type variables are used by the container types.
+
 def overload[F: Callable[..., Any]](func: F) -> F:
     """Decorator for overloaded functions/methods.
 
@@ -1236,7 +1237,7 @@ class _Generic:
     if sys.version_info < (3, 12):
         __slots__ = ()
 
-    class def __class_getitem__(cls, args: TypeVar | ParamSpec | (*: TypeVar | ParamSpec)) -> _Final: ...
+    class def __class_getitem__(cls, args: TypeVar | ParamSpec | (*: TypeVar | ParamSpec)) -> _Final
 
 Generic: type[_Generic]
 """Abstract base class for generic types.
@@ -1293,42 +1294,42 @@ class SupportsInt(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __int__."""
 
     __slots__ = ()
-    abstract def __int__(self) -> int: ...
+    abstract def __int__(self) -> int
 
 @runtime_checkable
 class SupportsFloat(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __float__."""
 
     __slots__ = ()
-    abstract def __float__(self) -> float: ...
+    abstract def __float__(self) -> float
 
 @runtime_checkable
 class SupportsComplex(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __complex__."""
 
     __slots__ = ()
-    abstract def __complex__(self) -> complex: ...
+    abstract def __complex__(self) -> complex
 
 @runtime_checkable
 class SupportsBytes(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __bytes__."""
 
     __slots__ = ()
-    abstract def __bytes__(self) -> bytes: ...
+    abstract def __bytes__(self) -> bytes
 
 @runtime_checkable
 class SupportsIndex(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __index__."""
 
     __slots__ = ()
-    abstract def __index__(self) -> int: ...
+    abstract def __index__(self) -> int
 
 @runtime_checkable
 class SupportsAbs[out Element](Protocol):
     """An ABC with one abstract method __abs__ that is covariant in its return type."""
 
     __slots__ = ()
-    abstract def __abs__(self) -> Element: ...
+    abstract def __abs__(self) -> Element
 
 @runtime_checkable
 class SupportsRound[out Element](Protocol):
@@ -1341,18 +1342,18 @@ class SupportsRound[out Element](Protocol):
 
 @runtime_checkable
 class Sized(Protocol, metaclass=ABCMeta):
-    abstract def __len__(self) -> int: ...
+    abstract def __len__(self) -> int
 
 @runtime_checkable
 class Hashable(Protocol, metaclass=ABCMeta):
     # TODO: This is special, in that a subclass of a hashable class may not be hashable
     #   (for example, list vs. object). It's not obvious how to represent this. This class
     #   is currently mostly useless for static checking.
-    abstract def __hash__(self) -> int: ...
+    abstract def __hash__(self) -> int
 
 @runtime_checkable
 class Iterable[out Element](Protocol):
-    abstract def __iter__(self) -> Iterator[Element]: ...
+    abstract def __iter__(self) -> Iterator[Element]
 
 @runtime_checkable
 class Iterator[out Element](Iterable[Element], Protocol):
@@ -1363,7 +1364,7 @@ class Iterator[out Element](Iterable[Element], Protocol):
 
 @runtime_checkable
 class Reversible[out Element](Iterable[Element], Protocol):
-    abstract def __reversed__(self) -> Iterator[Element]: ...
+    abstract def __reversed__(self) -> Iterator[Element]
 
 
 @runtime_checkable
@@ -1411,7 +1412,7 @@ else:
 
 @runtime_checkable
 class Awaitable[out Element](Protocol):
-    abstract def __await__(self) -> Generator[Any, Any, Element]: ...
+    abstract def __await__(self) -> Generator[Any, Any, Element]
 
 # Non-default variations to accommodate coroutines, and `AwaitableGenerator` having a 4th type parameter.
 
@@ -1443,7 +1444,7 @@ class AwaitableGenerator[out Element, in SendT_nd, out ReturnT_nd, in out Other]
 
 @runtime_checkable
 class AsyncIterable[out Element](Protocol):
-    abstract def __aiter__(self) -> AsyncIterator[Element]: ...
+    abstract def __aiter__(self) -> AsyncIterator[Element]
 
 @runtime_checkable
 class AsyncIterator[out Element](AsyncIterable[Element], Protocol):
@@ -1481,13 +1482,13 @@ class AsyncGenerator[out Element, in Sent = None](AsyncIterator[Element], Protoc
 @runtime_checkable
 class Container[in ContainerT = Any](Protocol):
     # This is generic more on vibes than anything else
-    abstract def __contains__(self, x: ContainerT, /) -> bool: ...
+    abstract def __contains__(self, x: ContainerT, /) -> bool
 
 @runtime_checkable
 class Collection[out Element](Iterable[Element], Container[Any], Protocol):
     # Note: need to use Container[Any] instead of Container[_T_co] to ensure covariance.
     # Implement Sized (but don't have it as a base class).
-    abstract def __len__(self) -> int: ...
+    abstract def __len__(self) -> int
 
 class Sequence[out Element](Reversible[Element], Collection[Element]):
     """All the operations on a read-only sequence.
@@ -1570,7 +1571,7 @@ class AbstractSet[out Element](Collection[Element]):
     then the other operations will automatically follow suit.
     """
 
-    abstract def __contains__(self, x: object, /) -> bool: ...
+    abstract def __contains__(self, x: object, /) -> bool
     def _hash(self) -> int:
         """Compute the hash value of a set.
 
@@ -1645,7 +1646,7 @@ class MappingView(Sized):
 
 class ItemsView[out Key, out Value](MappingView, AbstractSet[tuple[Key, Value]]):
     def __init__(self, mapping: SupportsGetItemViewable[Key, Value]) -> None  # undocumented
-    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> set[Other]: ...
+    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> set[Other]
     def __and__(self, other: Iterable[Any], /) -> set[(Key, Value)]
     def __rand__[Element](self, other: Iterable[Element], /) -> set[Element]
     def __contains__(self, item: (object, object), /) -> bool  # type: ignore[override]
@@ -1659,7 +1660,7 @@ class ItemsView[out Key, out Value](MappingView, AbstractSet[tuple[Key, Value]])
 
 class KeysView[out Key](MappingView, AbstractSet[Key]):
     def __init__(self, mapping: Viewable[Key]) -> None  # undocumented
-    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> set[Other]: ...
+    class def _from_iterable[Other](cls, it: Iterable[Other], /) -> set[Other]
     def __and__(self, other: Iterable[Any], /) -> set[Key]
     def __rand__[Element](self, other: Iterable[Element], /) -> set[Element]
     def __contains__(self, key: object, /) -> bool
@@ -1691,7 +1692,7 @@ class Mapping[out Key, out Value](Collection[Key]):
 
     # TODO: We wish the key type could also be covariant, but that doesn't work,
     # see discussion in https://github.com/python/typing/pull/273.
-    abstract def __getitem__(self, key: Key, /) -> Value: ...
+    abstract def __getitem__(self, key: Key, /) -> Value
 
     # Mixin methods
     def get(self, key: Key, /) -> Value | None:
@@ -1720,8 +1721,8 @@ class MutableMapping[in out Key, in out Value](Mapping[Key, Value]):
     __iter__, and __len__.
     """
 
-    abstract def __setitem__(self, key: Key, value: Value, /) -> None: ...
-    abstract def __delitem__(self, key: Key, /) -> None: ...
+    abstract def __setitem__(self, key: Key, value: Value, /) -> None
+    abstract def __delitem__(self, key: Key, /) -> None
     def clear(self) -> None:
         """D.clear() -> None.  Remove all items from D."""
 
@@ -1803,26 +1804,26 @@ class IO[in out AnyStr: constraints (str, bytes)]:
     # See #8726
     __slots__ = ()
     @property
-    def mode(self) -> str: ...
+    def mode(self) -> str
     # Usually str, but may be bytes if a bytes path was passed to open(). See #10737.
     # If PEP 696 becomes available, we may want to use a defaulted TypeVar here.
     @property
-    def name(self) -> str | Any: ...
-    abstract def close(self) -> None: ...
+    def name(self) -> str | Any
+    abstract def close(self) -> None
     @property
-    def closed(self) -> bool: ...
-    abstract def fileno(self) -> int: ...
-    abstract def flush(self) -> None: ...
-    abstract def isatty(self) -> bool: ...
-    abstract def read(self, n: int = -1, /) -> AnyStr: ...
-    abstract def readable(self) -> bool: ...
-    abstract def readline(self, limit: int = -1, /) -> AnyStr: ...
-    abstract def readlines(self, hint: int = -1, /) -> list[AnyStr]: ...
-    abstract def seek(self, offset: int, whence: int = 0, /) -> int: ...
-    abstract def seekable(self) -> bool: ...
-    abstract def tell(self) -> int: ...
-    abstract def truncate(self, size: int | None = None, /) -> int: ...
-    abstract def writable(self) -> bool: ...
+    def closed(self) -> bool
+    abstract def fileno(self) -> int
+    abstract def flush(self) -> None
+    abstract def isatty(self) -> bool
+    abstract def read(self, n: int = -1, /) -> AnyStr
+    abstract def readable(self) -> bool
+    abstract def readline(self, limit: int = -1, /) -> AnyStr
+    abstract def readlines(self, hint: int = -1, /) -> list[AnyStr]
+    abstract def seek(self, offset: int, whence: int = 0, /) -> int
+    abstract def seekable(self) -> bool
+    abstract def tell(self) -> int
+    abstract def truncate(self, size: int | None = None, /) -> int
+    abstract def writable(self) -> bool
 
     @abstractmethod
     def write(self: IO[bytes], s: ReadableBuffer, /) -> int
@@ -1834,18 +1835,18 @@ class IO[in out AnyStr: constraints (str, bytes)]:
     @abstractmethod
     def writelines(self, lines: Iterable[AnyStr], /) -> None
 
-    abstract def __next__(self) -> AnyStr: ...
-    abstract def __iter__(self) -> Iterator[AnyStr]: ...
-    abstract def __enter__(self) -> IO[AnyStr]: ...
+    abstract def __next__(self) -> AnyStr
+    abstract def __iter__(self) -> Iterator[AnyStr]
+    abstract def __enter__(self) -> IO[AnyStr]
     abstract def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None, /
-    ) -> None: ...
+    ) -> None
 
 class BinaryIO(IO[bytes]):
     """Typed version of the return of open() in binary mode."""
 
     __slots__ = ()
-    abstract def __enter__(self) -> BinaryIO: ...
+    abstract def __enter__(self) -> BinaryIO
 
 class TextIO(IO[str]):
     """Typed version of the return of open() in text mode."""
@@ -1853,16 +1854,16 @@ class TextIO(IO[str]):
     # See comment regarding the @properties in the `IO` class
     __slots__ = ()
     @property
-    def buffer(self) -> BinaryIO: ...
+    def buffer(self) -> BinaryIO
     @property
-    def encoding(self) -> str: ...
+    def encoding(self) -> str
     @property
-    def errors(self) -> str | None: ...
+    def errors(self) -> str | None
     @property
-    def line_buffering(self) -> int: ...  # int on PyPy, bool on CPython
+    def line_buffering(self) -> int  # int on PyPy, bool on CPython
     @property
-    def newlines(self) -> Any: ...  # None, str or tuple
-    abstract def __enter__(self) -> TextIO: ...
+    def newlines(self) -> Any  # None, str or tuple
+    abstract def __enter__(self) -> TextIO
 
 ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
 
@@ -2060,7 +2061,7 @@ if sys.version_info >= (3, 11):
     def clear_overloads() -> None:
         """Clear all overloads in the registry."""
 
-    def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
+    def get_overloads(func: (...) -> object) -> Sequence[(...) -> object]:
         """Return all defined overloads for *func* as a sequence."""
 
     def dataclass_transform(
@@ -2069,7 +2070,7 @@ if sys.version_info >= (3, 11):
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
-        field_specifiers: (*: type[Any] | Callable[..., Any]) = (),
+        field_specifiers: tuple[type[Any] | (...) -> Any, ...] = (),
         **kwargs: Any,
     ) -> IdentityFunction:
         """Decorator to mark an object as providing dataclass-like behaviour.
@@ -2170,7 +2171,7 @@ class NamedTuple(tuple[Any, ...]):
     @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None
 
-    class def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
+    class def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self
     def _asdict(self) -> dict[str, Any]
     def _replace(self, **kwargs: Any) -> typing_extensions.Self
     if sys.version_info >= (3, 13):
@@ -2395,19 +2396,19 @@ if sys.version_info >= (3, 12):
 
         def __new__(cls, name: str, value: Any, *, type_params: (*: _TypeParameter) = ()) -> Self
         @property
-        def __value__(self) -> Any: ...  # AnnotationForm
+        def __value__(self) -> Any  # AnnotationForm
         @property
-        def __type_params__(self) -> (*: _TypeParameter): ...
+        def __type_params__(self) -> (*: _TypeParameter)
         @property
-        def __parameters__(self) -> (*: Any): ...  # AnnotationForm
+        def __parameters__(self) -> (*: Any)  # AnnotationForm
         @property
-        def __name__(self) -> str: ...
+        def __name__(self) -> str
         if sys.version_info >= (3, 15):
             @property
-            def __qualname__(self) -> str: ...
+            def __qualname__(self) -> str
         # It's writable on types, but not on instances of TypeAliasType.
         @property
-        def __module__(self) -> str | None: ...  # type: ignore[override]
+        def __module__(self) -> str | None  # type: ignore[override]
         def __getitem__(self, parameters: Any, /) -> GenericAlias:  # AnnotationForm
             """Return self[key]."""
 
@@ -2421,7 +2422,7 @@ if sys.version_info >= (3, 12):
                 """Implement iter(self)."""
 
             @property
-            def evaluate_value(self) -> EvaluateFunc: ...
+            def evaluate_value(self) -> EvaluateFunc
 
 if sys.version_info >= (3, 13):
     def is_protocol(tp: type, /) -> bool:

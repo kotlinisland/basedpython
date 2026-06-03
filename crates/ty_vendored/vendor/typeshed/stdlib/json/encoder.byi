@@ -1,6 +1,6 @@
 """Implementation of JSONEncoder"""
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from re import Pattern
 from typing import Any, Final
 
@@ -77,7 +77,7 @@ class JSONEncoder:
         sort_keys: bool = False,
         indent: int | str | None = None,
         separators: (str, str) | None = None,
-        default: Callable[..., Any] | None = None,
+        default: (...) -> Any | None = None,
     ) -> None:
         """Constructor for JSONEncoder, with sensible defaults.
 

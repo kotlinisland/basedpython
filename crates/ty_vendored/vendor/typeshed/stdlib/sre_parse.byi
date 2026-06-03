@@ -39,7 +39,7 @@ class State:
     groupwidths: list[int | None]
     lookbehindgroups: int | None
     @property
-    def groups(self) -> int: ...
+    def groups(self) -> int
     def opengroup(self, name: str | None = None) -> int
     def closegroup(self, gid: int, p: SubPattern) -> None
     def checkgroup(self, gid: int) -> bool
@@ -72,7 +72,7 @@ class Tokenizer:
     def getwhile(self, n: int, charset: Iterable[str]) -> str
     def getuntil(self, terminator: str, name: str) -> str
     @property
-    def pos(self) -> int: ...
+    def pos(self) -> int
     def tell(self) -> int
     def seek(self, index: int) -> None
     def error(self, msg: str, offset: int = 0) -> _Error

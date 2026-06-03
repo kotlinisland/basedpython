@@ -143,17 +143,16 @@ impl<'src> Parser<'src> {
     /// `None` if no variance keyword was present.
     ///
     /// Disambiguates `out` from a bare reference to a variable named `out`:
-    /// the variance form requires the next token to start a *type
-    /// expression*, i.e. a name, attribute path, or bracketed/parenthesized
-    /// type — not an arithmetic continuation like `out + 1`.
+    /// the variance form requires the next token to be a *name* (`out T`).
+    /// Two adjacent names are never valid Python, so `out T` is unambiguous —
+    /// whereas `out[...]`, `out(...)`, `out.attr`, `out + 1` etc. are an
+    /// ordinary subscript / call / attribute / arithmetic on a variable named
+    /// `out` and must be left alone (real Python uses them, e.g. `xs[out[0]]`).
     pub(super) fn eat_basedpython_variance_prefix(
         &mut self,
     ) -> Option<ruff_python_ast::helpers::UseSiteVariance> {
         use ruff_python_ast::helpers::UseSiteVariance;
-        let next_starts_type_expr = matches!(
-            self.peek(),
-            TokenKind::Name | TokenKind::Lpar | TokenKind::Lsqb
-        );
+        let next_starts_type_expr = matches!(self.peek(), TokenKind::Name);
         let variance = if self.at(TokenKind::In) {
             // `in` is a hard keyword, so its presence in subscript-start
             // position is unambiguously variance.

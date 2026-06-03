@@ -140,3 +140,18 @@ class Box[out T]:
 def _(box: Box[int]):
     reveal_type(box.get())  # revealed: int
 ```
+
+## `out` as an ordinary variable is not variance
+
+Only `out` immediately followed by a *name* (`out T`) is a variance prefix — two adjacent names are
+never valid Python. `out` followed by `[`, `(` or `.` is an ordinary subscript, call or attribute on
+a variable named `out`, and must parse as plain Python. `out` is a common variable name; this
+regressed on real code (`home-assistant` has `xs[out[0]]`):
+
+```py
+def f(xs: list[int], out: tuple[int, int]):
+    reveal_type(xs[out[0]])  # revealed: int
+
+def g(out: list[int]):
+    reveal_type(out[0])  # revealed: int
+```

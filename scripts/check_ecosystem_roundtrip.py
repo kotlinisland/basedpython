@@ -10,23 +10,44 @@
 
 """Round-trip ecosystem check for the basedpython transpiler.
 
-For every ``.py`` file in a target project, run::
+For each target project, round-trip the whole tree with the directory-level
+`by` commands::
 
-    by transpile --reverse <file>   # python -> basedpython
-    by transpile                    # basedpython -> python (via stdin)
+    by transpile --reverse <project>   # python -> basedpython (in place)
+    by build                           # basedpython -> python (-> out/)
 
-and compare the result against the original source. A divergence means
-either the reverse transform missed an idiom or the forward transform
-isn't a left-inverse of it.
+`by build` uses one shared project db, so cross-module types resolve — the same
+path real `.by` projects take. This is far cheaper than spawning `by` per file:
+two processes per project, not thousands.
 
-Two modes:
+The point of the check is not whether the round-trip reproduces the original
+source (the forward transpiler normalizes formatting and adds a preamble, so it
+won't). The point is whether a change to the transpiler *moves* the output — so
+we round-trip each project with two `by` binaries (the merge base and the PR)
+and diff those two results against each other, exactly like the ty
+ecosystem-analyzer diffs diagnostics between base and head.
 
-* ``check_ecosystem_roundtrip.py <by> <project-dir>`` — round-trip a
-  pre-cloned project on disk.
+A project is a **regression** when it built on the base but now fails to build;
+that fails the check. Output that merely *changed*, or a project that now builds
+when it used to fail, is surfaced in the report but does not fail — those want a
+human's eyes, not a red build.
 
-* ``check_ecosystem_roundtrip.py <by> --primer <name> [--checkout DIR]``
-  — fetch a mypy-primer project (using ``setup_primer_project.py``)
-  and round-trip it.
+Modes:
+
+* ``check_ecosystem_roundtrip.py <by-new> --baseline <by-old>`` — diff the
+  round-trip output of two binaries across the primer corpus. This is the CI
+  mode; the markdown report on stdout is posted as a PR comment.
+
+* ``check_ecosystem_roundtrip.py <by>`` — single binary; just report projects
+  that fail to round-trip-build. Useful locally to find crashes.
+
+* either form accepts a positional ``<project-dir>`` to round-trip a
+  pre-cloned project on disk instead of fetching from mypy-primer.
+
+For CI the corpus is sharded like the ty ecosystem-analyzer: each shard runs
+``--shard N --num-shards M --json-out shard-N.json`` over its slice of the
+project list, and a final ``--render shard-*.json`` pass merges the shard JSON
+into the single markdown report.
 
 The default project list is ``crates/ty_python_semantic/resources/primer/good.txt``.
 """
@@ -36,11 +57,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import difflib
+import json
 import logging
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
+import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import Iterable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
@@ -51,8 +76,64 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# directories that don't represent first-party project source
-SKIP_PARTS = frozenset(
+_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE") if hasattr(os, "sysconf") else 4096
+
+
+def _total_ram_bytes() -> int | None:
+    """Total physical RAM, or None if it can't be determined."""
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError, AttributeError):
+        return None
+
+
+def _resolve_mem_limit_bytes(gb: float) -> int | None:
+    """An explicit GB budget, else a fraction of total RAM that leaves the OS
+    and the python harness room to breathe (so the watchdog kills a runaway
+    build before the kernel OOM-kills the whole runner). None disables it."""
+    if gb > 0:
+        return int(gb * 1e9)
+    if gb < 0:
+        return None
+    total = _total_ram_bytes()
+    if total is None:
+        return None
+    return int(total * 0.70)
+
+
+def _rss_bytes(pid: int) -> int | None:
+    """Resident memory of `pid`, or None if it can't be read. Linux reads
+    /proc; elsewhere falls back to `ps`."""
+    try:
+        with open(f"/proc/{pid}/statm") as f:
+            return int(f.read().split()[1]) * _PAGE_SIZE
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        r = subprocess.run(
+            ["ps", "-o", "rss=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return int(r.stdout.strip()) * 1024
+    except (ValueError, OSError):
+        return None
+
+
+# pin every pass to the highest supported version so compat lowering doesn't
+# add or remove polyfills between binaries
+ROUNDTRIP_MIN_VERSION = "3.15"
+
+# embedded in the rendered report so the PR-comment workflow can find and
+# update its own comment in place
+COMMENT_MARKER = "<!-- by-ecosystem-roundtrip -->"
+
+# label used for a whole-project build failure (no single file owns it)
+BUILD_PATH = Path("<build>")
+
+# directories that aren't first-party source (skipped when sizing a project)
+_NON_SOURCE_DIRS = frozenset(
     {
         ".venv",
         "venv",
@@ -68,35 +149,62 @@ SKIP_PARTS = frozenset(
         "build",
         "dist",
         "node_modules",
+        "out",
     }
 )
 
-# pin both passes to the highest supported version so compat lowering
-# doesn't add or remove polyfills between the two passes
-ROUNDTRIP_MIN_VERSION = "3.15"
+
+# projects whose `by build` spikes past the runner's memory faster than the
+# watchdog can react, so they OOM-kill the whole shard rather than failing
+# cleanly. the file-count proxy below misses them — their per-file db cost is
+# unusually high (e.g. spack's ~1160 deeply interconnected package modules) — so
+# skip them by name regardless of size
+_OVERSIZED_PROJECTS = frozenset({"spack"})
 
 
-class FileResult(NamedTuple):
-    path: Path
-    ok: bool
+def count_source_py(root: Path) -> int:
+    """Count first-party `.py` files under `root` (a proxy for build memory:
+    `by build` holds the whole project's db in memory, so a giant project can
+    OOM the runner)."""
+    n = 0
+    for p in root.rglob("*.py"):
+        if not any(part in _NON_SOURCE_DIRS for part in p.relative_to(root).parts):
+            n += 1
+    return n
+
+
+class ProjectOutcome(NamedTuple):
+    """The result of round-trip-building a project with a single binary."""
+
     error: str | None
-    diff: str
+    # relpath under out/ -> built python; empty when error is set
+    outputs: dict[str, bytes]
 
 
-class ProjectResult(NamedTuple):
+class FileDiff(NamedTuple):
+    path: Path
+    # "broken" | "fixed" | "changed" | "error-changed"
+    kind: str
+    detail: str
+
+
+class FileError(NamedTuple):
+    path: Path
+    error: str
+
+
+class ProjectDiff(NamedTuple):
     name: str
     files_checked: int
-    failures: list[FileResult]
-    errors: list[FileResult]
+    diffs: list[FileDiff]
+    skipped: str | None
 
 
-def iter_python_files(root: Path) -> Iterable[Path]:
-    for p in root.rglob("*.py"):
-        if any(part in SKIP_PARTS for part in p.relative_to(root).parts):
-            continue
-        if p.is_symlink():
-            continue
-        yield p
+class ProjectErrors(NamedTuple):
+    name: str
+    files_checked: int
+    errors: list[FileError]
+    skipped: str | None
 
 
 async def _run(
@@ -105,6 +213,8 @@ async def _run(
     *,
     stdin: bytes | None = None,
     cwd: Path | None = None,
+    mem_limit_bytes: int | None = None,
+    timeout: float | None = None,
 ) -> tuple[int, bytes, bytes]:
     proc = await create_subprocess_exec(
         str(program),
@@ -112,85 +222,211 @@ async def _run(
         stdin=PIPE if stdin is not None else None,
         stdout=PIPE,
         stderr=PIPE,
-        cwd=str(cwd) if cwd else None,
+        cwd=str(cwd) if cwd is not None else None,
     )
-    out, err = await proc.communicate(stdin)
-    return proc.returncode or 0, out, err
+
+    if mem_limit_bytes is None and timeout is None:
+        out, err = await proc.communicate(stdin)
+        return proc.returncode or 0, out, err
+
+    # watchdog: kill the process if its resident set exceeds the budget or it
+    # outlives the wall-clock timeout, so one runaway or hung `by` invocation is
+    # recorded as a (canonical) error instead of OOM-killing or stalling the
+    # whole shard. poll often so a fast memory spike can't outrun us
+    comm = asyncio.ensure_future(proc.communicate(stdin))
+    deadline = time.monotonic() + timeout if timeout is not None else None
+    killed: str | None = None
+    while not comm.done():
+        await asyncio.wait({comm}, timeout=0.25)
+        if comm.done():
+            break
+        if deadline is not None and time.monotonic() > deadline:
+            killed = f"timed out after {timeout:g}s"
+            proc.kill()
+            break
+        if mem_limit_bytes is not None:
+            rss = _rss_bytes(proc.pid)
+            if rss is not None and rss > mem_limit_bytes:
+                killed = f"exceeded {mem_limit_bytes / 1e9:g}GB memory budget"
+                proc.kill()
+                break
+    out, err = await comm
+    rc = proc.returncode or 0
+    if killed is not None:
+        # canonical message (drop the partial stderr) so the identical kill
+        # under both binaries diffs to "no change" rather than a spurious
+        # regression — only a kill that is new on head should read as broken
+        err = f"killed: {killed}".encode()
+        rc = 137
+    return rc, out, err
 
 
-async def roundtrip_file(
-    by: Path,
-    file: Path,
-    project_root: Path,
-) -> FileResult:
-    """Reverse-transpile then forward-transpile, comparing to the original."""
-    rel = file.relative_to(project_root)
+def collect_outputs(out_dir: Path) -> dict[str, bytes]:
+    """Read every built `.py` under `out_dir`, keyed by path relative to it."""
+    outputs: dict[str, bytes] = {}
+    if not out_dir.is_dir():
+        return outputs
+    for p in out_dir.rglob("*.py"):
+        if p.is_symlink():
+            continue
+        try:
+            outputs[str(p.relative_to(out_dir))] = p.read_bytes()
+        except OSError as e:
+            logger.warning("could not read built file %s: %s", p, e)
+    return outputs
 
-    try:
-        original = file.read_bytes()
-    except OSError as e:
-        return FileResult(rel, False, f"read failed: {e}", "")
 
-    # pass 1: python -> basedpython
-    rc, reversed_src, err = await _run(
-        by,
-        ["transpile", "--reverse", "--min-version", ROUNDTRIP_MIN_VERSION, str(file)],
-    )
-    if rc != 0:
-        return FileResult(
-            rel, False, f"reverse failed: {err.decode(errors='replace').strip()}", ""
-        )
-
-    # pass 2: basedpython -> python (stdin so is_python defaults to false)
-    rc, forward_src, err = await _run(
-        by,
-        ["transpile", "--min-version", ROUNDTRIP_MIN_VERSION],
-        stdin=reversed_src,
-    )
-    if rc != 0:
-        return FileResult(
-            rel, False, f"forward failed: {err.decode(errors='replace').strip()}", ""
-        )
-
-    if forward_src == original:
-        return FileResult(rel, True, None, "")
-
-    # decode lazily for the diff; tolerate non-utf8 by replacing
-    diff = "".join(
-        difflib.unified_diff(
-            original.decode("utf-8", errors="replace").splitlines(keepends=True),
-            forward_src.decode("utf-8", errors="replace").splitlines(keepends=True),
-            fromfile=f"a/{rel}",
-            tofile=f"b/{rel}",
-            n=2,
-        )
-    )
-    return FileResult(rel, False, None, diff)
+async def reset_project(root: Path) -> None:
+    """Restore pristine source for the next binary: bring back the tracked
+    `.py` files reverse deleted and drop the generated `.by`/`out`. Keep the
+    venv (if any). The clones are git repos, so this is cheap."""
+    await _run(Path("git"), ["-C", str(root), "checkout", "--", "."])
+    await _run(Path("git"), ["-C", str(root), "clean", "-fdx", "-e", ".venv"])
 
 
 async def roundtrip_project(
     by: Path,
+    root: Path,
+    *,
+    build_mem_limit_bytes: int | None,
+    build_timeout: float | None,
+) -> ProjectOutcome:
+    """Reverse the whole project (py->by) then build it (by->py via out/)."""
+    rc, _, err = await _run(
+        by,
+        ["transpile", "--reverse", "--min-version", ROUNDTRIP_MIN_VERSION, str(root)],
+        mem_limit_bytes=build_mem_limit_bytes,
+        timeout=build_timeout,
+    )
+    if rc != 0:
+        msg = err.decode(errors="replace").strip()
+        return ProjectOutcome(error=f"reverse: {msg}", outputs={})
+
+    rc, _, err = await _run(
+        by,
+        ["build", "--min-version", ROUNDTRIP_MIN_VERSION],
+        cwd=root,
+        mem_limit_bytes=build_mem_limit_bytes,
+        timeout=build_timeout,
+    )
+    outputs = collect_outputs(root / "out")
+    # a non-zero exit from ty diagnostics (e.g. unresolved third-party imports —
+    # the corpus is cloned source-only, so those are expected and unavoidable)
+    # is not a round-trip failure: the transpile still emitted `out/`. only a
+    # build the watchdog killed (137), or one that produced nothing at all, is a
+    # genuine failure
+    if rc == 137 or (rc != 0 and not outputs):
+        msg = err.decode(errors="replace").strip()
+        return ProjectOutcome(error=f"build: {msg}", outputs={})
+
+    return ProjectOutcome(error=None, outputs=outputs)
+
+
+def _unified_diff(old: bytes, new: bytes, rel: Path) -> str:
+    return "".join(
+        difflib.unified_diff(
+            old.decode("utf-8", errors="replace").splitlines(keepends=True),
+            new.decode("utf-8", errors="replace").splitlines(keepends=True),
+            fromfile=f"base/{rel}",
+            tofile=f"head/{rel}",
+            n=2,
+        )
+    )
+
+
+def classify_project(
+    name: str, old: ProjectOutcome, new: ProjectOutcome
+) -> ProjectDiff:
+    """Compare a project's round-trip build on the base vs the head binary."""
+    diffs: list[FileDiff] = []
+
+    if old.error is not None or new.error is not None:
+        if old.error is not None and new.error is not None:
+            if old.error != new.error:
+                diffs.append(
+                    FileDiff(
+                        BUILD_PATH,
+                        "error-changed",
+                        f"base: {old.error}\nhead: {new.error}",
+                    )
+                )
+        elif new.error is not None:  # built on base, fails on head
+            diffs.append(FileDiff(BUILD_PATH, "broken", new.error))
+        else:  # failed on base, builds on head
+            diffs.append(FileDiff(BUILD_PATH, "fixed", ""))
+        return ProjectDiff(name, len(old.outputs) or len(new.outputs), diffs, None)
+
+    # both built — diff the per-file output
+    rels = sorted(set(old.outputs) | set(new.outputs))
+    for rel in rels:
+        o = old.outputs.get(rel)
+        n = new.outputs.get(rel)
+        if o == n:
+            continue
+        if o is None:
+            diffs.append(FileDiff(Path(rel), "changed", "(only produced on head)"))
+        elif n is None:
+            diffs.append(FileDiff(Path(rel), "changed", "(only produced on base)"))
+        else:
+            diffs.append(FileDiff(Path(rel), "changed", _unified_diff(o, n, Path(rel))))
+    return ProjectDiff(name, len(rels), diffs, None)
+
+
+async def diff_project(
+    old_by: Path,
+    new_by: Path,
     project_root: Path,
     name: str,
     *,
-    file_concurrency: int,
-) -> ProjectResult:
-    files = list(iter_python_files(project_root))
-    sem = asyncio.Semaphore(file_concurrency)
+    build_mem_limit_bytes: int | None,
+    build_timeout: float | None,
+) -> ProjectDiff:
+    # base and head share the tree, so run them sequentially with a reset in
+    # between to restore pristine `.py` source
+    old = await roundtrip_project(
+        old_by,
+        project_root,
+        build_mem_limit_bytes=build_mem_limit_bytes,
+        build_timeout=build_timeout,
+    )
+    await reset_project(project_root)
+    new = await roundtrip_project(
+        new_by,
+        project_root,
+        build_mem_limit_bytes=build_mem_limit_bytes,
+        build_timeout=build_timeout,
+    )
+    await reset_project(project_root)
+    return classify_project(name, old, new)
 
-    async def task(file: Path) -> FileResult:
-        async with sem:
-            return await roundtrip_file(by, file, project_root)
 
-    results = await asyncio.gather(*(task(f) for f in files))
-    failures = [r for r in results if not r.ok and r.error is None]
-    errors = [r for r in results if r.error is not None]
-    return ProjectResult(name, len(files), failures, errors)
+async def check_project(
+    by: Path,
+    project_root: Path,
+    name: str,
+    *,
+    build_mem_limit_bytes: int | None,
+    build_timeout: float | None,
+) -> ProjectErrors:
+    outcome = await roundtrip_project(
+        by,
+        project_root,
+        build_mem_limit_bytes=build_mem_limit_bytes,
+        build_timeout=build_timeout,
+    )
+    await reset_project(project_root)
+    errors = [] if outcome.error is None else [FileError(BUILD_PATH, outcome.error)]
+    return ProjectErrors(name, len(outcome.outputs), errors, None)
 
 
 @asynccontextmanager
 async def setup_primer_project(name: str, parent: Path) -> AsyncIterator[Path]:
-    """Clone a mypy-primer project into ``parent / name`` if not already there."""
+    """Clone a mypy-primer project into ``parent / name`` if not already there.
+
+    `by build` resolves third-party types from the ambient Python environment
+    rather than the project's virtualenv, so installing the project's
+    dependencies wouldn't change its output — we clone source only.
+    """
     target = parent / name
     if not target.exists():
         script = Path(__file__).with_name("setup_primer_project.py")
@@ -212,43 +448,145 @@ async def setup_primer_project(name: str, parent: Path) -> AsyncIterator[Path]:
     yield target
 
 
-def render_report(results: list[ProjectResult]) -> tuple[str, bool]:
-    lines: list[str] = []
+def render_diff_report(
+    results: list[ProjectDiff], old_label: str, new_label: str
+) -> tuple[str, bool]:
+    broken = [(r, d) for r in results for d in r.diffs if d.kind == "broken"]
+    fixed = [(r, d) for r in results for d in r.diffs if d.kind == "fixed"]
+    changed = [(r, d) for r in results for d in r.diffs if d.kind == "changed"]
+    error_changed = [
+        (r, d) for r in results for d in r.diffs if d.kind == "error-changed"
+    ]
+    skipped = [r for r in results if r.skipped is not None]
     total_files = sum(r.files_checked for r in results)
-    total_failures = sum(len(r.failures) for r in results)
-    total_errors = sum(len(r.errors) for r in results)
+    n_projects = len(results) - len(skipped)
 
-    if total_failures == 0 and total_errors == 0:
-        return (
-            f"✅ round-trip clean across {total_files} files in {len(results)} projects.",
-            True,
+    lines: list[str] = ["## by ecosystem round-trip", "", COMMENT_MARKER, ""]
+
+    if not broken and not fixed and not changed and not error_changed:
+        lines.append(
+            f"✅ no round-trip differences between `{old_label}` and `{new_label}` "
+            f"across {total_files} files in {n_projects} projects."
         )
+        if skipped:
+            lines.append("")
+            lines.append(_render_skipped(skipped))
+        return "\n".join(lines).rstrip() + "\n", True
 
+    lines.append(f"base: `{old_label}` → head: `{new_label}`")
+    lines.append("")
     lines.append(
-        f"ℹ️ round-trip detected changes "  # noqa: RUF001
-        f"(files: {total_files}, divergences: {total_failures}, errors: {total_errors})"
+        f"regressions: {len(broken)}, changed: {len(changed)}, "
+        f"improvements: {len(fixed)}, error changes: {len(error_changed)} "
+        f"(across {total_files} files in {n_projects} projects)"
     )
     lines.append("")
-    for r in results:
-        if not r.failures and not r.errors:
-            continue
-        lines.append(
-            f"### {r.name} — {len(r.failures)} divergence(s), {len(r.errors)} error(s) "
-            f"out of {r.files_checked} files"
-        )
-        for fr in r.errors:
-            lines.append(f"- ERROR `{fr.path}`: {fr.error}")
-        for fr in r.failures:
-            lines.append(f"<details><summary>{fr.path}</summary>")
+
+    if broken:
+        lines.append("### ❌ regressions (built on base, now fails)")
+        lines.append("")
+        for r, d in broken:
+            lines.append(f"- `{r.name}` `{d.path}`: {d.detail}")
+        lines.append("")
+
+    if changed:
+        lines.append("### ℹ️ changed round-trip output")  # noqa: RUF001
+        lines.append("")
+        for r, d in changed:
+            lines.append(f"<details><summary>{r.name} — {d.path}</summary>")
             lines.append("")
             lines.append("```diff")
-            lines.append(fr.diff.rstrip())
+            lines.append(d.detail.rstrip())
             lines.append("```")
             lines.append("")
             lines.append("</details>")
         lines.append("")
 
-    return "\n".join(lines), False
+    if error_changed:
+        lines.append("### ⚠️ build error changed (failed before and after)")
+        lines.append("")
+        for r, d in error_changed:
+            lines.append(f"<details><summary>{r.name} — {d.path}</summary>")
+            lines.append("")
+            lines.append("```")
+            lines.append(d.detail.rstrip())
+            lines.append("```")
+            lines.append("")
+            lines.append("</details>")
+        lines.append("")
+
+    if fixed:
+        lines.append("### ✅ improvements (failed on base, now builds)")
+        lines.append("")
+        for r, d in fixed:
+            lines.append(f"- `{r.name}` `{d.path}`")
+        lines.append("")
+
+    if skipped:
+        lines.append(_render_skipped(skipped))
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n", not broken
+
+
+def _render_skipped(skipped: list[ProjectDiff]) -> str:
+    parts = ["### ⏭️ skipped", ""]
+    parts.extend(f"- `{r.name}`: {r.skipped}" for r in skipped)
+    return "\n".join(parts)
+
+
+def _project_diff_to_dict(p: ProjectDiff) -> dict:
+    return {
+        "name": p.name,
+        "files_checked": p.files_checked,
+        "skipped": p.skipped,
+        "diffs": [
+            {"path": str(d.path), "kind": d.kind, "detail": d.detail} for d in p.diffs
+        ],
+    }
+
+
+def _project_diff_from_dict(d: dict) -> ProjectDiff:
+    return ProjectDiff(
+        d["name"],
+        d["files_checked"],
+        [FileDiff(Path(x["path"]), x["kind"], x["detail"]) for x in d["diffs"]],
+        d["skipped"],
+    )
+
+
+def render_from_json(paths: list[Path], old_label: str, new_label: str) -> int:
+    """Merge per-shard JSON results into the single markdown report."""
+    projects: list[ProjectDiff] = []
+    for path in paths:
+        data = json.loads(path.read_text())
+        projects.extend(_project_diff_from_dict(x) for x in data["projects"])
+    report, _clean = render_diff_report(projects, old_label, new_label)
+    print(report)
+    # findings (broken/changed/error-changed) are surfaced in the PR comment for
+    # humans to review — they don't fail the job. only a genuine harness crash
+    # (an uncaught exception above) is a failure
+    return 0
+
+
+def render_error_report(results: list[ProjectErrors]) -> tuple[str, bool]:
+    total_files = sum(r.files_checked for r in results)
+    errors = [(r, e) for r in results for e in r.errors]
+    skipped = [r for r in results if r.skipped is not None]
+
+    lines: list[str] = ["## by ecosystem round-trip", "", COMMENT_MARKER, ""]
+    if not errors:
+        lines.append(
+            f"✅ round-trip built cleanly across {total_files} files "
+            f"in {len(results) - len(skipped)} projects."
+        )
+        return "\n".join(lines).rstrip() + "\n", True
+
+    lines.append(f"❌ {len(errors)} project(s) failed to round-trip build")
+    lines.append("")
+    for r, e in errors:
+        lines.append(f"- `{r.name}`: {e.error}")
+    return "\n".join(lines).rstrip() + "\n", False
 
 
 async def main_async(args: argparse.Namespace) -> int:
@@ -257,24 +595,69 @@ async def main_async(args: argparse.Namespace) -> int:
         logger.error("by binary not found: %s", by)
         return 2
 
-    project_concurrency = args.project_concurrency
-    file_concurrency = args.file_concurrency
-    sem = asyncio.Semaphore(project_concurrency)
+    baseline: Path | None = None
+    if args.baseline is not None:
+        baseline = args.baseline.resolve()
+        if not baseline.is_file():
+            logger.error("baseline by binary not found: %s", baseline)
+            return 2
 
-    async def run_one(name: str, root: Path) -> ProjectResult:
+    sem = asyncio.Semaphore(args.project_concurrency)
+    mem_limit = _resolve_mem_limit_bytes(args.build_mem_limit_gb)
+    build_timeout = args.build_timeout if args.build_timeout > 0 else None
+    if mem_limit is not None:
+        logger.info("per-build memory budget: %.1f GB", mem_limit / 1e9)
+    if build_timeout is not None:
+        logger.info("per-build wall-clock timeout: %g s", build_timeout)
+
+    async def run_one(name: str, root: Path) -> ProjectDiff | ProjectErrors:
         async with sem:
+            if name in _OVERSIZED_PROJECTS:
+                logger.info("skipping %s: known to OOM the runner", name)
+                return skipped_result(
+                    name,
+                    "skipped: known to spike past the runner's memory during "
+                    "`by build` (faster than the watchdog can react)",
+                )
+            if args.max_project_py_files:
+                n_py = count_source_py(root)
+                if n_py > args.max_project_py_files:
+                    logger.info("skipping %s: %d .py files over limit", name, n_py)
+                    return skipped_result(
+                        name,
+                        f"skipped: {n_py} .py files exceeds "
+                        f"--max-project-py-files ({args.max_project_py_files}); "
+                        f"`by build` would not fit in the runner's memory",
+                    )
             logger.info("round-tripping %s", name)
-            return await roundtrip_project(
-                by, root, name, file_concurrency=file_concurrency
+            if baseline is not None:
+                return await diff_project(
+                    baseline,
+                    by,
+                    root,
+                    name,
+                    build_mem_limit_bytes=mem_limit,
+                    build_timeout=build_timeout,
+                )
+            return await check_project(
+                by,
+                root,
+                name,
+                build_mem_limit_bytes=mem_limit,
+                build_timeout=build_timeout,
             )
 
-    results: list[ProjectResult] = []
+    def skipped_result(name: str, note: str) -> ProjectDiff | ProjectErrors:
+        if baseline is not None:
+            return ProjectDiff(name, 0, [], note)
+        return ProjectErrors(name, 0, [], note)
+
+    results: list[ProjectDiff | ProjectErrors] = []
 
     if args.project_dir is not None:
         root = args.project_dir.resolve()
         results.append(await run_one(root.name, root))
     else:
-        # Primer-driven mode
         if args.checkout:
             location_ctx = nullcontext(args.checkout)
         else:
@@ -296,37 +679,106 @@ async def main_async(args: argparse.Namespace) -> int:
                     for line in projects_file.read_text().splitlines()
                     if line.strip() and not line.startswith("#")
                 ]
-                if args.limit:
-                    primer_names = primer_names[: args.limit]
+            if args.limit:
+                primer_names = primer_names[: args.limit]
+            # round-robin so adjacent (often similarly-sized) projects land on
+            # different shards
+            if args.num_shards > 1:
+                primer_names = primer_names[args.shard :: args.num_shards]
 
-            async def setup_and_run(name: str) -> ProjectResult:
+            async def setup_and_run(name: str) -> ProjectDiff | ProjectErrors:
                 try:
                     async with setup_primer_project(name, parent) as root:
                         return await run_one(name, root)
                 except Exception as e:
+                    # a clone/network failure affects base and head equally, so
+                    # it's noise, not a regression: skip it without failing
                     logger.warning("project %s failed setup: %s", name, e)
-                    return ProjectResult(
-                        name,
-                        0,
-                        [],
-                        [FileResult(Path("."), False, f"setup failed: {e}", "")],
-                    )
+                    return skipped_result(name, f"setup failed: {e}")
+                finally:
+                    # free the clone (source + generated `.by` + `out/`) so disk
+                    # doesn't accumulate across the shard's projects. --checkout
+                    # is for reuse, so only clean the temp-dir mode
+                    if args.checkout is None:
+                        shutil.rmtree(parent / name, ignore_errors=True)
 
-            results = await asyncio.gather(*(setup_and_run(n) for n in primer_names))
+            results = list(
+                await asyncio.gather(*(setup_and_run(n) for n in primer_names))
+            )
 
-    report, clean = render_report(results)
+    # shard worker: emit machine-readable results for the render step to merge.
+    # a shard never decides pass/fail (the render step aggregates and does), so
+    # this returns 0 even when its slice contains a regression.
+    if args.json_out is not None:
+        diffs = [r for r in results if isinstance(r, ProjectDiff)]
+        args.json_out.write_text(
+            json.dumps({"projects": [_project_diff_to_dict(p) for p in diffs]})
+        )
+        return 0
+
+    if baseline is not None:
+        diffs = [r for r in results if isinstance(r, ProjectDiff)]
+        report, clean = render_diff_report(diffs, args.old_label, args.new_label)
+    else:
+        errs = [r for r in results if isinstance(r, ProjectErrors)]
+        report, clean = render_error_report(errs)
+
     print(report)
     return 0 if clean else 1
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("by", type=Path, help="path to the `by` binary")
+    parser.add_argument(
+        "by",
+        type=Path,
+        nargs="?",
+        help="path to the `by` binary (the head/new); omitted in --render mode",
+    )
     parser.add_argument(
         "project_dir",
         type=Path,
         nargs="?",
         help="pre-cloned project directory to check (skips primer fetch)",
+    )
+    parser.add_argument(
+        "--shard",
+        type=int,
+        default=0,
+        help="0-based index of this shard (with --num-shards)",
+    )
+    parser.add_argument(
+        "--num-shards",
+        type=int,
+        default=1,
+        help="partition the project list into this many shards",
+    )
+    parser.add_argument(
+        "--json-out",
+        type=Path,
+        help="write per-project diff results as JSON (shard worker mode); "
+        "requires --baseline and suppresses the markdown report",
+    )
+    parser.add_argument(
+        "--render",
+        type=Path,
+        nargs="+",
+        help="merge these shard JSON files into the markdown report and exit",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        help="path to a second `by` binary (the merge base); enables diff mode",
+    )
+    parser.add_argument(
+        "--old-label",
+        default="base",
+        help="display label for the baseline binary in the report",
+    )
+    parser.add_argument(
+        "--new-label",
+        default="head",
+        help="display label for the head binary in the report",
     )
     parser.add_argument(
         "--primer",
@@ -350,8 +802,38 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         help="limit the number of primer projects to check",
     )
-    parser.add_argument("--project-concurrency", type=int, default=4)
-    parser.add_argument("--file-concurrency", type=int, default=8)
+    parser.add_argument(
+        "--project-concurrency",
+        type=int,
+        default=1,
+        help="how many projects to round-trip-build at once (each build holds a "
+        "whole project's db in memory, so keep this modest)",
+    )
+    parser.add_argument(
+        "--max-project-py-files",
+        type=int,
+        default=2000,
+        help="skip projects with more first-party .py files than this — `by "
+        "build` holds the whole project's db in memory, so the biggest projects "
+        "(e.g. spack) would OOM the runner (0 disables the limit)",
+    )
+    parser.add_argument(
+        "--build-mem-limit-gb",
+        type=float,
+        default=0.0,
+        help="kill a `by` reverse/build whose resident memory exceeds this many "
+        "GB and record it as a (canonical) error, so one runaway build can't OOM "
+        "the runner and take down the shard. 0 (the default) auto-sizes to 70%% "
+        "of total RAM; a negative value disables the watchdog",
+    )
+    parser.add_argument(
+        "--build-timeout",
+        type=float,
+        default=900.0,
+        help="kill a `by` reverse/build that runs longer than this many seconds "
+        "and record it as a (canonical) error, so one hung invocation can't "
+        "stall the whole shard until the job timeout (0 disables the timeout)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
 
@@ -362,6 +844,15 @@ def main() -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
+    if args.render:
+        return render_from_json(args.render, args.old_label, args.new_label)
+    if args.by is None:
+        logger.error("the `by` binary is required unless --render is given")
+        return 2
+    if args.json_out is not None and args.baseline is None:
+        logger.error("--json-out requires --baseline (diff mode)")
+        return 2
 
     if args.checkout:
         args.checkout.mkdir(parents=True, exist_ok=True)

@@ -405,3 +405,74 @@ fn transpile_proceeds_past_non_syntax_errors() {
         .unwrap_or(&stdout);
     assert_eq!(body.trim(), "x: int = \"string\"");
 }
+
+#[test]
+fn transpile_directory_reverses_in_place() {
+    // `by transpile --reverse <dir>` converts every `.py` under the tree into a
+    // `.by` in place, deleting the original; venv/cache dirs are skipped
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    fs::create_dir_all(root.join("pkg")).unwrap();
+    fs::write(
+        root.join("pkg/models.py"),
+        "def find(x: int | None) -> int:\n    return x if x is not None else 0\n",
+    )
+    .unwrap();
+    // a file inside a skipped directory must be left untouched
+    fs::create_dir_all(root.join(".venv")).unwrap();
+    fs::write(root.join(".venv/dep.py"), "x = 1\n").unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_by"))
+        .arg("transpile")
+        .arg("--reverse")
+        .arg(root)
+        .output()
+        .expect("failed to spawn by");
+    assert!(
+        output.status.success(),
+        "reverse dir failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(!root.join("pkg/models.py").exists(), "original .py removed");
+    let reversed = fs::read_to_string(root.join("pkg/models.by")).unwrap();
+    assert!(
+        reversed.contains("?? 0"),
+        "coalesce reversed to basedpython form:\n{reversed}"
+    );
+    // skipped-dir file is left as-is
+    assert!(root.join(".venv/dep.py").exists());
+    assert!(!root.join(".venv/dep.by").exists());
+}
+
+#[test]
+fn transpile_directory_round_trips_through_build() {
+    // reverse a whole project, then `by build` it back: the forward pass uses
+    // one shared project db, so the cross-module form round-trips
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    fs::create_dir_all(root.join("pkg")).unwrap();
+    fs::write(root.join("pkg/__init__.by"), "").unwrap();
+    fs::write(
+        root.join("pkg/models.by"),
+        "def find(x: int | None) -> int:\n    return x ?? 0\n",
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_by"))
+        .arg("build")
+        .current_dir(root)
+        .output()
+        .expect("failed to spawn by");
+    assert!(
+        output.status.success(),
+        "build failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let built = fs::read_to_string(root.join("out/pkg/models.py")).unwrap();
+    assert!(
+        built.contains("x if x is not None else 0"),
+        "coalesce lowered back to python:\n{built}"
+    );
+}

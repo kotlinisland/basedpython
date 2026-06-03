@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -117,6 +118,17 @@ pub(crate) fn cmd_transpile(
     min_version: &str,
 ) -> anyhow::Result<ExitStatus> {
     let config = parse_version(min_version)?;
+
+    // a directory argument transpiles the whole tree in place: forward turns
+    // every `.by` into a `.py` (type-aware, one shared project db); reverse
+    // turns every `.py` into a `.by`. this is the project-level counterpart to
+    // the single-file/stdin path below
+    if let Some(p) = file {
+        if p.is_dir() {
+            return cmd_transpile_dir(p, reverse, &config);
+        }
+    }
+
     let (source, path) = match file {
         Some(p) => (
             fs::read_to_string(p).with_context(|| format!("{}", p.display()))?,
@@ -206,6 +218,115 @@ pub(crate) fn cmd_transpile(
 
     print!("{output}");
     Ok(ExitStatus::Success)
+}
+
+// ── directory transpile ───────────────────────────────────────────────────────
+
+/// directories skipped when walking a project for reverse transpile: virtual
+/// envs, caches, vcs metadata, and build outputs — none are first-party source
+const NON_SOURCE_DIRS: &[&str] = &[
+    ".venv",
+    "venv",
+    "env",
+    ".env",
+    "site-packages",
+    "__pycache__",
+    ".git",
+    ".tox",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "build",
+    "dist",
+    "node_modules",
+    "out",
+];
+
+fn cmd_transpile_dir(dir: &Path, reverse: bool, config: &Config) -> anyhow::Result<ExitStatus> {
+    if reverse {
+        reverse_dir(dir, config)
+    } else {
+        forward_dir(dir, config)
+    }
+}
+
+/// Reverse every `.py`/`.pyi` under `dir` into a `.by`/`.byi` in place,
+/// deleting the original. Reverse transforms are single-file, so no project db
+/// is needed.
+#[allow(clippy::print_stderr)]
+fn reverse_dir(dir: &Path, config: &Config) -> anyhow::Result<ExitStatus> {
+    let files = py_source_files(dir);
+    if files.is_empty() {
+        eprintln!("no .py files found");
+        return Ok(ExitStatus::Success);
+    }
+
+    let mut count = 0usize;
+    for py in &files {
+        let source = fs::read_to_string(py).with_context(|| format!("{}", py.display()))?;
+        let is_stub = py.extension().and_then(OsStr::to_str) == Some("pyi");
+        let file_config = Config {
+            is_python: true,
+            is_stub,
+            ..config.clone()
+        };
+        let output = by_transforms::reverse_transpile(&source, &file_config)
+            .map_err(|e| anyhow::anyhow!("{}: {e}", py.display()))?;
+        let by = py.with_extension(if is_stub { "byi" } else { "by" });
+        fs::write(&by, output).with_context(|| format!("{}", by.display()))?;
+        fs::remove_file(py).with_context(|| format!("{}", py.display()))?;
+        count += 1;
+    }
+
+    eprintln!("reversed {count} file(s) to basedpython");
+    Ok(ExitStatus::Success)
+}
+
+/// Forward-transpile every `.by` under `dir` into a `.py` next to it, using one
+/// shared project db so cross-module types resolve (the same path as `by
+/// build`, but written in place rather than to `out/`).
+#[allow(clippy::print_stderr)]
+fn forward_dir(dir: &Path, config: &Config) -> anyhow::Result<ExitStatus> {
+    let files = bpy_files(dir);
+    if files.is_empty() {
+        eprintln!("no .by files found");
+        return Ok(ExitStatus::Success);
+    }
+
+    let (db, handles) = build_project_db(dir, &files)?;
+    let ok = render_check_and_transpile(&db, &handles, config, |bpy, src, _line_map| {
+        let py = bpy.with_extension("py");
+        fs::write(&py, src).with_context(|| format!("{}", py.display()))?;
+        Ok(())
+    })?;
+    Ok(if ok {
+        ExitStatus::Success
+    } else {
+        ExitStatus::Failure
+    })
+}
+
+/// Every first-party `.py`/`.pyi` file under `root`, skipping [`NON_SOURCE_DIRS`]
+/// and symlinks.
+fn py_source_files(root: &Path) -> Vec<PathBuf> {
+    WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| {
+            !(e.file_type().is_dir()
+                && e.file_name()
+                    .to_str()
+                    .is_some_and(|n| NON_SOURCE_DIRS.contains(&n)))
+        })
+        .filter_map(Result::ok)
+        .filter(|e| {
+            let p = e.path();
+            !e.path_is_symlink()
+                && p.extension()
+                    .and_then(OsStr::to_str)
+                    .is_some_and(|x| matches!(x, "py" | "pyi"))
+        })
+        .map(walkdir::DirEntry::into_path)
+        .collect()
 }
 
 // ── traceback rewriting ────────────────────────────────────────────────────────

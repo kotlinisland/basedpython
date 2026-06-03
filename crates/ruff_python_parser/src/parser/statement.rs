@@ -283,6 +283,21 @@ impl<'src> Parser<'src> {
                 TokenKind::Name => {
                     let text = self.src_text(range);
                     if text == "let" {
+                        // `let` only introduces a declaration when it is shaped
+                        // like `let NAME =` or `let NAME : ...`. otherwise it is
+                        // an ordinary identifier (`let = 5`, `let(x)`,
+                        // `print(let)` are valid python), so don't hijack it —
+                        // and don't let a tool that parses arbitrary text (e.g.
+                        // ERA001 on the comment `# the OS will let us`) panic the
+                        // parser
+                        if self.peek_nth(idx).0 != TokenKind::Name
+                            || !matches!(
+                                self.peek_nth(idx + 1).0,
+                                TokenKind::Colon | TokenKind::Equal
+                            )
+                        {
+                            return None;
+                        }
                         // [modifiers] let name [: T] = value
                         self.error_if_not_basedpython(
                             "`let` declarations are not valid in .py files".to_string(),
@@ -559,7 +574,9 @@ impl<'src> Parser<'src> {
         } else {
             let_name
         };
-        self.bump(TokenKind::Equal);
+        // `expect` rather than `bump`: a `let NAME: ...` whose `=` is missing
+        // reports a recoverable error instead of panicking
+        self.expect(TokenKind::Equal);
         let value = self
             .parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
             .expr;

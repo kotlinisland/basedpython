@@ -104,8 +104,10 @@ pub(crate) enum Command {
         python_version: Option<PythonVersion>,
     },
 
-    /// Transpile a single file to stdout (reads stdin if no file given).
+    /// Transpile a file to stdout, or a whole directory in place (reads stdin if no path given).
     Transpile {
+        /// file to transpile to stdout, or a directory to transpile in place
+        /// (every `.by` → `.py`, or with `--reverse` every `.py` → `.by`)
         file: Option<PathBuf>,
         /// convert Python source into basedpython idioms (instead of the default by → py direction)
         #[arg(long)]

@@ -21,7 +21,7 @@ by <COMMAND>
 <dt><a href="#by-run"><code>by run</code></a></dt><dd><p>Transpile and run a module with <code>python -m &lt;module&gt;</code></p></dd>
 <dt><a href="#by-build"><code>by build</code></a></dt><dd><p>Transpile all .by files and write them to out/</p></dd>
 <dt><a href="#by-generate-api-file"><code>by generate-api-file</code></a></dt><dd><p>Generate an api lockfile (<code>api.lock</code>) summarising the public type-level surface of the project</p></dd>
-<dt><a href="#by-transpile"><code>by transpile</code></a></dt><dd><p>Transpile a single file to stdout (reads stdin if no file given)</p></dd>
+<dt><a href="#by-transpile"><code>by transpile</code></a></dt><dd><p>Transpile a file to stdout, or a whole directory in place (reads stdin if no path given)</p></dd>
 <dt><a href="#by-help"><code>by help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
 </dl>
 
@@ -289,7 +289,7 @@ by generate-api-file [OPTIONS]
 
 ## by transpile
 
-Transpile a single file to stdout (reads stdin if no file given)
+Transpile a file to stdout, or a whole directory in place (reads stdin if no path given)
 
 <h3 class="cli-reference">Usage</h3>
 
@@ -299,7 +299,8 @@ by transpile [OPTIONS] [FILE]
 
 <h3 class="cli-reference">Arguments</h3>
 
-<dl class="cli-reference"><dt id="by-transpile--file"><a href="#by-transpile--file"><code>FILE</code></a></dt></dl>
+<dl class="cli-reference"><dt id="by-transpile--file"><a href="#by-transpile--file"><code>FILE</code></a></dt><dd><p>file to transpile to stdout, or a directory to transpile in place (every <code>.by</code> → <code>.py</code>, or with <code>--reverse</code> every <code>.py</code> → <code>.by</code>)</p>
+</dd></dl>
 
 <h3 class="cli-reference">Options</h3>
 

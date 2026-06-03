@@ -25,6 +25,30 @@ fn test_modes() {
 }
 
 #[test]
+fn basedpython_let_keyword_never_panics() {
+    // `let` is only the declaration keyword when shaped like `let NAME =` or
+    // `let NAME :`. anything else is an ordinary identifier and must parse
+    // without panicking — regression for a `bump(Equal)` assertion that fired
+    // when ERA001 parsed a comment such as `# the OS will let us`
+    for source in [
+        "let us",
+        "let",
+        "let = 5",
+        "let(x)",
+        "x = let + 1",
+        "for let in items:\n    pass",
+        "let x = 5",
+        "let x: int = 5",
+    ] {
+        // success here is simply not panicking
+        let _ = parse(
+            source,
+            ParseOptions::from(Mode::Module).with_basedpython(true),
+        );
+    }
+}
+
+#[test]
 fn test_expr_mode_invalid_syntax1() {
     let source = "first second";
     let error = parse_expression(source).unwrap_err();

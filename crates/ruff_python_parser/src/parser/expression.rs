@@ -1108,15 +1108,18 @@ impl<'src> Parser<'src> {
                 // basedpython postfix `^` propagate. `^` is otherwise the infix
                 // bitwise-xor operator, so it is only postfix when no operand
                 // follows; an operand on the right means it is xor (left for the
-                // binary loop). exception: a `^` *glued* to its operand (no
-                // whitespace, as one writes `expr^`) followed by a unary-capable
-                // arithmetic token (`+ - ~ * **`) is postfix-then-binary
-                // (`p(a)^ + b` → `(p(a)^) + b`), not xor-of-unary — the spaced
-                // form `a ^ -b` stays xor.
+                // binary loop). exception: in basedpython a `^` *glued* to its
+                // operand (no whitespace, as one writes `expr^`) followed by a
+                // unary-capable arithmetic token (`+ - ~ * **`) is
+                // postfix-then-binary (`p(a)^ + b` → `(p(a)^) + b`), not
+                // xor-of-unary. that disambiguation must not apply in `.py` mode,
+                // where glued `a^-b` is plain `a ^ (-b)` — stealing it would make
+                // valid python a syntax error.
                 TokenKind::CircumFlex
                     if self.options.mode != Mode::Ipython
                         && (!(EXPR_SET.contains(self.peek()) || self.peek().is_soft_keyword())
-                            || (lhs.range().end() == self.current_token_range().start()
+                            || (self.options.is_basedpython
+                                && lhs.range().end() == self.current_token_range().start()
                                 && matches!(
                                     self.peek(),
                                     TokenKind::Plus

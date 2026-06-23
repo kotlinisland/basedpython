@@ -330,7 +330,15 @@ fn emit_enum(
         let vis = enum_visibility_prefix(class, source);
         emit_plain_enum(out, source, name, vis, &variants, &members, imports);
     } else {
-        emit_sealed_hierarchy(out, source, class, &variants, &members, imports, min_version);
+        emit_sealed_hierarchy(
+            out,
+            source,
+            class,
+            &variants,
+            &members,
+            imports,
+            min_version,
+        );
     }
 
     // the replaced source range excludes its trailing newline, so the lowered

@@ -26,6 +26,7 @@ fn mdtest_dir() -> PathBuf {
 /// runtime floor is 3.13; CI runners range from 3.10 upward, so a checker-clean
 /// block can fail to even parse on an older interpreter. Returns `None` (the
 /// test then skips) when uv or the interpreter can't be obtained.
+#[cfg(not(windows))]
 fn python() -> Option<String> {
     if let Ok(p) = std::env::var("PYTHON") {
         return Some(p);
@@ -48,6 +49,15 @@ fn python() -> Option<String> {
         .output()
         .ok()?;
     find()
+}
+
+/// On windows the harness is skipped unless `PYTHON` is set explicitly: it drives
+/// a python subprocess whose interpreter discovery and stdout encoding differ
+/// from unix, and the checker/runtime contract it validates is platform
+/// independent, so unix coverage suffices.
+#[cfg(windows)]
+fn python() -> Option<String> {
+    std::env::var("PYTHON").ok()
 }
 
 /// `major.minor` of the interpreter the blocks will execute on, so the
@@ -144,7 +154,7 @@ fn with_reveal_stub(transpiled: &str) -> String {
 )]
 fn clean_mdtest_blocks_run() {
     let Some(python) = python() else {
-        eprintln!("skipping: uv could not provide a python 3.13 interpreter");
+        eprintln!("skipping: no python 3.13 interpreter available (uv on unix, or set PYTHON)");
         return;
     };
     let Some(version) = python_version(&python) else {

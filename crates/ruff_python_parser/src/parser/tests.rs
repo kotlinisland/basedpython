@@ -465,6 +465,30 @@ fn glued_circumflex_before_unary_is_xor_in_py() {
 }
 
 #[test]
+fn fstring_conversion_after_ternary_is_not_force_unwrap() {
+    // the `!s` / `!r` in an interpolation is the conversion flag, not the
+    // basedpython postfix force-unwrap. for a conditional the conversion lands
+    // on the `else` tail, which must inherit the interpolation context so the
+    // `!` isn't eaten as force-unwrap. regression: poetry's
+    // `f"{p if not W else g(p)!s}"` became a spurious `.py` syntax error and
+    // tipped the formatter ecosystem check over its allowed error count.
+    for source in [
+        r#"f"{a if b else c!s}""#,
+        r#"f"{a if b else c!r:>{w}}""#,
+        r#"f"{a if b else c if d else e!s}""#,
+        r#"f"{x!r}""#,
+        r#"f"{a + b!s}""#,
+    ] {
+        let parsed = crate::parse_unchecked(source, ParseOptions::from(Mode::Module));
+        assert!(
+            parsed.errors().is_empty(),
+            "expected {source:?} to parse cleanly in .py mode, got: {:?}",
+            parsed.errors()
+        );
+    }
+}
+
+#[test]
 fn recursion_limit_nested_parens() {
     let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);

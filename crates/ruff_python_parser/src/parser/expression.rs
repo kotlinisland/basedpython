@@ -289,7 +289,7 @@ impl<'src> Parser<'src> {
             let parsed_expr = self.parse_simple_expression(context);
 
             if self.at(TokenKind::If) {
-                Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
+                Expr::If(self.parse_if_expression(parsed_expr.expr, start, context)).into()
             } else {
                 parsed_expr
             }
@@ -4345,18 +4345,34 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    pub(super) fn parse_if_expression(
+        &mut self,
+        body: Expr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
 
         self.expect(TokenKind::Else);
 
+        // the `else` value is the tail of the conditional, so a trailing
+        // interpolation conversion (`f"{a if b else c!s}"`) lands here — carry
+        // only the interpolation flag so the `!` stays the conversion flag
+        // rather than being eaten as a postfix force-unwrap. the other context
+        // flags (excluded `in`/`for`, starred precedence, …) must not leak into
+        // the `else` value, which otherwise parses as an ordinary expression.
+        let orelse_context = if context.is_in_interpolation() {
+            ExpressionContext::default().with_in_interpolation()
+        } else {
+            ExpressionContext::default()
+        };
         // `a if b else a if b else ...` recurses through `orelse` at the
         // conditional layer, which is not covered by the `parse_lhs_expression`
         // guard (that scope is released once each atom is parsed). Guard here.
         let orelse = if let Some(orelse) =
-            self.with_recursion(Self::parse_conditional_expression_or_higher)
+            self.with_recursion(|p| p.parse_conditional_expression_or_higher_impl(orelse_context))
         {
             orelse
         } else {

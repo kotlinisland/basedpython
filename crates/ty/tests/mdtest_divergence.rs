@@ -138,7 +138,10 @@ fn with_reveal_stub(transpiled: &str) -> String {
 }
 
 #[test]
-#[expect(clippy::print_stderr, reason = "skip diagnostic when python is unavailable")]
+#[expect(
+    clippy::print_stderr,
+    reason = "skip diagnostic when python is unavailable"
+)]
 fn clean_mdtest_blocks_run() {
     let Some(python) = python() else {
         eprintln!("skipping: uv could not provide a python 3.13 interpreter");
@@ -163,7 +166,8 @@ fn clean_mdtest_blocks_run() {
         .expect("mdtest dir")
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| {
-            p.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
+            p.extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
                 && p.file_name()
                     .and_then(|n| n.to_str())
                     .is_some_and(|n| n.starts_with("basedpython_"))

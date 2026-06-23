@@ -434,7 +434,10 @@ fn glued_circumflex_before_unary_is_xor_in_py() {
             panic!("expected an expression statement for {source:?}");
         };
         let Expr::BinOp(binop) = &*stmt.value else {
-            panic!("expected `a ^ <unary>` for {source:?}, got {:?}", stmt.value);
+            panic!(
+                "expected `a ^ <unary>` for {source:?}, got {:?}",
+                stmt.value
+            );
         };
         assert_eq!(binop.op, Operator::BitXor, "operator for {source:?}");
         assert!(

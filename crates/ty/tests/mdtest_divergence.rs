@@ -19,30 +19,35 @@ fn mdtest_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../ty_python_semantic/resources/mdtest")
 }
 
-fn python() -> String {
+/// A CPython 3.13 interpreter, provisioned through uv so the harness runs the
+/// same interpreter everywhere instead of riding on whatever `python3` the host
+/// happens to ship. The transpiler emits modern syntax — PEP 695 generics, PEP
+/// 696 type-parameter defaults (`class C[T = int]`), PEP 646 unpacking — whose
+/// runtime floor is 3.13; CI runners range from 3.10 upward, so a checker-clean
+/// block can fail to even parse on an older interpreter. Returns `None` (the
+/// test then skips) when uv or the interpreter can't be obtained.
+fn python() -> Option<String> {
     if let Ok(p) = std::env::var("PYTHON") {
-        return p;
+        return Some(p);
     }
-    // newest available interpreter: blocks exercise modern syntax (`match`,
-    // subclassable `Any`) that the system `python3` may predate
-    for candidate in [
-        "python3.14",
-        "python3.13",
-        "python3.12",
-        "python3.11",
-        "python3.10",
-        "python3",
-    ] {
-        if Command::new(candidate)
-            .arg("-c")
-            .arg("pass")
+    let find = || {
+        let out = Command::new("uv")
+            .args(["python", "find", "3.13"])
             .output()
-            .is_ok_and(|o| o.status.success())
-        {
-            return candidate.to_owned();
-        }
+            .ok()?;
+        out.status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    };
+    if let Some(path) = find() {
+        return Some(path);
     }
-    "python3".to_owned()
+    // not discoverable yet — let uv download a managed build, then locate it
+    Command::new("uv")
+        .args(["python", "install", "3.13"])
+        .output()
+        .ok()?;
+    find()
 }
 
 /// `major.minor` of the interpreter the blocks will execute on, so the
@@ -135,7 +140,10 @@ fn with_reveal_stub(transpiled: &str) -> String {
 #[test]
 #[expect(clippy::print_stderr, reason = "skip diagnostic when python is unavailable")]
 fn clean_mdtest_blocks_run() {
-    let python = python();
+    let Some(python) = python() else {
+        eprintln!("skipping: uv could not provide a python 3.13 interpreter");
+        return;
+    };
     let Some(version) = python_version(&python) else {
         eprintln!("skipping: `{python}` not runnable");
         return;

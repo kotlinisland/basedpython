@@ -59,7 +59,7 @@ fn python_version(python: &str) -> Option<String> {
         .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
-/// Extract the ```by fenced blocks of a markdown file, in order, with a flag
+/// Extract the `by` fenced code blocks of a markdown file, in order, with a flag
 /// for blocks living in a multi-file section (one that declares companion
 /// modules via a `` `name.py`: `` marker) — those import section-local modules
 /// and cannot run standalone.
@@ -133,6 +133,7 @@ fn with_reveal_stub(transpiled: &str) -> String {
 }
 
 #[test]
+#[expect(clippy::print_stderr, reason = "skip diagnostic when python is unavailable")]
 fn clean_mdtest_blocks_run() {
     let python = python();
     let Some(version) = python_version(&python) else {
@@ -154,9 +155,10 @@ fn clean_mdtest_blocks_run() {
         .expect("mdtest dir")
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("basedpython_") && n.ends_with(".md"))
+            p.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
+                && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("basedpython_"))
         })
         .collect();
     files.sort();

@@ -7,6 +7,14 @@ serial = { max-threads = 1 }
 filter = 'binary(file_watching)'
 test-group = 'serial'
 
+# The checker/runtime divergence harness transpiles + runs every basedpython
+# mdtest block through subprocesses (~200 spawns) and provisions a python via uv
+# on the first cold run, so on CI it legitimately runs past the default 60s slow
+# cutoff. Give it a generous terminate budget (mirrored under `ci` below).
+[[profile.default.overrides]]
+filter = 'test(clean_mdtest_blocks_run)'
+slow-timeout = { period = "60s", terminate-after = 5 }
+
 [profile.ci]
 # Print out output for failing tests as soon as they fail, and also at the end
 # of the run (for easy scrollability).
@@ -22,3 +30,9 @@ slow-timeout =  { period = "1s", terminate-after = 60 }
 
 # Show slow jobs in the final summary
 final-status-level = "slow"
+
+# The divergence harness is heavy (see the note under `profile.default`); exempt
+# it from the aggressive 60s deadlock cutoff so it isn't killed mid-run on CI.
+[[profile.ci.overrides]]
+filter = 'test(clean_mdtest_blocks_run)'
+slow-timeout = { period = "60s", terminate-after = 5 }

@@ -29,7 +29,9 @@ basedpython is a Python-like language that transpiles to pure Python
 - [`typeof` keyword](features/typeof.md)
 - [star projections (`X[*]`)](features/star-projection.md)
 - [strict `float` and `complex`](features/no-number-promotions.md)
+- [infinity and nan float literals](features/float-literals.md)
 - [literal type promotion](features/literal-types.md)
+- [symbolic operations in types](features/symbolic-type-ops.md)
 - [typed dict literals](features/typed-dict-literal.md)
 - [anonymous named tuple types](features/anonymous-named-tuple.md)
 - [explicit typevar constraints](features/constraints.md)
@@ -46,11 +48,15 @@ basedpython is a Python-like language that transpiles to pure Python
 ## syntax extensions
 
 - [modifiers and visibility](features/modifiers.md)
+- [based enums (`enum class`)](features/enums.md)
+- [sealed classes](features/sealed-classes.md)
 - [init method shorthand](features/init-method.md)
 - [empty declarations](features/empty-declarations.md)
+- [main function](features/main-function.md)
 - [identity and isinstance (`===` / `!==` / `is`)](features/identity-swap.md)
 - [optional chaining (`?.`)](features/optional-chaining.md)
 - [none-coalesce operator (`??`)](features/none-coalesce.md)
+- [postfix await (`.await`)](features/await-attribute.md)
 - [mutable default arguments](features/mutable-defaults.md)
 - [dedented triple-quoted strings](features/dedent-strings.md)
 - [tuple member access (`expr.N`)](features/tuple-index.md)
@@ -61,6 +67,10 @@ basedpython is a Python-like language that transpiles to pure Python
 - [`sentinel` declarations](features/sentinel.md)
 - [lazy imports](features/lazy-imports.md)
 - [repeated `_` parameters](features/repeated-underscore.md)
+
+## planned
+
+- [destructuring with `if let`](features/if-let.md)
 
 ## development
 

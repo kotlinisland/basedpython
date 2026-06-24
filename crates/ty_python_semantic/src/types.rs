@@ -1723,6 +1723,14 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// basedpython: create an unpromotable float literal, used for explicit
+    /// `float.inf` / `float.nan` annotations that must not widen to `float`
+    pub(crate) fn unpromotable_float_literal(value: f64) -> Self {
+        Self::LiteralValue(LiteralValueType::unpromotable(
+            literal::FloatLiteralType::from_f64(value),
+        ))
+    }
+
     /// basedpython: create a promotable complex literal
     pub(crate) fn complex_literal(db: &'db dyn Db, re: f64, im: f64) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(
@@ -5424,6 +5432,16 @@ impl<'db> Type<'db> {
             // rewrite to `JustFloat` / `JustComplex`, which preserves the
             // strict meaning for .py consumers
             Type::ClassLiteral(class) => {
+                // a based-enum sum type (`enum Shape:`) denotes the union of its
+                // variants' instance types (`Circle | Square | Empty`) when used
+                // as a type, so annotations, assignability, and match
+                // exhaustiveness all see the closed set of variants
+                if let ClassLiteral::Static(static_class) = class
+                    && let Some(union) =
+                        crate::types::class::based_enum_variant_union(db, *static_class)
+                {
+                    return Ok(union);
+                }
                 let is_by_ext = |ext: Option<&str>| matches!(ext, Some("by" | "byi"));
                 let is_by = match scope_id.file(db).path(db) {
                     ruff_db::files::FilePath::System(p) => is_by_ext(p.extension()),
@@ -5437,7 +5455,18 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
+            Type::GenericAlias(alias) => {
+                // a subscripted based-enum sum type (`Tree[int]`) denotes the
+                // union of its variants specialized by the type arguments
+                // (`Node[int] | Leaf`), mirroring the bare-enum case above so
+                // generic enums see the same closed variant set
+                if let Some(union) =
+                    crate::types::class::based_enum_variant_union(db, alias.origin(db))
+                {
+                    return Ok(union.apply_specialization(db, alias.specialization(db)));
+                }
+                Ok(Type::instance(db, ClassType::from(*alias)))
+            }
 
             Type::SubclassOf(_)
             | Type::EnumComplement(_)
@@ -5531,6 +5560,10 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
+                // a wrapped optional is already an instance type; it denotes itself
+                KnownInstanceType::WrappedOptional(ty) => {
+                    Ok(Type::KnownInstance(KnownInstanceType::WrappedOptional(*ty)))
+                }
                 KnownInstanceType::TypeGenericAlias(instance) => {
                     // When `type[…]` appears in a value position (e.g. in an implicit type alias),
                     // we infer its argument as a type expression. This ensures that we can emit
@@ -6297,7 +6330,7 @@ impl<'db> Type<'db> {
                         );
                     }
                 }
-                KnownInstanceType::Annotated(ty) => {
+                KnownInstanceType::Annotated(ty) | KnownInstanceType::WrappedOptional(ty) => {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }

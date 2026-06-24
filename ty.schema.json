@@ -520,6 +520,16 @@
             }
           ]
         },
+        "final-on-variable": {
+          "title": "detects the `final` modifier on a bare variable assignment",
+          "description": "## What it does\nChecks for the basedpython `final` modifier applied to a bare variable\nassignment outside of a class body, e.g. `final a = 1`.\n\n## Why is this bad?\n`final` is a class/method modifier. On a bare assignment it lowers to a\nplain assignment and makes the variable no more final than before, so it\nis almost certainly a mistake. A final variable is declared with `let`,\nwhich lowers to `Final`.\n\n`final override` is a legitimate assignment marker and is not flagged.\n\n## Example\n\n```by\n# Error: `final` on a variable has no effect\nfinal a = 1\n\n# Correct: `let` declares a final variable\nlet a = 1\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "final-without-value": {
           "title": "detects `Final` declarations without a value",
           "description": "## What it does\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n```python\nfrom typing import Final\n\n# Error: `Final` symbol without a value\nMY_CONSTANT: Final[int]\n\n# OK: `Final` symbol with a value\nMY_CONSTANT: Final[int] = 1\n```",
@@ -1323,6 +1333,16 @@
         "subclass-of-final-class": {
           "title": "detects subclasses of final classes",
           "description": "## What it does\nChecks for classes that subclass final classes.\n\n## Why is this bad?\nDecorating a class with `@final` declares to the type checker that it should not be subclassed.\n\n## Example\n\n```python\nfrom typing import final\n\n@final\nclass A: ...\nclass B(A): ...  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "subclass-of-sealed-class": {
+          "title": "detects subclasses of sealed classes from outside their workspace",
+          "description": "## What it does\nChecks for classes that subclass a basedpython `sealed` class from outside\nthe workspace in which the sealed class is defined.\n\n## Why is this bad?\nA `sealed` class declares a closed set of subclasses. It may be subclassed\nfreely from anywhere within its own workspace, but not from a dependency,\nso that the set of subclasses is fully known.\n\n## Example\n\n```by\n# in a dependency:\nsealed class Shape\n\n# in your workspace:\nclass Circle(Shape): ...  # error: `Shape` is sealed in another workspace\n```",
           "default": "error",
           "oneOf": [
             {

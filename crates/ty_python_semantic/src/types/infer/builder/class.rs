@@ -1,12 +1,12 @@
 use crate::place::Place;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
+    CallArguments, DataclassFlags, DataclassParams, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
     call::CallError,
     callable::CallableFunctionProvenance,
     function::KnownFunction,
     infer::{
-        TypeInferenceBuilder,
+        InferenceFlags, TypeInferenceBuilder,
         builder::{DeclaredAndInferredType, DeferredExpressionState},
         original_class_type,
     },
@@ -79,23 +79,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
             Vec::with_capacity(decorator_list.len());
+        let mut is_sealed = false;
         let source = ruff_db::source::source_text(db, self.file());
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
-            // basedpython `enum class Foo` / `protocol Foo` parse to synthetic
-            // `enum_class` / `protocol_class` marker decorators (no `@` in the
-            // source). their effect — the injected `Enum` / `Protocol` base — is
-            // applied in `explicit_bases`; the marker itself is not a runtime
-            // decorator, so applying it here would resolve to `Unknown` and poison
-            // the whole class type
+            // basedpython `enum class Foo` / `protocol Foo` / `sealed class Foo`
+            // parse to synthetic `enum_class` / `protocol_class` / `sealed` marker
+            // decorators (no `@` in the source). their effect is applied here (the
+            // `sealed` flag) or in `explicit_bases` (the injected `Enum` /
+            // `Protocol` base); the marker itself is not a runtime decorator, so
+            // applying it would resolve to `Unknown` and poison the whole class type.
+            // the visibility markers (`private`/`export`/`open`) are transpile-time
+            // only — a rename or `__all__` entry, with no type-level effect — so they
+            // are skipped here for the same reason. (`final`/`abstract`/`data` carry
+            // real type semantics and are recognized further down instead.)
             if let ast::Expr::Name(name) = &decorator.expression
-                && matches!(name.id.as_str(), "enum_class" | "protocol_class")
+                && matches!(
+                    name.id.as_str(),
+                    "enum_class"
+                        | "protocol_class"
+                        | "sealed"
+                        | "enum_def"
+                        | "variant_unit"
+                        | "variant_tuple"
+                        | "private"
+                        | "export"
+                        | "open"
+                )
                 && source
                     .as_bytes()
                     .get(usize::from(decorator.range.start()))
                     .copied()
                     != Some(b'@')
             {
+                if name.id.as_str() == "sealed" {
+                    is_sealed = true;
+                }
                 continue;
             }
             decorator_types_and_nodes.push((decorator_ty, decorator));
@@ -121,6 +140,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut deprecated = None;
         let mut type_check_only = false;
         let mut dataclass_params = None;
+        // based-enum payload variants construct like frozen dataclasses: ty
+        // synthesizes a positional `__init__` from their annotated fields. unit
+        // variants are payload-less *values* and are modelled as enum-literal
+        // members (see `enum_metadata`), so they need no dataclass synthesis
+        if class_node.has_synthetic_marker("variant_tuple") {
+            dataclass_params = Some(DataclassParams::from_flags(
+                db,
+                DataclassFlags::default() | DataclassFlags::FROZEN,
+            ));
+        }
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
         let infer_original_class_ty = |deprecated,
@@ -146,6 +175,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     dataclass_params,
                     dataclass_transformer_params,
                     total_ordering,
+                    is_sealed,
                 )),
             }
         };
@@ -403,6 +433,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         let defer_class_args = self.in_stub() || self.is_basedpython_file();
+        // resolve bases with `IN_TYPE_EXPRESSION` set so the basedpython
+        // `dynamic` keyword resolves to `Any` in a base list (`class C(dynamic)`),
+        // matching the transpiler's `dynamic → Any` rewrite. only `dynamic` name
+        // resolution consults this flag, so other bases are unaffected
+        let previously_in_type_expression = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_EXPRESSION, true);
         for base in class.bases() {
             if defer_class_args {
                 self.infer_expression_with_state(
@@ -414,6 +452,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(base, TypeContext::default());
             }
         }
+        self.context.inference_flags.set(
+            InferenceFlags::IN_TYPE_EXPRESSION,
+            previously_in_type_expression,
+        );
         self.typevar_binding_context = previous_typevar_binding_context;
 
         if let Some(arguments) = class.arguments.as_deref()

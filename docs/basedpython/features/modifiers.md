@@ -13,15 +13,18 @@ boilerplate decorator/annotation pairs at transpile time
 | `open class Foo`        | `class Foo` (keyword stripped, no decorator)        |
 | `data class Foo`        | `@dataclass(slots=True)` + `class Foo`              |
 | `frozen data class Foo` | `@dataclass(frozen=True, slots=True)` + `class Foo` |
-| `enum class Color`      | `class Color(Enum)` (base added)                    |
 | `protocol Foo`          | `class Foo(Protocol)` (base added)                  |
+| `sealed class Foo`      | `class Foo` + `Foo.__sealed_members__ = (...)`      |
 
 `abstract` is a marker for the type checker; it has no runtime decorator.
 `open` is the inverse of `final` — a marker that the class is intended to be
 subclassed. neither emits a runtime artefact
 
-bases are preserved when the modifier injects one — `enum class Color(str)` becomes
-`class Color(str, Enum): ...`
+`sealed` declares a closed subclass hierarchy — see
+[sealed classes](sealed-classes.md)
+
+`enum class` is not a modifier but its own declaration form — see
+[based enums](enums.md)
 
 ## function modifiers
 
@@ -62,6 +65,12 @@ and annotated assignments. the modifier keyword is stripped at transpile time:
 
 these are compile-time-only markers — they constrain how the symbol is
 checked but emit no runtime artefact
+
+a bare `final x = 1` (with no `override`) is not an assignment modifier: it would
+strip to a plain `x = 1` and declare nothing final. outside a class body ty
+rejects it with `final-on-variable` and points you to `let`, which lowers to
+`Final`. inside a class body it is a plain attribute, matching `let` there, and
+is not flagged
 
 ## export / public / private
 

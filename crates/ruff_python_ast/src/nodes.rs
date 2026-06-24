@@ -44,6 +44,60 @@ impl StmtClassDef {
             None => &[],
         }
     }
+
+    /// True when this class def carries the synthetic basedpython marker
+    /// `marker` — an `Invalid`-ctx `Name` decorator the parser attaches to
+    /// surface constructs it desugars to a `ClassDef` (`enum class Foo:` →
+    /// `enum_def`, a variant → `variant_unit` / `variant_tuple`). the
+    /// `Invalid` ctx distinguishes it from a real decorator of the same
+    /// spelling.
+    pub fn has_synthetic_marker(&self, marker: &str) -> bool {
+        self.decorator_list.iter().any(|dec| {
+            matches!(&dec.expression, Expr::Name(name) if name.is_invalid() && name.id == marker)
+        })
+    }
+
+    /// True for a based-enum declaration (`enum class Shape:`).
+    pub fn is_based_enum(&self) -> bool {
+        self.has_synthetic_marker("enum_def")
+    }
+
+    /// True for a based-enum variant (`Circle(radius: float)`, `Empty`) — the
+    /// nested class defs inside a based enum.
+    pub fn is_enum_variant(&self) -> bool {
+        self.has_synthetic_marker("variant_unit") || self.has_synthetic_marker("variant_tuple")
+    }
+
+    /// True for a based enum whose variants are *all* payload-less unit
+    /// variants (`enum class Color: case Red, Green`) and whose body carries no
+    /// assignment members. These lower to an idiomatic `Enum` (members reached
+    /// as `Color.Red`), unlike payload-bearing enums which lower to a sealed
+    /// hierarchy of variant subclasses.
+    ///
+    /// An assignment member (`MAX = 10`, `let MAX = 10`) disqualifies the
+    /// `Enum` form: Python's `Enum` turns every class-body assignment into a
+    /// *member*, which would silently diverge from the constant semantics the
+    /// type checker models. Such enums take the sealed-hierarchy lowering,
+    /// where constants stay constants.
+    pub fn is_all_unit_enum(&self) -> bool {
+        if !self.is_based_enum() {
+            return false;
+        }
+        let mut saw_variant = false;
+        for stmt in &self.body {
+            match stmt {
+                Stmt::ClassDef(variant) if variant.is_enum_variant() => {
+                    saw_variant = true;
+                    if !variant.has_synthetic_marker("variant_unit") {
+                        return false;
+                    }
+                }
+                Stmt::Assign(_) | Stmt::AnnAssign(_) | Stmt::AugAssign(_) => return false,
+                _ => {}
+            }
+        }
+        saw_variant
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2637,6 +2691,10 @@ pub enum Operator {
     FloorDiv,
     /// basedpython: `a ?? b` — None-coalescing operator
     Coalesce,
+    /// basedpython: `T ? E` — result-type separator (`Result[T, E]`). This is
+    /// type-level surface syntax, never a runtime operator; it is lowered
+    /// away before codegen of the final python
+    Result,
 }
 
 impl Operator {
@@ -2656,6 +2714,7 @@ impl Operator {
             Operator::BitAnd => "&",
             Operator::FloorDiv => "//",
             Operator::Coalesce => "??",
+            Operator::Result => "?",
         }
     }
 
@@ -2676,6 +2735,8 @@ impl Operator {
             Operator::BitAnd => "__and__",
             Operator::FloorDiv => "__floordiv__",
             Operator::Coalesce => "__coalesce__",
+            // type-level syntax, never dispatched at runtime
+            Operator::Result => "__result__",
         }
     }
 
@@ -2696,6 +2757,7 @@ impl Operator {
             Operator::BitAnd => "__iand__",
             Operator::FloorDiv => "__ifloordiv__",
             Operator::Coalesce => "__icoalesce__",
+            Operator::Result => "__iresult__",
         }
     }
 
@@ -2716,6 +2778,7 @@ impl Operator {
             Operator::BitAnd => "__rand__",
             Operator::FloorDiv => "__rfloordiv__",
             Operator::Coalesce => "__rcoalesce__",
+            Operator::Result => "__rresult__",
         }
     }
 }
@@ -2734,6 +2797,14 @@ pub enum UnaryOp {
     Not,
     UAdd,
     USub,
+    /// basedpython: postfix `?` optional-type marker — `T?` (`Optional[T]`)
+    Optional,
+    /// basedpython: postfix `^` propagate operator — `expr^` early-returns
+    /// the absent case of a wrapped value
+    Propagate,
+    /// basedpython: postfix `!` force-unwrap operator — `expr!` panics on
+    /// the absent case of a wrapped value
+    Force,
 }
 
 impl UnaryOp {
@@ -2743,7 +2814,19 @@ impl UnaryOp {
             UnaryOp::Not => "not",
             UnaryOp::UAdd => "+",
             UnaryOp::USub => "-",
+            UnaryOp::Optional => "?",
+            UnaryOp::Propagate => "^",
+            UnaryOp::Force => "!",
         }
+    }
+
+    /// basedpython postfix operators render *after* their operand (`T?`,
+    /// `expr^`, `expr!`); the standard unary operators are prefix.
+    pub const fn is_postfix(self) -> bool {
+        matches!(
+            self,
+            UnaryOp::Optional | UnaryOp::Propagate | UnaryOp::Force
+        )
     }
 }
 

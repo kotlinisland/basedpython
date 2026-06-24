@@ -21,7 +21,7 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
+    BindingContext, CallableType, DynamicType, GenericContext, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
     TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
@@ -180,7 +180,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if is_dotted_name(expression) {
                     match attribute_expression.ctx {
                         ast::ExprContext::Load => {
-                            let ty = self.infer_attribute_expression(attribute_expression);
+                            // basedpython: `float.inf` / `float.nan` in a type
+                            // position are the infinity / not-a-number float
+                            // literals. infer the receiver once so the builtin
+                            // check and the non-`float` fallback share it
+                            let ty = if self.is_basedpython_file()
+                                && let Some(value) =
+                                    basedpython_float_constant(&attribute_expression.attr)
+                            {
+                                let receiver = self.infer_maybe_standalone_expression(
+                                    &attribute_expression.value,
+                                    TypeContext::default(),
+                                );
+                                if let Type::ClassLiteral(class) = receiver
+                                    && class.is_known(self.db(), KnownClass::Float)
+                                {
+                                    return Type::unpromotable_float_literal(value);
+                                }
+                                // receiver isn't the builtin `float` — finish
+                                // the normal attribute load with the type we
+                                // already inferred, so it isn't inferred twice
+                                self.infer_attribute_load_impl(attribute_expression, receiver)
+                            } else {
+                                self.infer_attribute_expression(attribute_expression)
+                            };
                             if let Some(materialized) = self.intercept_nested_top_bottom(ty) {
                                 return materialized;
                             }
@@ -477,6 +500,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // anything else is an invalid annotation:
                     op => {
+                        // basedpython: a symbolic operation in a type expression,
+                        // e.g. `1 + 1`, `A + B`, `1 + typeof d`. evaluate the
+                        // operands as types and apply the operator with the same
+                        // type-level binary logic ty uses for value expressions, so
+                        // `1 + 1` resolves to `Literal[2]`. this reuses literal/type
+                        // alias/typevar handling for free via
+                        // `infer_binary_expression_type`
+                        if self.is_basedpython_file() {
+                            let left_ty = self.infer_type_expression(&binary.left);
+                            let right_ty = self.infer_type_expression(&binary.right);
+                            if let Some(result) = self.infer_binary_expression_type(
+                                binary.into(),
+                                false,
+                                left_ty,
+                                right_ty,
+                                op,
+                            ) {
+                                return result;
+                            }
+                            // operands are already inferred as type expressions
+                            // above; the operator just isn't supported between them
+                            self.report_invalid_type_expression(
+                                expression,
+                                format_args!(
+                                    "Invalid binary operator `{}` in type annotation",
+                                    op.as_str()
+                                ),
+                            );
+                            return Type::unknown();
+                        }
                         // Avoid inferring the types of invalid binary expressions that have been
                         // parsed from a string annotation, as they are not present in the semantic
                         // index.
@@ -783,6 +836,83 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if matches!(unary.op, ast::UnaryOp::Not) && self.is_basedpython_file() {
                     let inner = self.infer_type_expression(&unary.operand);
                     return inner.negate(self.db());
+                }
+                // basedpython: `-float.inf` is the negative-infinity float
+                // literal (`-float.nan` stays nan). the exact `-float.<inf|nan>`
+                // shape produces an *unpromotable* float literal, which the
+                // generic numeric handling below would not preserve
+                if self.is_basedpython_file()
+                    && matches!(unary.op, ast::UnaryOp::USub)
+                    && let ast::Expr::Attribute(attr) = &*unary.operand
+                    && basedpython_float_constant(&attr.attr).is_some()
+                    && let ast::Expr::Name(name) = &*attr.value
+                    && name.id.as_str() == "float"
+                {
+                    let inner = self.infer_type_expression(&unary.operand);
+                    if let Type::LiteralValue(literal) = inner
+                        && let LiteralValueTypeKind::Float(value) = literal.kind()
+                    {
+                        return Type::unpromotable_float_literal(-value.as_f64());
+                    }
+                    // shape matched but `float` was shadowed — `inner` is
+                    // already inferred and stored, so report without re-running
+                    // value inference on the operand
+                    self.report_invalid_type_expression(
+                        expression,
+                        format_args!(
+                            "Unary operations are not allowed in {}s",
+                            self.type_expression_context()
+                        ),
+                    );
+                    return Type::unknown();
+                }
+                // basedpython: `T?` in type position is the optional type
+                // `T | None`. a nested optional (`T??`) cannot collapse into a
+                // union (the outer- and inner-`None` states would merge), so
+                // each extra layer wraps the inner type in `WrappedOptional` —
+                // and `?` over a *bare type variable* is wrapped too
+                // (`WrappedOptional(T | None)`), because specializing a plain
+                // `T | None` with an optional `T` would flatten the layer
+                // (`f[T](t: T) -> T?` called with `int | None` must yield
+                // `int??`, not `int | None`). a generic optional's values are
+                // therefore constructed with `Some(…)` / `None`, matching the
+                // wrapped runtime convention regardless of what `T` binds to
+                if matches!(unary.op, ast::UnaryOp::Optional) && self.is_basedpython_file() {
+                    let inner = self.infer_type_expression(&unary.operand);
+                    let operand_is_optional = matches!(
+                        &*unary.operand,
+                        ast::Expr::UnaryOp(operand)
+                            if matches!(operand.op, ast::UnaryOp::Optional)
+                    );
+                    if operand_is_optional {
+                        return Type::KnownInstance(KnownInstanceType::WrappedOptional(
+                            InternedType::new(self.db(), inner),
+                        ));
+                    }
+                    let decomposition = UnionType::from_elements_leave_aliases(
+                        self.db(),
+                        [inner, Type::none(self.db())],
+                    );
+                    if matches!(inner, Type::TypeVar(_)) {
+                        return Type::KnownInstance(KnownInstanceType::WrappedOptional(
+                            InternedType::new(self.db(), decomposition),
+                        ));
+                    }
+                    return decomposition;
+                }
+                // basedpython: a unary numeric operation in a type expression,
+                // e.g. `-3` → `Literal[-3]` or `~0` → `Literal[-1]`. evaluate the
+                // operand as a type and apply the operator with the same unary
+                // logic ty uses for value expressions, mirroring the symbolic
+                // binary-operation handling above
+                if self.is_basedpython_file()
+                    && matches!(
+                        unary.op,
+                        ast::UnaryOp::USub | ast::UnaryOp::UAdd | ast::UnaryOp::Invert
+                    )
+                {
+                    let operand_ty = self.infer_type_expression(&unary.operand);
+                    return self.infer_unary_expression_type(unary.op, operand_ty, unary);
                 }
                 if !self.in_string_annotation() {
                     self.infer_unary_expression(unary);
@@ -2015,6 +2145,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.into_diagnostic(format_args!(
                             "`{ty}` is not a generic class",
                             ty = ty.inner(self.db()).display(self.db())
+                        ));
+                    }
+                    Type::unknown()
+                }
+                KnownInstanceType::WrappedOptional(_) => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "a wrapped optional cannot be specialized",
                         ));
                     }
                     Type::unknown()
@@ -3482,6 +3623,16 @@ struct VarianceSliceElement<'ast> {
     /// expression inside the marker; for non-marker elements the element
     /// itself.
     inner: &'ast ast::Expr,
+}
+
+/// basedpython: map the attribute name of `float.inf` / `float.nan` to its
+/// `f64` value, or `None` for any other attribute
+fn basedpython_float_constant(attr: &ast::Identifier) -> Option<f64> {
+    match attr.as_str() {
+        "inf" => Some(f64::INFINITY),
+        "nan" => Some(f64::NAN),
+        _ => None,
+    }
 }
 
 /// If `slice` contains at least one use-site variance marker, return the

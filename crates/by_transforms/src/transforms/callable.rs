@@ -23,10 +23,11 @@ use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{Expr, ExprCallableType, Operator, Stmt};
+use ruff_python_ast::{Expr, ExprCallableType, Operator, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use super::ast_driver::{PassContext, TypeAwarePass};
+use super::wrapped_runtime::OPTIONAL_RUNTIME;
 use crate::type_info::TypeInfo;
 
 #[expect(
@@ -36,11 +37,18 @@ use crate::type_info::TypeInfo;
 pub(crate) struct CallableSyntax<'src> {
     source: &'src str,
     types: Option<&'src (dyn TypeInfo + 'src)>,
+    /// ranges already folded by `symbolic_type_op` (e.g. `1 + typeof d` →
+    /// `Literal[3]`). a claimed sub-expression is opaque here: descending into
+    /// it would re-render its `typeof`/operator surface and the wider edit
+    /// would clobber the fold, so `rewrite` leaves it for the fold's own edit
+    claimed_ranges: &'src [TextRange],
     pub(crate) edits: Vec<Fix>,
     pub(crate) needs_import: bool,
     pub(crate) needs_protocol_import: bool,
     pub(crate) needs_intersection_import: bool,
     pub(crate) needs_typeof_import: bool,
+    pub(crate) needs_not_import: bool,
+    pub(crate) needs_optional_runtime: bool,
     /// shape → synthesized class name. used to dedupe identical
     /// non-denotable callable shapes
     protocol_shapes: HashMap<ProtocolShape, String>,
@@ -61,11 +69,14 @@ impl<'src> CallableSyntax<'src> {
         Self {
             source,
             types: None,
+            claimed_ranges: &[],
             edits: Vec::new(),
             needs_import: false,
             needs_protocol_import: false,
             needs_intersection_import: false,
             needs_typeof_import: false,
+            needs_not_import: false,
+            needs_optional_runtime: false,
             protocol_shapes: HashMap::new(),
             protocol_class_defs: String::new(),
         }
@@ -73,6 +84,11 @@ impl<'src> CallableSyntax<'src> {
 
     pub(crate) fn with_types(mut self, types: &'src dyn TypeInfo) -> Self {
         self.types = Some(types);
+        self
+    }
+
+    pub(crate) fn with_claimed_ranges(mut self, claimed: &'src [TextRange]) -> Self {
+        self.claimed_ranges = claimed;
         self
     }
 
@@ -223,6 +239,12 @@ impl<'src> CallableSyntax<'src> {
     }
 
     pub(crate) fn rewrite(&mut self, expr: &Expr) -> Option<String> {
+        // a symbolic-fold-claimed sub-expression is opaque: the fold emits its
+        // own edit over this exact range, so re-rendering here (and clobbering
+        // it with a wider edit) must not happen
+        if self.claimed_ranges.contains(&expr.range()) {
+            return None;
+        }
         match expr {
             Expr::CallableType(ct) if self.is_non_denotable(ct) => {
                 self.needs_protocol_import = true;
@@ -277,6 +299,40 @@ impl<'src> CallableSyntax<'src> {
                     })
                     .collect();
                 Some(format!("Intersection[{}]", rendered.join(", ")))
+            }
+
+            // `not T` → `Not[T]`
+            Expr::UnaryOp(u) if matches!(u.op, UnaryOp::Not) => {
+                self.needs_not_import = true;
+                let inner = self
+                    .rewrite(&u.operand)
+                    .unwrap_or_else(|| self.src(u.operand.range()).to_owned());
+                Some(format!("Not[{inner}]"))
+            }
+
+            // `T?` → `T | None` (and nested `T??` → `Optional[T | None]`), so the
+            // optional composes when it sits inside a callable-arrow arg/return
+            Expr::UnaryOp(u) if matches!(u.op, UnaryOp::Optional) => {
+                let mut depth: usize = 1;
+                let mut inner: &Expr = u.operand.as_ref();
+                while let Expr::UnaryOp(u2) = inner {
+                    if u2.op != UnaryOp::Optional {
+                        break;
+                    }
+                    depth += 1;
+                    inner = u2.operand.as_ref();
+                }
+                let inner_str = self
+                    .rewrite(inner)
+                    .unwrap_or_else(|| self.src(inner.range()).to_owned());
+                if depth >= 2 {
+                    self.needs_optional_runtime = true;
+                }
+                Some(format!(
+                    "{}{inner_str} | None{}",
+                    "Optional[".repeat(depth - 1),
+                    "]".repeat(depth - 1)
+                ))
             }
 
             Expr::BinOp(b) => {
@@ -419,6 +475,17 @@ impl crate::transforms::type_expr_walker::TypeExprVisitor for CallableSyntax<'_>
         if synthetic_let_slice(expr).is_some() {
             return crate::transforms::type_expr_walker::Recurse::Descend;
         }
+        // a bare top-level optional (`int?`, `int??`) is owned by
+        // `optional_type`, which emits narrow edits (a zero-width `Optional[`
+        // insertion for nested layers). our whole-range rewrite would collide
+        // with that insertion at the shared start offset. descend instead so a
+        // callable nested inside the operand is still lowered, while the `?`
+        // layers stay with their dedicated pass. (an optional *inside* a
+        // callable arg/return is handled by `rewrite`'s recursion, where the
+        // callable's wider edit cleanly subsumes the optional's narrow ones.)
+        if matches!(expr, Expr::UnaryOp(u) if u.op == UnaryOp::Optional) {
+            return crate::transforms::type_expr_walker::Recurse::Descend;
+        }
         // `rewrite` is a deep recursive rewriter that produces a single
         // replacement for the whole expression. emit the edit and stop
         if let Some(rewrite) = self.rewrite(expr) {
@@ -467,8 +534,18 @@ impl<'ast> ruff_python_ast::visitor::Visitor<'ast> for ValueCallableWalker<'_, '
 
 impl TypeAwarePass for CallableSyntaxPass<'_> {
     fn run(&self, stmts: &[Stmt], types: &dyn TypeInfo, ctx: &mut PassContext) {
-        let mut inner = CallableSyntax::new(self.source).with_types(types);
-        crate::transforms::type_expr_walker::walk_type_positions(stmts, Some(types), &mut inner);
+        // owned copy so `inner`'s borrow doesn't pin `ctx` against the mutable
+        // `required_imports` / `edits` uses below
+        let claimed = ctx.claimed_type_op_ranges.clone();
+        let mut inner = CallableSyntax::new(self.source)
+            .with_types(types)
+            .with_claimed_ranges(&claimed);
+        crate::transforms::type_expr_walker::walk_type_positions_skipping(
+            stmts,
+            Some(types),
+            &ctx.claimed_type_op_ranges,
+            &mut inner,
+        );
         // also lower callable types appearing in value positions; duplicate
         // edits over type-position callables dedup in the splice
         {
@@ -492,6 +569,13 @@ impl TypeAwarePass for CallableSyntaxPass<'_> {
         if inner.needs_typeof_import {
             ctx.required_imports
                 .push("from ty_extensions import TypeOf".to_owned());
+        }
+        if inner.needs_not_import {
+            ctx.required_imports
+                .push("from ty_extensions import Not".to_owned());
+        }
+        if inner.needs_optional_runtime {
+            ctx.required_imports.push(OPTIONAL_RUNTIME.to_owned());
         }
         let defs = inner.class_defs().to_owned();
         for fix in inner.edits {
@@ -587,6 +671,19 @@ mod tests {
             indoc! {"
                 from typing import Callable
                 a: Callable[[int], int] | None
+            "},
+        );
+    }
+
+    /// an optional `?` on a callable arg lowers inside the `Callable[...]`
+    /// rendering — the callable's whole-range edit subsumes `optional_type`'s
+    #[test]
+    fn callable_arg_optional() {
+        check(
+            "a: (int?) -> int\n",
+            indoc! {"
+                from typing import Callable
+                a: Callable[[int | None], int]
             "},
         );
     }

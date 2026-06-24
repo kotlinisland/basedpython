@@ -128,10 +128,12 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SHADOWED_TYPE_VARIABLE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&SUBCLASS_OF_SEALED_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&OVERRIDE_OF_FINAL_VARIABLE);
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_ON_NON_METHOD);
+    registry.register_lint(&FINAL_ON_VARIABLE);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
@@ -2310,6 +2312,32 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for classes that subclass a basedpython `sealed` class from outside
+    /// the workspace in which the sealed class is defined.
+    ///
+    /// ## Why is this bad?
+    /// A `sealed` class declares a closed set of subclasses. It may be subclassed
+    /// freely from anywhere within its own workspace, but not from a dependency,
+    /// so that the set of subclasses is fully known.
+    ///
+    /// ## Example
+    ///
+    /// ```by
+    /// # in a dependency:
+    /// sealed class Shape
+    ///
+    /// # in your workspace:
+    /// class Circle(Shape): ...  # error: `Shape` is sealed in another workspace
+    /// ```
+    pub(crate) static SUBCLASS_OF_SEALED_CLASS = {
+        summary: "detects subclasses of sealed classes from outside their workspace",
+        status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for classes that inherit from a dataclass with `order=True`.
     ///
     /// ## Why is this bad?
@@ -2452,6 +2480,35 @@ declare_lint! {
     pub(crate) static FINAL_ON_NON_METHOD = {
         summary: "detects `@final` applied to non-method functions",
         status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the basedpython `final` modifier applied to a bare variable
+    /// assignment outside of a class body, e.g. `final a = 1`.
+    ///
+    /// ## Why is this bad?
+    /// `final` is a class/method modifier. On a bare assignment it lowers to a
+    /// plain assignment and makes the variable no more final than before, so it
+    /// is almost certainly a mistake. A final variable is declared with `let`,
+    /// which lowers to `Final`.
+    ///
+    /// `final override` is a legitimate assignment marker and is not flagged.
+    ///
+    /// ## Example
+    ///
+    /// ```by
+    /// # Error: `final` on a variable has no effect
+    /// final a = 1
+    ///
+    /// # Correct: `let` declares a final variable
+    /// let a = 1
+    /// ```
+    pub(crate) static FINAL_ON_VARIABLE = {
+        summary: "detects the `final` modifier on a bare variable assignment",
+        status: LintStatus::stable("0.0.40"),
         default_level: Level::Error,
     }
 }

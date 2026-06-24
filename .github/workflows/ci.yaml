@@ -306,7 +306,10 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-    timeout-minutes: 20
+    # the basedpython divergence harness transpiles + runs every mdtest block
+    # through a subprocess and provisions python via uv, so the full pipeline
+    # (tests + doctests + dogfood + docs) runs longer than the upstream 20m
+    timeout-minutes: 30
     env:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only

@@ -10,7 +10,8 @@ pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
+    ExpandedClassBaseEntry, StaticClassLiteral, based_enum_unit_member_names,
+    based_enum_variant_union, expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
@@ -564,6 +565,17 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// basedpython: returns whether this class is declared `sealed`.
+    pub(crate) fn is_sealed(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static(class) => class.is_sealed(db),
+            Self::Dynamic(_)
+            | Self::DynamicEnum(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicTypedDict(_) => false,
+        }
+    }
+
     /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
     /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
     /// synthesis is valid.
@@ -1063,6 +1075,11 @@ impl<'db> ClassType<'db> {
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_final(db)
+    }
+
+    /// basedpython: is this class declared `sealed`?
+    pub(crate) fn is_sealed(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).is_sealed(db)
     }
 
     /// Returns a map of methods on this class that were defined as abstract on a superclass

@@ -51,21 +51,21 @@ use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
-    GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
-    INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
-    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_type_checking_constant,
+    FINAL_ON_VARIABLE, GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
+    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
+    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_bad_dunder_set_call,
+    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -4319,6 +4319,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(inferred_ty),
             );
             return;
+        }
+
+        // basedpython: a bare `final` modifier on an assignment (`final a = 1`)
+        // lowers to a plain assignment and leaves the variable no more final
+        // than before — the user almost certainly meant `let`. `final override`
+        // is a real marker, so only fire when `override` is absent. inside a
+        // class body a bare `final` assignment is a plain attribute, matching
+        // `let`-in-class, so restrict this to non-class scopes.
+        if let ast::Expr::Name(ann_name) = annotation
+            && ann_name.id.as_str() == "__modifier_assign__"
+            && let ast::Expr::Name(target_name) = target
+            && self
+                .index
+                .scope(self.scope().file_scope_id(self.db()))
+                .kind()
+                != ScopeKind::Class
+        {
+            let source = source_text(self.db(), self.file());
+            let modifiers = &source[ann_name.range()];
+            let has_final = modifiers.split_whitespace().any(|kw| kw == "final");
+            let has_override = modifiers.split_whitespace().any(|kw| kw == "override");
+            if has_final
+                && !has_override
+                && let Some(builder) = self.context.report_lint(&FINAL_ON_VARIABLE, ann_name)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "`final` on variable `{name}` has no effect; use `let` instead",
+                    name = target_name.id
+                ));
+                diagnostic.info("a final variable is declared with `let`, which lowers to `Final`");
+            }
         }
 
         let mut declared = self.infer_annotation_expression_allow_pep_613(
@@ -8893,6 +8924,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             value,
+            postfix: _,
         } = await_expression;
 
         let expr_type = self.infer_expression(
@@ -9096,6 +9128,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if self.is_basedpython_file() && is_basedpython_implicit_typing_name(symbol_name) {
                     typing_symbol(db, symbol_name)
                         .or_fall_back_to(db, || typing_extensions_symbol(db, symbol_name))
+                } else {
+                    Place::Undefined.into()
+                }
+            })
+            // basedpython only: `dynamic` is the surface spelling of
+            // `typing.Any` in a type expression, lowered to `Any` by the
+            // transpiler. resolve the bare keyword to the `Any` special form so
+            // type checking matches. gated on type-expression position so a
+            // value-position `dynamic` stays an ordinary identifier; only
+            // reached when otherwise unbound, so a local `dynamic = …` binding
+            // still shadows it
+            .or_fall_back_to(db, || {
+                if self.is_basedpython_file()
+                    && symbol_name == "dynamic"
+                    && self
+                        .inference_flags()
+                        .contains(InferenceFlags::IN_TYPE_EXPRESSION)
+                {
+                    typing_symbol(db, "Any")
+                } else {
+                    Place::Undefined.into()
+                }
+            })
+            // basedpython only: `Some` is the present-case optional constructor.
+            // It has no runtime definition in real Python — the transpiler lowers
+            // `Some(x)` to the injected `Optional(x)` wrapper — so it's resolved
+            // magically here rather than via a typeshed stub. Only reached when
+            // otherwise unbound, so a local `Some = …` binding still shadows it.
+            // It takes exactly one value (so `Some()` / `Some(1, 2)` are arity
+            // errors) and produces the wrapped optional of that value's type
+            .or_fall_back_to(db, || {
+                if self.is_basedpython_file() && symbol_name == "Some" {
+                    let value_typevar = BoundTypeVarInstance::synthetic(
+                        db,
+                        Name::new_static("_SomeT"),
+                        TypeVarVariance::Covariant,
+                    );
+                    let value_ty = Type::TypeVar(value_typevar);
+                    let value = Parameter::positional_only(Some(Name::new_static("value")))
+                        .with_annotated_type(value_ty);
+                    let signature = Signature::new_generic(
+                        Some(GenericContext::from_typevar_instances(db, [value_typevar])),
+                        Parameters::new(db, [value]),
+                        Type::KnownInstance(KnownInstanceType::WrappedOptional(InternedType::new(
+                            db, value_ty,
+                        ))),
+                    );
+                    Place::bound(Type::single_callable(db, signature)).into()
                 } else {
                     Place::Undefined.into()
                 }
@@ -9722,6 +9802,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // performed the narrowing so we know to re-add None
         let mut none_chain_was_optional = false;
         if self.is_basedpython_file() && attribute.optional {
+            // a wrapped optional's present value is its inner type — peel the
+            // wrapper before the lookup (the runtime reads `.value`); the
+            // wrapper's absent outer state short-circuits to `None`
+            if let Type::KnownInstance(KnownInstanceType::WrappedOptional(inner)) = value_type {
+                value_type = inner.inner(db);
+                none_chain_was_optional = true;
+            }
             let none = Type::none(db);
             let narrowed = match value_type {
                 Type::Union(u) => u.map(db, |elem| {
@@ -10133,6 +10220,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::UnaryOp::Not => {
                     unreachable!("Not operator is handled in its own case");
                 }
+                ast::UnaryOp::Optional | ast::UnaryOp::Propagate | ast::UnaryOp::Force => {
+                    unreachable!("basedpython postfix operators are handled in their own case");
+                }
             };
 
             match operand_type.try_call_dunder(
@@ -10162,6 +10252,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
+            }
+
+            // basedpython postfix `!` force-unwrap and `^` propagate both peel
+            // one absent layer. On a `WrappedOptional` they yield the wrapped
+            // inner type; on a union they strip the absent arms — `None` for an
+            // optional (`T | None`) and any `BaseException` subtype for a
+            // result-like union (`int | TypeError`) — leaving the present value
+            (
+                ast::UnaryOp::Force | ast::UnaryOp::Propagate,
+                Type::KnownInstance(KnownInstanceType::WrappedOptional(inner)),
+            ) => inner.inner(self.db()),
+            (ast::UnaryOp::Force | ast::UnaryOp::Propagate, Type::Union(union)) => {
+                let none = Type::none(self.db());
+                let base_exception = KnownClass::BaseException.to_instance(self.db());
+                let is_absent = |element: Type<'db>| {
+                    element == none
+                        || (!element.is_dynamic()
+                            && element.is_subtype_of(self.db(), base_exception))
+                };
+                let present: Vec<Type<'db>> = union
+                    .elements(self.db())
+                    .iter()
+                    .copied()
+                    .filter(|element| !is_absent(*element))
+                    .collect();
+                if present.len() == union.elements(self.db()).len() {
+                    // nothing to unwrap — unwrap of a non-optional union
+                    todo_type!("basedpython unwrap of non-optional")
+                } else {
+                    UnionType::from_elements(self.db(), present)
+                }
+            }
+
+            // basedpython postfix `?` and `^` / `!` on non-optional operands.
+            // These are wrapped-type surface syntax that the transpiler lowers
+            // away; ty does not yet model the remaining unwrap/propagate cases
+            (ast::UnaryOp::Optional | ast::UnaryOp::Propagate | ast::UnaryOp::Force, _) => {
+                todo_type!("basedpython wrapped-type operator")
             }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
@@ -10223,6 +10351,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ast::UnaryOp::UAdd => "__pos__",
                     ast::UnaryOp::USub => "__neg__",
                     ast::UnaryOp::Not => unreachable!(),
+                    ast::UnaryOp::Optional | ast::UnaryOp::Propagate | ast::UnaryOp::Force => {
+                        unreachable!()
+                    }
                 };
 
                 match tvar.typevar(self.db()).bound_or_constraints(self.db()) {

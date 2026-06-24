@@ -35,11 +35,13 @@ use ruff_text_size::{Ranged, TextRange};
 
 use super::{
     annotation, anon_named_tuple, auto_quote, callable, cast, coalesce, coalesce_chain, compat,
-    decl_site_variance, decorator_keyword, dedent_string, empty_declarations, generic_call,
-    generics, identity_swap, implicit_typing, init_method, intersection, just_float, kw_subscript,
-    literal_types, modifiers, mutable_defaults, none_chain, not_type, overload,
-    repeated_underscore, sentinel, super_keyword, top_star, tuple_index, type_is,
-    typed_dict_literal, typed_lambda, typeof_keyword, unpack, use_site_variance,
+    decl_site_variance, decorator_keyword, dedent_string, dynamic_keyword, empty_declarations,
+    float_const, force_unwrap, generic_call, generics, identity_swap, implicit_typing, init_method,
+    intersection, just_float, kw_subscript, literal_types, main_function, modifiers,
+    mutable_defaults, none_chain, not_type, optional_type, overload, postfix_await, propagate,
+    repeated_underscore, sentinel, some_ctor, super_keyword, symbolic_type_op, top_star,
+    tuple_index, type_is, typed_dict_literal, typed_lambda, typeof_keyword, unpack,
+    use_site_variance,
 };
 use crate::Config;
 use crate::type_info::TypeInfo;
@@ -51,6 +53,16 @@ use crate::type_info::TypeInfo;
 enum SemDb<'p> {
     Project(&'p dyn ty_python_semantic::Db, ruff_db::files::File),
     Local(ty_project::TestDb, ruff_db::files::File),
+}
+
+/// One fragment of a [`PassContext::template_edits`] replacement: literal text,
+/// or a passthrough span of original source. Passthrough spans are materialized
+/// with any sibling edits inside them applied, so a wide rewrite (e.g.
+/// `a ?? b` → `a if a is not None else b`) composes with lowerings inside its
+/// operands instead of clobbering them via first-wins overlap dedup
+pub(crate) enum Fragment {
+    Lit(String),
+    Src(TextRange),
 }
 
 /// Mutable state shared across every pass during a single transpile.
@@ -76,6 +88,12 @@ pub(crate) struct PassContext {
     /// surrounding context contains basedpython markers a sibling pass
     /// hasn't lowered yet
     pub(crate) text_edits: Vec<(TextRange, String)>,
+    /// Structured sub-statement edits whose replacement is a [`Fragment`] list.
+    /// Unlike `text_edits` (whose plain string wins over anything nested inside
+    /// it), the `Src` passthrough spans of a template are materialized with the
+    /// sibling edits they contain applied — use this for any rewrite that
+    /// re-emits operand source
+    pub(crate) template_edits: Vec<(TextRange, Vec<Fragment>)>,
     /// Hard transpile errors a pass surfaced — abort the pipeline rather
     /// than emit partial / invalid output. Each entry is a human-readable
     /// message suitable for showing the user
@@ -83,6 +101,11 @@ pub(crate) struct PassContext {
     /// Lines to append AFTER the spliced body (e.g. modifiers' auto-
     /// generated `__all__ = [...]`). Driver emits each as its own line
     pub(crate) epilogue: Vec<String>,
+    /// Source ranges of operations that `symbolic_type_op` resolved up front
+    /// (e.g. `1 + 1` → `Literal[2]`). Type-aware passes skip these via
+    /// [`walk_type_positions_skipping`](super::type_expr_walker::walk_type_positions_skipping)
+    /// so they don't re-process an operation that no longer appears in the output
+    pub(crate) claimed_type_op_ranges: Vec<TextRange>,
 }
 
 /// A single AST-level rewrite pass.
@@ -148,6 +171,83 @@ pub(crate) fn render_expr(expr: &Expr) -> String {
     Generator::new(&indent, LineEnding::Lf)
         .with_mode(Mode::BasedPython)
         .expr(expr)
+}
+
+/// A sub-statement edit's replacement: plain text, or a template whose `Src`
+/// passthrough spans compose with nested edits.
+enum SubPatch {
+    Text(String),
+    Template(Vec<Fragment>),
+}
+
+/// Materialize a template's fragments into `out`. `Src` passthrough spans are
+/// emitted from original source with the contained sub-edits (indices into
+/// `all`) applied.
+fn materialize_fragments(
+    out: &mut String,
+    frags: &[Fragment],
+    source: &str,
+    all: &[(usize, usize, SubPatch)],
+    contained: &[usize],
+) {
+    for frag in frags {
+        match frag {
+            Fragment::Lit(s) => out.push_str(s),
+            Fragment::Src(span) => {
+                apply_within(
+                    out,
+                    source,
+                    usize::from(span.start()),
+                    usize::from(span.end()),
+                    all,
+                    contained,
+                );
+            }
+        }
+    }
+}
+
+/// Emit `source[s0..e0]` with the edits from `contained` (indices into `all`,
+/// in position order) that fall inside the span applied, first-wins on
+/// overlap. Nested templates recurse; a same-start insertion at depth ≥ 2 is
+/// emitted ahead of its nested template rather than absorbed into it (only the
+/// top-level claim pass implements absorption — no current pass nests
+/// templates, so the simpler rule suffices here).
+fn apply_within(
+    out: &mut String,
+    source: &str,
+    s0: usize,
+    e0: usize,
+    all: &[(usize, usize, SubPatch)],
+    contained: &[usize],
+) {
+    let mut cursor = s0;
+    let mut k = 0;
+    while k < contained.len() {
+        let idx = contained[k];
+        let (s, e) = (all[idx].0, all[idx].1);
+        // outside this span, a boundary insertion at its end, or overlapping
+        // an already-applied edit — skip
+        if s < cursor || s < s0 || e > e0 || (s == e && s == e0) {
+            k += 1;
+            continue;
+        }
+        out.push_str(&source[cursor..s]);
+        match &all[idx].2 {
+            SubPatch::Text(t) => out.push_str(t),
+            SubPatch::Template(frags) => {
+                let inner: Vec<usize> = contained[k + 1..]
+                    .iter()
+                    .copied()
+                    .filter(|&m| all[m].0 >= s && all[m].1 <= e && all[m].0 != e)
+                    .collect();
+                materialize_fragments(out, frags, source, all, &inner);
+            }
+        }
+        cursor = cursor.max(e);
+        k += 1;
+    }
+    out.push_str(&source[cursor..e0]);
 }
 
 /// Coalesce repeated `from <module> import X` lines into a single
@@ -285,14 +385,18 @@ pub(crate) fn run_against_source<'a>(
         text_edits: RefCell::new(vec![]),
     };
 
-    let tuple_index_inner = tuple_index::TupleIndex::new();
-    let tuple_index_pass = VisitorPass {
-        inner: &tuple_index_inner,
-        changed_cell: tuple_index_inner.changed_cell(),
-        imports: vec![],
-        hoist: RefCell::new(vec![]),
-        text_edits: RefCell::new(vec![]),
-    };
+    // resolve symbolic operations in type positions (`1 + 1` → `Literal[2]`)
+    // up front, from the original parse where `typeof` operands are still
+    // intact for ty to read. the pass replaces each operation node and must run
+    // before `typeof` lowering so a `typeof` operand is consumed here
+    let symbolic_folds =
+        symbolic_type_op::collect_symbolic_folds(parsed_handle.suite(), &semantic_model);
+    let symbolic_needs_literal_import = symbolic_folds.needs_literal_import;
+    let symbolic_needs_any_import = symbolic_folds.needs_any_import;
+    ctx.claimed_type_op_ranges = symbolic_folds.claimed_ranges();
+    let symbolic_pass = symbolic_type_op::SymbolicTypeOp::new(symbolic_folds);
+
+    let tuple_index_pass = tuple_index::TupleIndexPass::new();
 
     let sentinel_inner = sentinel::Sentinel::new();
     let sentinel_pass = VisitorPass {
@@ -312,7 +416,7 @@ pub(crate) fn run_against_source<'a>(
         text_edits: RefCell::new(vec![]),
     };
 
-    let typed_lambda_inner = typed_lambda::TypedLambda::new();
+    let typed_lambda_inner = typed_lambda::TypedLambda::new(source_ref);
     let typed_lambda_pass = VisitorPass {
         inner: &typed_lambda_inner,
         changed_cell: typed_lambda_inner.changed_cell(),
@@ -323,13 +427,15 @@ pub(crate) fn run_against_source<'a>(
 
     let not_type_pass = not_type::NotType::new();
     let intersection_pass = intersection::IntersectionType::new();
+    let dynamic_keyword_pass = dynamic_keyword::DynamicKeywordPass::new();
     let type_is_pass = type_is::TypeIs::new();
     let top_star_pass = top_star::TopStar::new();
     let identity_swap_pass = identity_swap::IdentitySwap::new(source_ref);
     let compat_pass = compat::CompatRewrite::new(source_ref, config.clone());
     let dedent_string_pass = dedent_string::DedentString::new(source_ref);
     let super_keyword_pass = super_keyword::SuperKeyword::new();
-    let mutable_defaults_pass = mutable_defaults::MutableDefaults::new();
+    let postfix_await_pass = postfix_await::PostfixAwait::new(source_ref);
+    let mutable_defaults_pass = mutable_defaults::MutableDefaultsPass::new(source_ref);
     let auto_quote_pass = auto_quote::AutoQuote::new(
         source_ref,
         config.min_version,
@@ -337,12 +443,14 @@ pub(crate) fn run_against_source<'a>(
     );
     let init_method_pass = init_method::InitMethod::new(source_ref);
     let modifiers_pass = modifiers::ModifiersPass::new(source_ref);
+    let main_function_pass = main_function::MainFunction::new(source_ref, config.is_stub);
     let empty_declarations_pass = empty_declarations::EmptyDeclarations::new();
     let overload_pass = overload::Overload::new(source_ref, config.is_stub);
     let decorator_keyword_pass = decorator_keyword::DecoratorKeyword::new(source_ref);
     let unpack_pass = unpack::UnpackSyntax::new(config.clone());
     let typed_dict_literal_pass = typed_dict_literal::TypedDictLiteralPass::new(source_ref);
     let just_float_pass = just_float::JustFloatPass::new();
+    let float_const_pass = float_const::FloatConstPass::new();
     let kw_subscript_pass = kw_subscript::KwSubscriptPass::new(source_ref);
     let generic_call_pass = generic_call::GenericCallStripPass::new(source_ref);
     let implicit_typing_pass = implicit_typing::ImplicitTypingPass::new();
@@ -350,7 +458,11 @@ pub(crate) fn run_against_source<'a>(
     let literal_types_pass = literal_types::LiteralTypePass::new(source_ref);
     let callable_pass = callable::CallableSyntaxPass::new(source_ref);
     let coalesce_text_pass = coalesce::NoneCoalescePass::new(source_ref);
+    let force_unwrap_pass = force_unwrap::ForceUnwrapPass::new(source_ref);
+    let some_ctor_pass = some_ctor::SomeCtorPass::new();
+    let propagate_pass = propagate::PropagatePass::new(source_ref);
     let none_chain_pass = none_chain::NoneChainPass::new(source_ref);
+    let optional_type_pass = optional_type::OptionalTypePass::new(source_ref);
     let generics_pass = generics::GenericPolyfillPass::new(source_ref, config.clone());
     let variance_pass = decl_site_variance::VarianceStripPass::new();
     let anon_named_tuple_pass =
@@ -373,23 +485,31 @@ pub(crate) fn run_against_source<'a>(
         &compat_pass,
         &dedent_string_pass,
         &super_keyword_pass,
+        &postfix_await_pass,
         &auto_quote_pass,
         &init_method_pass,
         &modifiers_pass,
+        // after modifiers so the entry-point guard follows any `__all__` it
+        // emits, and before the AST-mutation passes so `main`'s decorator
+        // ranges are still valid for the `private` check
+        &main_function_pass,
         &empty_declarations_pass,
         &overload_pass,
         &decorator_keyword_pass,
         &unpack_pass,
         &typed_dict_literal_pass,
-        // AST-mutation passes second (may zero node ranges)
+        // AST-mutation passes second (may zero node ranges).
+        // symbolic_type_op replaces whole operation nodes (consuming any
+        // `typeof` operand) and reads original source ranges, so it must run
+        // first among the mutation passes — before `typeof` and before any
+        // pass that zeroes ranges
+        &symbolic_pass,
         &coalesce_pass,
         &cast_pass,
         &typeof_pass,
-        &tuple_index_pass,
         &sentinel_pass,
         &repeated_underscore_pass,
         &typed_lambda_pass,
-        &mutable_defaults_pass,
     ];
     for pass in passes {
         pass.run(&mut module, &mut ctx);
@@ -400,17 +520,34 @@ pub(crate) fn run_against_source<'a>(
     let type_aware: &[&dyn TypeAwarePass] = &[
         &not_type_pass,
         &intersection_pass,
+        &dynamic_keyword_pass,
         &just_float_pass,
+        &float_const_pass,
         &kw_subscript_pass,
         &generic_call_pass,
         &implicit_typing_pass,
         &tuple_types_pass,
         &literal_types_pass,
         &callable_pass,
+        // `T?` → `T | None`; a type-position edit, disjoint from the
+        // value-position `??` / `?.` lowerings below
+        &optional_type_pass,
         // coalesce sees `?.` LHS via source ranges; must run BEFORE
         // none_chain so its wider `??` edit wins over none_chain's narrow
         // `?.` edit when both target the same span
         &coalesce_text_pass,
+        // `expr!` → `_force_unwrap(expr)`; narrow insert/replace edits that compose
+        // with sibling operator lowerings inside the operand
+        &force_unwrap_pass,
+        // `expr.N` → `expr[N]`; a narrow replacement of the `.N` bytes only
+        &tuple_index_pass,
+        // mutable defaults → `_MISSING` sentinel swap + body-prologue guard;
+        // narrow edits, so the function body's own lowerings still apply
+        &mutable_defaults_pass,
+        // `Some(x)` → `Optional(x)`; a narrow identifier rename
+        &some_ctor_pass,
+        // `expr^` → guard hoisted before the enclosing statement + unwrapped value
+        &propagate_pass,
         &none_chain_pass,
         // generics emits wide replacements covering whole type-params
         // headers; variance's narrow def-site deletion gets dropped by
@@ -437,6 +574,18 @@ pub(crate) fn run_against_source<'a>(
         ctx.required_imports
             .push("from ty_extensions import TypeOf".to_owned());
     }
+    // symbolic folds that produced a `Literal[..]` need the import, unless the
+    // source already binds `Literal`
+    if symbolic_needs_literal_import && !literal_types::literal_already_imported(&semantic_model) {
+        ctx.required_imports
+            .push("from typing import Literal".to_owned());
+    }
+    // symbolic folds that produced `Any` (e.g. `dynamic + 1`) need the import,
+    // unless the source already binds `Any`
+    if symbolic_needs_any_import && !semantic_model.is_bound_globally("Any") {
+        ctx.required_imports
+            .push("from typing import Any".to_owned());
+    }
     if sentinel_inner.ever_changed() {
         ctx.required_imports
             .push("from typing_extensions import Sentinel".to_owned());
@@ -452,6 +601,7 @@ pub(crate) fn run_against_source<'a>(
         && ctx.required_imports.is_empty()
         && ctx.hoisted.is_empty()
         && ctx.text_edits.is_empty()
+        && ctx.template_edits.is_empty()
         && ctx.epilogue.is_empty()
     {
         let cow = match stripped {
@@ -478,8 +628,12 @@ pub(crate) fn run_against_source<'a>(
         all_idx.insert(*k);
     }
 
+    // only statements an AST pass actually re-rendered occupy their range —
+    // a hoist-only target keeps its original text (the hoists are emitted as a
+    // zero-width insertion before it), so sub-statement edits inside it still
+    // apply
     let occupied_ranges: Vec<(usize, usize)> =
-        all_idx.iter().map(|&i| original_ranges[i]).collect();
+        ctx.changed.iter().map(|&i| original_ranges[i]).collect();
     let overlaps = |start: usize, end: usize| -> bool {
         occupied_ranges.iter().any(|(s, e)| start < *e && *s < end)
     };
@@ -494,22 +648,6 @@ pub(crate) fn run_against_source<'a>(
         }
         .to_owned();
 
-        let stmt_text = if ctx.changed.binary_search(&idx).is_ok() {
-            let rendered = render_stmt(&original_body[idx]);
-            // render_stmt emits a trailing newline. drop it when the source
-            // already has one immediately after the stmt (avoids `\n\n`); keep
-            // it when the stmt is at end-of-file with no trailing newline so
-            // we don't lose multi-line structure
-            let source_has_trailing_newline = source_ref.as_bytes().get(end) == Some(&b'\n');
-            if source_has_trailing_newline {
-                rendered.trim_end_matches('\n').to_owned()
-            } else {
-                rendered
-            }
-        } else {
-            source_ref[start..end].to_owned()
-        };
-
         let mut block = String::new();
         if let Some(hoists) = hoisted_by_idx.remove(&idx) {
             for h in hoists {
@@ -519,27 +657,60 @@ pub(crate) fn run_against_source<'a>(
                 block.push_str(&line_indent);
             }
         }
-        block.push_str(&stmt_text);
-        edits.push((start, end, block));
+
+        if ctx.changed.binary_search(&idx).is_ok() {
+            let rendered = render_stmt(&original_body[idx]);
+            // render_stmt emits a trailing newline. drop it when the source
+            // already has one immediately after the stmt (avoids `\n\n`); keep
+            // it when the stmt is at end-of-file with no trailing newline so
+            // we don't lose multi-line structure
+            let source_has_trailing_newline = source_ref.as_bytes().get(end) == Some(&b'\n');
+            if source_has_trailing_newline {
+                block.push_str(rendered.trim_end_matches('\n'));
+            } else {
+                block.push_str(&rendered);
+            }
+            edits.push((start, end, block));
+        } else if !block.is_empty() {
+            // hoist-only: insert the hoisted lines before the statement and
+            // leave its source bytes (and any edits inside them) in place
+            edits.push((start, start, block));
+        }
     }
-    // ruff-style first-wins dedup for text_edits. sort by start; skip any
-    // edit whose start is before the running cursor (overlaps a prior edit)
-    // or which collides with a whole-statement splice. zero-width insertions
-    // (start == end) at the cursor are allowed — they consume no source bytes
-    // so multiple insertions + a deletion at the same position can compose
-    let mut sub_edits: Vec<(usize, usize, String)> = ctx
+    // ruff-style first-wins dedup for sub-statement edits. sort by start; skip
+    // any edit whose start is before the running cursor (overlaps a prior
+    // edit) or which collides with a whole-statement splice. zero-width
+    // insertions (start == end) at the cursor are allowed — they consume no
+    // source bytes so multiple insertions + a deletion at the same position
+    // can compose. a plain-text edit wins over anything nested inside it; a
+    // template edit instead *materializes* nested edits within its `Src`
+    // passthrough spans, so wide rewrites compose with inner lowerings
+    let mut sub_edits: Vec<(usize, usize, SubPatch)> = ctx
         .text_edits
         .into_iter()
-        .map(|(r, s)| (usize::from(r.start()), usize::from(r.end()), s))
+        .map(|(r, s)| {
+            (
+                usize::from(r.start()),
+                usize::from(r.end()),
+                SubPatch::Text(s),
+            )
+        })
+        .chain(ctx.template_edits.into_iter().map(|(r, frags)| {
+            (
+                usize::from(r.start()),
+                usize::from(r.end()),
+                SubPatch::Template(frags),
+            )
+        }))
         .collect();
     // start asc. tie-break by edit shape:
     //   1. zero-width insertions first — they don't consume bytes, so any
     //      following deletion/replacement at the same start can still apply
     //   2. then wider replacements before narrower ones — so a wider edit
-    //      wins over a narrow one nested inside it (ruff-style first-wins
-    //      overlap skip preserves the wider edit's intent)
+    //      wins over (or, for templates, absorbs) a narrow one nested inside
+    //      it
     sub_edits.sort_by(|a, b| {
-        let priority = |e: &(usize, usize, String)| {
+        let priority = |e: &(usize, usize, SubPatch)| {
             // (start, is_replacement_not_insertion, neg_end-for-wider-first)
             if e.1 == e.0 {
                 (e.0, 0i64, 0i64) // insertion
@@ -551,35 +722,123 @@ pub(crate) fn run_against_source<'a>(
         };
         priority(a).cmp(&priority(b))
     });
+    // claim pre-pass: each replacement, outermost-first (the sort guarantees an
+    // enclosing edit precedes anything inside it), claims the edits nested in
+    // its span. a template *materializes* its claimees inside its `Src` spans;
+    // a plain-text replacement drops them (first-wins). same-start zero-width
+    // insertions are absorbed by a template (they target the construct's first
+    // token, e.g. `_force_unwrap(` ahead of a coalesce operand) but stay
+    // independent ahead of a plain-text replacement, preserving the documented
+    // insertion + deletion compose behaviour
+    let mut claimed = vec![false; sub_edits.len()];
+    for i in 0..sub_edits.len() {
+        let (s_i, e_i) = (sub_edits[i].0, sub_edits[i].1);
+        if e_i == s_i || claimed[i] {
+            continue;
+        }
+        let is_template = matches!(sub_edits[i].2, SubPatch::Template(_));
+        for (m, edit) in sub_edits.iter().enumerate() {
+            if m == i || claimed[m] {
+                continue;
+            }
+            let (s_m, e_m) = (edit.0, edit.1);
+            let inside = s_m >= s_i && e_m <= e_i && s_m != e_i;
+            let boundary_insertion = s_m == e_m && (s_m == s_i || s_m == e_i);
+            if inside && (is_template || !boundary_insertion) {
+                claimed[m] = true;
+            }
+        }
+    }
+
+    let mut dropped_by_splice: Vec<(usize, usize)> = Vec::new();
     let mut cursor = 0usize;
     let mut i = 0;
     while i < sub_edits.len() {
-        let (start, end, repl) = sub_edits[i].clone();
-        if start < cursor || overlaps(start, end) {
+        if claimed[i] {
             i += 1;
             continue;
         }
-        // coalesce all zero-width insertions sharing this start into a
-        // single combined insertion (text concatenated in push order). this
+        let (start, end) = (sub_edits[i].0, sub_edits[i].1);
+        if start < cursor {
+            i += 1;
+            continue;
+        }
+        if overlaps(start, end) {
+            if end > start {
+                dropped_by_splice.push((start, end));
+            }
+            i += 1;
+            continue;
+        }
+        // coalesce all unclaimed zero-width insertions sharing this start into
+        // a single combined insertion (text concatenated in push order). this
         // sidesteps the replace_range-at-same-position ordering issue: each
         // pass pushes its slice in left-to-right intent order, and we
         // splice them as one contiguous string
         if end == start {
-            let mut combined = repl;
-            let mut j = i + 1;
+            let mut combined = String::new();
+            let mut j = i;
             while j < sub_edits.len() && sub_edits[j].0 == start && sub_edits[j].1 == start {
-                combined.push_str(&sub_edits[j].2);
+                if !claimed[j] {
+                    match &sub_edits[j].2 {
+                        SubPatch::Text(t) => combined.push_str(t),
+                        SubPatch::Template(frags) => {
+                            materialize_fragments(
+                                &mut combined,
+                                frags,
+                                source_ref,
+                                &sub_edits,
+                                &[],
+                            );
+                        }
+                    }
+                }
                 j += 1;
             }
             edits.push((start, start, combined));
             i = j;
             continue;
         }
-        if end > start {
-            cursor = end;
-        }
+        let repl = match &sub_edits[i].2 {
+            // a plain-text replacement wins over anything inside it
+            SubPatch::Text(t) => t.clone(),
+            SubPatch::Template(frags) => {
+                // the claimees nested in this span materialize inside the
+                // template's `Src` passthrough fragments
+                let contained: Vec<usize> = (0..sub_edits.len())
+                    .filter(|&m| {
+                        m != i
+                            && claimed[m]
+                            && sub_edits[m].0 >= start
+                            && sub_edits[m].1 <= end
+                            && sub_edits[m].0 != end
+                    })
+                    .collect();
+                let mut out = String::new();
+                materialize_fragments(&mut out, frags, source_ref, &sub_edits, &contained);
+                out
+            }
+        };
         edits.push((start, end, repl));
+        cursor = end;
         i += 1;
+    }
+
+    // composition invariant: an edit dropped because an AST pass re-rendered
+    // its enclosing statement is fine when the pass consumed the construct,
+    // but a leak when the re-render reprinted it. detect the leak precisely
+    // rather than letting it surface as a confusing syntax error downstream
+    for (start, end) in dropped_by_splice {
+        let construct = &source_ref[start..end];
+        let leaked = edits.iter().any(|(bs, be, btext)| {
+            *be > *bs && *bs <= start && end <= *be && btext.contains(construct)
+        });
+        if leaked {
+            let preview: String = construct.chars().take(40).collect();
+            ctx.errors.push(format!(
+                "transform conflict: `{preview}` was lowered by a sub-statement edit, but an AST pass re-rendered its enclosing statement and the construct leaked into the output"
+            ));
+        }
     }
     // line table for the spliced body, built from the ascending edit list
     // before the descending application sort consumes it. generated lines from
@@ -607,7 +866,17 @@ pub(crate) fn run_against_source<'a>(
             prefix.push_str(imp);
             prefix.push('\n');
         }
-        out.insert_str(0, &prefix);
+        // a `from __future__ import …` line must stay first (it's a syntax error
+        // anywhere else), so splice required imports in after it when present.
+        // every leading line here maps to `None`, so the order among them
+        // doesn't affect the line table built above
+        let future = "from __future__ import annotations\n";
+        let at = if out.starts_with(future) {
+            future.len()
+        } else {
+            0
+        };
+        out.insert_str(at, &prefix);
     }
     if !ctx.epilogue.is_empty() {
         if !out.ends_with('\n') {

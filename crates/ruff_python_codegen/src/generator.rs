@@ -2269,7 +2269,13 @@ if True:
     #[test_case::test_case("x = (a + b)!" ; "force parenthesises looser operand")]
     #[test_case::test_case("x = a?.b" ; "optional chain still works")]
     fn basedpython_wrapped_round_trip(contents: &str) {
-        assert_eq!(based_round_trip(contents), contents);
+        // `based_round_trip` emits the platform line ending, so normalise the
+        // expected value the same way (mirrors the other round-trip tests);
+        // otherwise the multi-line cases fail on windows (CRLF vs LF)
+        assert_eq!(
+            based_round_trip(contents),
+            contents.replace('\n', LineEnding::default().as_str())
+        );
     }
 
     /// infix bitwise-xor must NOT be swallowed by the postfix `^` operator
